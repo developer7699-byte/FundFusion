@@ -1,1 +1,1 @@
-# FundFusion it is a trading platform created in 2026
+# FundFusion 
