@@ -1,0 +1,536 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleName {
+  CUSTOMER
+  MERCHANT
+  ADMIN
+}
+
+enum UserStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum MerchantStatus {
+  APPLIED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  ACTIVE
+  INACTIVE
+}
+
+enum OtpPurpose {
+  REGISTER
+  LOGIN
+  RESET_PASSWORD
+  ADMIN_2FA
+}
+
+enum LedgerDirection {
+  DEBIT
+  CREDIT
+}
+
+enum LedgerAccountType {
+  AVAILABLE
+  LOCKED
+  PLATFORM_FEE
+  ESCROW
+  EXTERNAL
+}
+
+enum OrderStatus {
+  CREATED
+  FUNDS_LOCKED
+  MATCHING
+  SELLER_ASSIGNED
+  PAYMENT_PENDING
+  PAYMENT_SUBMITTED
+  VERIFICATION
+  COMPLETED
+  CANCELLED
+  EXPIRED
+  REFUND_PENDING
+  REFUNDED
+  DISPUTED
+  FAILED
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_FOR_USER
+  RESOLVED
+  CLOSED
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED_CUSTOMER
+  RESOLVED_MERCHANT
+  CLOSED
+}
+
+model Role {
+  id        String     @id @default(uuid())
+  name      RoleName   @unique
+  users     UserRole[]
+  createdAt DateTime   @default(now())
+}
+
+model User {
+  id               String         @id @default(uuid())
+  email            String         @unique
+  phone            String?        @unique
+  passwordHash     String
+  displayName      String
+  status           UserStatus     @default(PENDING_VERIFICATION)
+  emailVerifiedAt  DateTime?
+  lastLoginAt      DateTime?
+  failedLoginCount Int            @default(0)
+  deletedAt        DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  roles            UserRole[]
+  sessions         Session[]
+  otps             OtpChallenge[]
+  customer         CustomerProfile?
+  merchant         MerchantProfile?
+  wallets          Wallet[]
+  notifications    Notification[]
+  tickets          SupportTicket[] @relation("TicketOwner")
+  assignedTickets  SupportTicket[] @relation("TicketAssignee")
+  auditLogs        AuditLog[]
+  securityEvents   SecurityEvent[]
+  quotes           ConversionQuote[]
+  orders           P2POrder[]      @relation("CustomerOrders")
+  assignments      MerchantAssignment[]
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+model Session {
+  id               String    @id @default(uuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash String
+  familyId         String
+  userAgent        String?
+  ipAddress        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([userId])
+  @@index([familyId])
+}
+
+model OtpChallenge {
+  id         String     @id @default(uuid())
+  userId     String?
+  user       User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email      String
+  purpose    OtpPurpose
+  codeHash   String
+  attempts   Int        @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime   @default(now())
+
+  @@index([email, purpose])
+}
+
+model CustomerProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kycStatus   String   @default("UNVERIFIED")
+  referralCode String  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model MerchantProfile {
+  id             String         @id @default(uuid())
+  userId         String         @unique
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName   String
+  status         MerchantStatus @default(APPLIED)
+  commissionBps  Int            @default(100)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  assignments    MerchantAssignment[]
+  settlements    Settlement[]
+}
+
+model Asset {
+  id        String   @id @default(uuid())
+  symbol    String   @unique
+  name      String
+  decimals  Int
+  kind      String
+  active    Boolean  @default(true)
+  accounts  WalletAccount[]
+  networks  BlockchainNetwork[]
+}
+
+model BlockchainNetwork {
+  id        String   @id @default(uuid())
+  assetId   String
+  asset     Asset    @relation(fields: [assetId], references: [id])
+  code      String
+  name      String
+  mockOnly  Boolean  @default(true)
+  active    Boolean  @default(true)
+  addresses WalletAddress[]
+  deposits  Deposit[]
+
+  @@unique([assetId, code])
+}
+
+model Wallet {
+  id        String          @id @default(uuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String          @default("PRIMARY")
+  accounts  WalletAccount[]
+  createdAt DateTime        @default(now())
+
+  @@unique([userId, label])
+}
+
+model WalletAccount {
+  id             String            @id @default(uuid())
+  walletId       String
+  wallet         Wallet            @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  assetId        String
+  asset          Asset             @relation(fields: [assetId], references: [id])
+  available      Decimal           @default(0) @db.Decimal(36, 18)
+  locked         Decimal           @default(0) @db.Decimal(36, 18)
+  simulated      Boolean           @default(true)
+  addresses      WalletAddress[]
+  ledgerEntries  LedgerEntry[]
+  deposits       Deposit[]
+  withdrawals    Withdrawal[]
+  transfersOut   Transfer[]        @relation("TransferSource")
+  transfersIn    Transfer[]        @relation("TransferDest")
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([walletId, assetId])
+}
+
+model WalletAddress {
+  id        String            @id @default(uuid())
+  accountId String
+  account   WalletAccount     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  networkId String
+  network   BlockchainNetwork @relation(fields: [networkId], references: [id])
+  address   String
+  isDefault Boolean           @default(false)
+  createdAt DateTime          @default(now())
+
+  @@unique([networkId, address])
+}
+
+model LedgerTransaction {
+  id          String        @id @default(uuid())
+  reference   String        @unique
+  memo        String
+  idempotency String        @unique
+  createdAt   DateTime      @default(now())
+  entries     LedgerEntry[]
+}
+
+model LedgerEntry {
+  id            String            @id @default(uuid())
+  transactionId String
+  transaction   LedgerTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  accountId     String?
+  account       WalletAccount?    @relation(fields: [accountId], references: [id])
+  accountType   LedgerAccountType
+  direction     LedgerDirection
+  amount        Decimal           @db.Decimal(36, 18)
+  assetSymbol   String
+  createdAt     DateTime          @default(now())
+
+  @@index([accountId])
+}
+
+model Deposit {
+  id          String            @id @default(uuid())
+  accountId   String
+  account     WalletAccount     @relation(fields: [accountId], references: [id])
+  networkId   String
+  network     BlockchainNetwork @relation(fields: [networkId], references: [id])
+  amount      Decimal           @db.Decimal(36, 18)
+  status      String
+  mockTxHash  String?
+  confirmations Int             @default(0)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model Withdrawal {
+  id        String        @id @default(uuid())
+  accountId String
+  account   WalletAccount @relation(fields: [accountId], references: [id])
+  amount    Decimal       @db.Decimal(36, 18)
+  fee       Decimal       @db.Decimal(36, 18)
+  address   String
+  status    String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model Transfer {
+  id          String        @id @default(uuid())
+  sourceId    String
+  source      WalletAccount @relation("TransferSource", fields: [sourceId], references: [id])
+  destId      String
+  dest        WalletAccount @relation("TransferDest", fields: [destId], references: [id])
+  amount      Decimal       @db.Decimal(36, 18)
+  fee         Decimal       @db.Decimal(36, 18)
+  status      String
+  createdAt   DateTime      @default(now())
+}
+
+model ConversionQuote {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  fromAsset   String
+  toAsset     String
+  rate        Decimal   @db.Decimal(36, 18)
+  fromAmount  Decimal   @db.Decimal(36, 18)
+  toAmount    Decimal   @db.Decimal(36, 18)
+  feeAmount   Decimal   @db.Decimal(36, 18)
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model P2POrder {
+  id           String      @id @default(uuid())
+  customerId   String
+  customer     User        @relation("CustomerOrders", fields: [customerId], references: [id])
+  side         String
+  status       OrderStatus @default(CREATED)
+  assetSymbol  String
+  cryptoAmount Decimal     @db.Decimal(36, 18)
+  inrAmount    Decimal     @db.Decimal(18, 2)
+  feeAmount    Decimal     @db.Decimal(18, 2)
+  idempotency  String      @unique
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  escrow       Escrow?
+  assignment   MerchantAssignment?
+  proofs       PaymentProof[]
+  dispute      Dispute?
+}
+
+model Escrow {
+  id         String   @id @default(uuid())
+  orderId    String   @unique
+  order      P2POrder @relation(fields: [orderId], references: [id])
+  lockedAmt  Decimal  @db.Decimal(36, 18)
+  releasedAt DateTime?
+  createdAt  DateTime @default(now())
+}
+
+model MerchantAssignment {
+  id         String           @id @default(uuid())
+  orderId    String           @unique
+  order      P2POrder         @relation(fields: [orderId], references: [id])
+  merchantId String
+  merchant   MerchantProfile  @relation(fields: [merchantId], references: [id])
+  userId     String
+  user       User             @relation(fields: [userId], references: [id])
+  acceptedAt DateTime?
+  createdAt  DateTime         @default(now())
+}
+
+model PaymentProof {
+  id        String   @id @default(uuid())
+  orderId   String
+  order     P2POrder @relation(fields: [orderId], references: [id])
+  utr       String?
+  note      String?
+  mockUrl   String?
+  createdAt DateTime @default(now())
+}
+
+model Settlement {
+  id         String          @id @default(uuid())
+  merchantId String
+  merchant   MerchantProfile @relation(fields: [merchantId], references: [id])
+  grossInr   Decimal         @db.Decimal(18, 2)
+  feeInr     Decimal         @db.Decimal(18, 2)
+  netInr     Decimal         @db.Decimal(18, 2)
+  status     String
+  createdAt  DateTime        @default(now())
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  userId      String
+  type        String
+  status      String
+  assetSymbol String
+  amount      Decimal  @db.Decimal(36, 18)
+  inrDisplay  Decimal? @db.Decimal(18, 2)
+  simulated   Boolean  @default(true)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model GiftCardBrand {
+  id        String            @id @default(uuid())
+  slug      String            @unique
+  name      String
+  category  String
+  active    Boolean           @default(true)
+  products  GiftCardProduct[]
+}
+
+model GiftCardProduct {
+  id        String          @id @default(uuid())
+  brandId   String
+  brand     GiftCardBrand   @relation(fields: [brandId], references: [id])
+  denominationInr Decimal   @db.Decimal(18, 2)
+  usdtPrice Decimal         @db.Decimal(36, 18)
+  active    Boolean         @default(true)
+  orders    GiftCardOrder[]
+}
+
+model GiftCardOrder {
+  id        String          @id @default(uuid())
+  productId String
+  product   GiftCardProduct @relation(fields: [productId], references: [id])
+  userId    String
+  status    String
+  mockCode  String?
+  createdAt DateTime        @default(now())
+}
+
+model UtilityService {
+  id        String         @id @default(uuid())
+  code      String         @unique
+  name      String
+  category  String
+  active    Boolean        @default(true)
+  orders    UtilityOrder[]
+}
+
+model UtilityOrder {
+  id         String         @id @default(uuid())
+  serviceId  String
+  service    UtilityService @relation(fields: [serviceId], references: [id])
+  userId     String
+  consumerId String
+  amountInr  Decimal        @db.Decimal(18, 2)
+  status     String
+  createdAt  DateTime       @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model SupportTicket {
+  id          String           @id @default(uuid())
+  ownerId     String
+  owner       User             @relation("TicketOwner", fields: [ownerId], references: [id])
+  assigneeId  String?
+  assignee    User?            @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  category    String
+  subject     String
+  status      TicketStatus     @default(OPEN)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  messages    SupportMessage[]
+  dispute     Dispute?
+}
+
+model SupportMessage {
+  id        String        @id @default(uuid())
+  ticketId  String
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  String
+  body      String
+  createdAt DateTime      @default(now())
+}
+
+model Dispute {
+  id        String        @id @default(uuid())
+  orderId   String        @unique
+  order     P2POrder      @relation(fields: [orderId], references: [id])
+  ticketId  String        @unique
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id])
+  status    DisputeStatus @default(OPEN)
+  reason    String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  action    String
+  entity    String
+  entityId  String
+  oldValue  Json?
+  newValue  Json?
+  ipAddress String?
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+}
+
+model SecurityEvent {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  type      String
+  severity  String
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
+
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+}

@@ -1,0 +1,17 @@
+{
+  "name": "nexora-pay",
+  "private": true,
+  "version": "0.1.0",
+  "description": "NEXORA PAY modular monolith",
+  "workspaces": [
+    "web",
+    "api"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace web",
+    "dev:api": "npm run start:dev --workspace api",
+    "db:up": "docker compose up -d",
+    "db:migrate": "npm run prisma:migrate --workspace api",
+    "db:seed": "npm run prisma:seed --workspace api"
+  }
+}

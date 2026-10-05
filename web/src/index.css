@@ -1,0 +1,147 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, .dark, .dark *));
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-nx-bg: var(--nx-bg);
+  --color-nx-bg2: var(--nx-bg2);
+  --color-nx-surface: var(--nx-surface);
+  --color-nx-accent: var(--nx-accent);
+  --color-nx-mint: var(--nx-mint);
+  --color-nx-text: var(--nx-text);
+  --color-nx-muted: var(--nx-muted);
+  --color-nx-ok: #35c98a;
+  --color-nx-warn: #f5b94c;
+  --color-nx-err: #f06d7a;
+  --color-nx-line: var(--nx-line);
+  --color-nx-card: var(--nx-card);
+  --color-nx-border: var(--nx-border);
+}
+
+:root,
+[data-theme="dark"] {
+  --nx-bg: #0b1020;
+  --nx-bg2: #111a2e;
+  --nx-surface: #172238;
+  --nx-accent: #8b7cff;
+  --nx-mint: #43e6b2;
+  --nx-text: #f7f8fc;
+  --nx-muted: #a5aec2;
+  --nx-line: rgba(255, 255, 255, 0.08);
+  --nx-card: #13192b;
+  --nx-border: rgba(255, 255, 255, 0.1);
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --nx-bg: #f3f5fb;
+  --nx-bg2: #ffffff;
+  --nx-surface: #e8edf8;
+  --nx-accent: #5f52e0;
+  --nx-mint: #0d9a78;
+  --nx-text: #121826;
+  --nx-muted: #5c667a;
+  --nx-line: rgba(18, 24, 38, 0.1);
+  --nx-card: #ffffff;
+  --nx-border: rgba(18, 24, 38, 0.1);
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--nx-bg);
+  color: var(--nx-text);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--nx-accent) 40%, transparent);
+}
+
+.nx-grid {
+  background-image:
+    radial-gradient(circle at 18% 12%, color-mix(in srgb, var(--nx-accent) 22%, transparent), transparent 32%),
+    radial-gradient(circle at 88% 8%, color-mix(in srgb, var(--nx-mint) 14%, transparent), transparent 28%),
+    linear-gradient(color-mix(in srgb, var(--nx-text) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--nx-text) 6%, transparent) 1px, transparent 1px);
+  background-size: auto, auto, 72px 72px, 72px 72px;
+}
+
+.nx-glass {
+  background: color-mix(in srgb, var(--nx-surface) 82%, transparent);
+  border: 1px solid var(--nx-line);
+  backdrop-filter: blur(16px);
+}
+
+/* Hide scrollbars globally while keeping scroll functionality */
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+::-webkit-scrollbar {
+  display: none;
+  width: 0px;
+  height: 0px;
+  background: transparent;
+}
+
+/* Full Screen Theme Toggle Circular Reveal View Transition */
+::view-transition-image-pair(root) {
+  isolation: auto;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+  display: block;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 9999;
+}
+
+/* Infinite Marquee Animations with Pause on Hover */
+@keyframes marquee-left {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes marquee-right {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0%); }
+}
+
+.animate-marquee-left {
+  animation: marquee-left 55s linear infinite;
+}
+
+.animate-marquee-right {
+  animation: marquee-right 55s linear infinite;
+}
+
+.pause-row:hover > .animate-marquee-left,
+.pause-row:hover > .animate-marquee-right {
+  animation-play-state: paused !important;
+}
+
+
+
+
