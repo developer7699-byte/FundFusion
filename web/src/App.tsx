@@ -34,6 +34,7 @@ import { CustomerLayout } from '@/layouts/CustomerLayout'
 import { DeskLayout, adminLinks, merchantLinks } from '@/layouts/DeskLayout'
 import { useAuth } from '@/lib/auth'
 import { Skeleton } from '@/components/ui/skeleton'
+import { CustomerProfilePage } from '@/features/customer/CustomerProfilePage'
 import {
   AccountLive,
   GiftBrand,
@@ -164,7 +165,7 @@ export function App() {
               <Route path="support/:ticketId" element={<TicketDetail />} />
               <Route path="referrals" element={<AccountLive title="Referrals" />} />
               <Route path="rewards" element={<AccountLive title="Rewards" />} />
-              <Route path="profile" element={<AccountLive title="Profile" />} />
+              <Route path="profile" element={<CustomerProfilePage />} />
               <Route path="settings" element={<AccountLive title="Settings" />} />
               <Route path="security" element={<AccountLive title="Security" />} />
               <Route path="sessions" element={<AccountLive title="Sessions" />} />

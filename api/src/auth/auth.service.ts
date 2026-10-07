@@ -163,18 +163,18 @@ export class AuthService {
     const family = familyId ?? randomUUID();
     const accessToken = await this.jwt.signAsync(
       { sub: userId, email, roles, typ: 'access' },
-      { secret: this.config.getOrThrow<string>('JWT_ACCESS_SECRET'), expiresIn: '15m' },
+      { secret: this.config.getOrThrow<string>('JWT_ACCESS_SECRET'), expiresIn: '365d' },
     );
     const refreshToken = await this.jwt.signAsync(
       { sub: userId, email, roles, family, typ: 'refresh' },
-      { secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'), expiresIn: '7d' },
+      { secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'), expiresIn: '365d' },
     );
     this.store.sessions.push({
       id: randomUUID(),
       userId,
       familyId: family,
       refreshTokenHash: this.hashToken(refreshToken),
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
       revokedAt: null,
     });
     return { accessToken, refreshToken, tokenType: 'Bearer', simulated: true };

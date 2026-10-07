@@ -142,6 +142,85 @@ body {
   animation-play-state: paused !important;
 }
 
+/* Custom UI Keyframes & Luxury Aesthetic Enhancements */
+@keyframes scan-beam {
+  0% { top: 4%; opacity: 0.2; }
+  50% { opacity: 0.95; }
+  100% { top: 92%; opacity: 0.2; }
+}
+
+@keyframes float-glow {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-4px) scale(1.02); }
+}
+
+@keyframes shimmer-move {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.18); opacity: 0.3; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+@keyframes rotate-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-scan-beam {
+  animation: scan-beam 2.4s ease-in-out infinite alternate;
+}
+
+.animate-float-glow {
+  animation: float-glow 4s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background-size: 200% 100%;
+  animation: shimmer-move 3.5s linear infinite;
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-rotate-slow {
+  animation: rotate-slow 20s linear infinite;
+}
+
+/* Glass & Aesthetic Utility Classes */
+.glass-premium {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.dark .glass-premium {
+  background: rgba(18, 24, 41, 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glow-shadow-blue {
+  box-shadow: 0 10px 30px -5px rgba(59, 89, 248, 0.4);
+}
+
+.glow-shadow-emerald {
+  box-shadow: 0 10px 30px -5px rgba(16, 185, 129, 0.4);
+}
+
+.glow-border-gradient {
+  background: linear-gradient(135deg, #3b59f8, #10b981, #6366f1);
+  background-size: 200% 200%;
+  animation: shimmer-move 4s ease infinite;
+}
+
+
 
 
 
