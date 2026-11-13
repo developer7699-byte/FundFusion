@@ -20,6 +20,7 @@ import {
 import { BackButton } from '@/components/ui/BackButton'
 import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/utils'
+import { ToastNotification } from '@/components/ui/ToastNotification'
 
 interface MoneyRequest {
   id: string
@@ -152,12 +153,7 @@ export function RequestMoneyPage() {
   return (
     <div className="space-y-4 max-w-lg mx-auto w-full pb-6">
       {/* Toast Alert */}
-      {toastMsg && (
-        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-slate-900/95 text-white dark:bg-white/95 dark:text-slate-900 text-xs font-bold shadow-xl border border-white/10 flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 dark:text-emerald-600 shrink-0" />
-          <span>{toastMsg}</span>
-        </div>
-      )}
+      <ToastNotification message={toastMsg} onClose={() => setToastMsg(null)} />
 
       {/* Top Header */}
       <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">

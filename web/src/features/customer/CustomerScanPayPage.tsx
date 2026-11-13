@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/utils'
+import { ToastNotification } from '@/components/ui/ToastNotification'
 
 export function CustomerScanPayPage() {
   const navigate = useNavigate()
@@ -262,12 +263,7 @@ export function CustomerScanPayPage() {
   return (
     <div className="min-h-[90vh] max-w-lg mx-auto space-y-4 pb-10 relative">
       {/* Toast Notification overlay */}
-      {toastMsg && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-full bg-slate-900/90 text-white text-xs font-bold shadow-2xl backdrop-blur-md border border-slate-700 flex items-center gap-2 animate-in fade-in duration-300">
-          <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" />
-          <span>{toastMsg}</span>
-        </div>
-      )}
+      <ToastNotification message={toastMsg} onClose={() => setToastMsg(null)} />
 
       {/* Top Header Navigation */}
       <div className="flex items-center justify-between px-1">

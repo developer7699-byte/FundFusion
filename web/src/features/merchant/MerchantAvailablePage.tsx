@@ -14,6 +14,7 @@ import { BackButton } from '@/components/ui/BackButton'
 import { useMerchantStore, type MerchantOrder } from '@/lib/merchant-store'
 import { AcceptOrderModal } from './components/MerchantModals'
 import { cn } from '@/lib/utils'
+import { ToastNotification } from '@/components/ui/ToastNotification'
 
 export function MerchantAvailable() {
   const { availableOrders, availableUsdt } = useMerchantStore()
@@ -46,12 +47,7 @@ export function MerchantAvailable() {
   return (
     <div className="space-y-4 max-w-lg mx-auto w-full pb-4 relative">
       {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-full bg-slate-900/90 text-white text-xs font-bold shadow-2xl backdrop-blur-md border border-slate-700 flex items-center gap-2 animate-in fade-in slide-in-from-top duration-300">
-          <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+      <ToastNotification message={toastMessage} onClose={() => setToastMessage(null)} />
 
       {/* Top Header */}
       <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">

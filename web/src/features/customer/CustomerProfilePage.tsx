@@ -33,6 +33,7 @@ import { useTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { useLanguage } from '@/lib/language'
 import { usePaymentMethods } from '@/lib/payment-methods'
+import { ToastNotification } from '@/components/ui/ToastNotification'
 
 type ModalType =
   | null
@@ -234,12 +235,7 @@ export function CustomerProfilePage() {
   return (
     <div className="space-y-4 max-w-lg mx-auto pb-3 relative">
       {/* Toast Notification overlay */}
-      {toastMessage && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-full bg-slate-900/90 text-white text-xs font-bold shadow-2xl backdrop-blur-md border border-slate-700 flex items-center gap-2 animate-in fade-in slide-in-from-top duration-300">
-          <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+      <ToastNotification message={toastMessage} onClose={() => setToastMessage(null)} />
 
       {/* Top Header with Back */}
       <div className="flex items-center gap-2.5 pb-1 border-b border-slate-100 dark:border-slate-800">

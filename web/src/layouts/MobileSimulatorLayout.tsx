@@ -52,6 +52,7 @@ import { useTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { useNotifications } from '@/lib/notifications'
 import { useLanguage } from '@/lib/language'
+import { useMerchantStore } from '@/lib/merchant-store'
 
 // Global scroll position memory across tabs and routes within this session
 const scrollMemory = new Map<string, number>()
@@ -70,6 +71,7 @@ export function MobileSimulatorLayout({
   const { theme, toggle, setTheme } = useTheme()
   const { unreadCount } = useNotifications()
   const { language, t } = useLanguage()
+  const { unreadNoticesCount } = useMerchantStore()
 
   // Scroll Container Ref & Dynamic Restoration
   const contentRef = useRef<HTMLDivElement>(null)
@@ -239,11 +241,11 @@ export function MobileSimulatorLayout({
   ]
 
   const merchantNav = [
-    { to: '/merchant/dashboard', label: 'Home', icon: Home },
-    { to: '/merchant/orders', label: 'Orders', icon: History },
-    { to: '/merchant/available-orders', label: 'Available', icon: Store, isCenter: true },
-    { to: '/merchant/wallet', label: 'Wallet', icon: Wallet },
-    { to: '/merchant/profile', label: 'Profile', icon: User },
+    { to: '/merchant/dashboard', label: t('merchantNav.home'), icon: Home },
+    { to: '/merchant/orders', label: t('merchantNav.orders'), icon: History },
+    { to: '/merchant/available-orders', label: t('merchantNav.available'), icon: Store, isCenter: true },
+    { to: '/merchant/wallet', label: t('merchantNav.wallet'), icon: Wallet },
+    { to: '/merchant/profile', label: t('merchantNav.profile'), icon: User },
   ]
 
   const bottomNav = isMerchant ? merchantNav : customerNav
@@ -419,10 +421,10 @@ export function MobileSimulatorLayout({
                   <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/25">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                     <span className="font-black text-xs text-slate-800 dark:text-slate-200 tracking-tight truncate">
-                      Merchant Desk
+                      {t('merchantHeader.desk')}
                     </span>
                     <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 px-1.5 py-0.2 rounded-full">
-                      LIVE
+                      {t('merchantHeader.live')}
                     </span>
                   </div>
                 </div>
@@ -448,23 +450,25 @@ export function MobileSimulatorLayout({
                   <NavLink
                     to="/merchant/orders"
                     className="p-1.5 sm:p-2 rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors"
-                    title="All Orders"
+                    title={t('merchantHeader.allOrders')}
                     aria-label="View orders"
                   >
                     <History className="w-5 h-5 stroke-[2]" />
                   </NavLink>
 
-                  {/* Notification Bell */}
+                  {/* Notification Bell with Dynamic Unread Badge */}
                   <NavLink
                     to="/merchant/notifications"
                     className="p-1.5 sm:p-2 rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors relative"
-                    title="Notifications"
+                    title={t('merchantHeader.notifications')}
                     aria-label="View notifications"
                   >
                     <Bell className="w-5 h-5 stroke-[2]" />
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center ring-2 ring-white dark:ring-[#0b1020] shadow-xs animate-in zoom-in-75 duration-200">
-                      2
-                    </span>
+                    {unreadNoticesCount > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center ring-2 ring-white dark:ring-[#0b1020] shadow-xs animate-in zoom-in-75 duration-200">
+                        {unreadNoticesCount > 9 ? '9+' : unreadNoticesCount}
+                      </span>
+                    )}
                   </NavLink>
                 </div>
               </header>

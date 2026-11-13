@@ -16,7 +16,6 @@ import {
   ChevronRight,
   ExternalLink,
   Layers,
-  ArrowLeftRight,
   Building2,
   CreditCard,
   Percent,
@@ -29,6 +28,8 @@ import {
 } from 'lucide-react'
 import { useMerchantStore, type MerchantOrder } from '@/lib/merchant-store'
 import { cn } from '@/lib/utils'
+import { useLanguage } from '@/lib/language'
+import { ToastNotification } from '@/components/ui/ToastNotification'
 import {
   DepositLiquidityModal,
   WithdrawPayoutModal,
@@ -39,6 +40,7 @@ import {
 
 export function MerchantHome() {
   const navigate = useNavigate()
+  const { t } = useLanguage()
   const {
     deskName,
     isOnline,
@@ -78,12 +80,7 @@ export function MerchantHome() {
   return (
     <div className="space-y-3.5 sm:space-y-4 max-w-lg mx-auto w-full pb-3 relative">
       {/* Toast Overlay */}
-      {toastMessage && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-full bg-slate-900/90 text-white text-xs font-bold shadow-2xl backdrop-blur-md border border-slate-700 flex items-center gap-2 animate-in fade-in slide-in-from-top duration-300">
-          <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+      <ToastNotification message={toastMessage} onClose={() => setToastMessage(null)} />
 
       {/* 1. TOP DESK IDENTITY & STATUS HERO */}
       <div className="rounded-3xl bg-gradient-to-tr from-[#0a2316] via-[#0d3420] to-[#0a2316] text-white p-4.5 sm:p-5 shadow-xl border border-emerald-500/30 relative overflow-hidden space-y-3.5">
@@ -108,15 +105,11 @@ export function MerchantHome() {
             </div>
           </div>
 
-          {/* Customer Mode Switch Pill */}
-          <Link
-            to="/customer/dashboard"
-            className="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 text-[10px] font-bold flex items-center gap-1 backdrop-blur-sm transition-all"
-            title="Switch to Customer Mode"
-          >
-            <ArrowLeftRight className="w-3 h-3 text-emerald-300" />
-            <span>Customer Mode</span>
-          </Link>
+          {/* Verified Partner Badge */}
+          <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1 backdrop-blur-sm shrink-0">
+            <ShieldCheck className="w-3 h-3 text-emerald-400" />
+            <span>Verified Desk</span>
+          </span>
         </div>
 
         {/* Online / Offline Status Toggle Bar */}
@@ -183,7 +176,7 @@ export function MerchantHome() {
           {/* Vault Split Bar */}
           <div className="grid grid-cols-2 gap-2 pt-2 text-[11px]">
             <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
-              <span className="text-slate-400 block text-[10px]">Available Liquidity</span>
+              <span className="text-slate-400 block text-[10px]">{t('merchantDash.availableToTrade')}</span>
               <span className="font-mono font-bold text-slate-900 dark:text-white">
                 {isBalanceVisible ? `${availableUsdt.toFixed(2)} USDT` : '••••'}
               </span>
@@ -191,7 +184,7 @@ export function MerchantHome() {
             <div className="p-2.5 rounded-xl bg-amber-500/5 border border-amber-500/15">
               <span className="text-amber-500 block text-[10px] flex items-center gap-1">
                 <Lock className="w-2.5 h-2.5" />
-                Locked in Escrow
+                {t('merchantDash.lockedEscrow')}
               </span>
               <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
                 {isBalanceVisible ? `${lockedUsdt.toFixed(2)} USDT` : '••••'}
@@ -205,65 +198,91 @@ export function MerchantHome() {
           <button
             type="button"
             onClick={() => setIsDepositOpen(true)}
-            className="py-3 px-4 rounded-2xl bg-[#22c55e] hover:bg-[#16a34a] text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer"
+            className="h-12 px-2.5 rounded-2xl bg-[#22c55e] hover:bg-[#16a34a] text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
           >
-            <span>Deposit USDT</span>
-            <ArrowDown className="w-4 h-4 stroke-[2.5]" />
+            <span>{t('merchantDash.deposit')}</span>
+            <ArrowDown className="w-4 h-4 stroke-[2.5] shrink-0" />
           </button>
 
           <button
             type="button"
             onClick={() => setIsWithdrawOpen(true)}
-            className="py-3 px-4 rounded-2xl bg-[#0c2417] dark:bg-[#10291e] hover:bg-[#133321] text-emerald-100 dark:text-emerald-300 font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer border border-emerald-900/30"
+            className="h-12 px-2.5 rounded-2xl bg-[#0c2417] dark:bg-[#10291e] hover:bg-[#133321] text-emerald-100 dark:text-emerald-300 font-black text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer border border-emerald-900/30 whitespace-nowrap"
           >
-            <span>Withdraw / Settle</span>
-            <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+            <span>{t('merchantDash.withdraw')}</span>
+            <ArrowUp className="w-4 h-4 stroke-[2.5] shrink-0" />
           </button>
         </div>
       </div>
 
-      {/* 3. PERFORMANCE STATS GRID (4 METRICS) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <div className="p-3 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 text-center space-y-0.5 shadow-2xs">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Today Volume</span>
-          <p className="text-sm font-black text-slate-900 dark:text-white font-mono">
+      {/* 3. PERFORMANCE STATS (2x2 Balanced Responsive Grid) */}
+      <div className="grid grid-cols-2 gap-2.5">
+        {/* Today Volume */}
+        <div className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 shadow-2xs space-y-1">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[10px] font-black uppercase tracking-wider">{t('merchantDash.todayVolume')}</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+          </div>
+          <p className="text-base font-black text-slate-900 dark:text-white font-mono tracking-tight">
             ₹{earnings.todayVolumeInr.toLocaleString('en-IN')}
           </p>
+          <span className="text-[10px] text-slate-400 block font-medium">18 {t('merchantDash.tradesSettled')}</span>
         </div>
 
-        <div className="p-3 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 text-center space-y-0.5 shadow-2xs">
-          <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider block">Today Net Fee</span>
-          <p className="text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono">
+        {/* Today Net Fee */}
+        <div className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 shadow-2xs space-y-1">
+          <div className="flex items-center justify-between text-emerald-500">
+            <span className="text-[10px] font-black uppercase tracking-wider">{t('merchantDash.todayNetFee')}</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          </div>
+          <p className="text-base font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight whitespace-nowrap">
             +{earnings.todayCommissionUsdt.toFixed(2)} USDT
           </p>
+          <span className="text-[10px] text-slate-400 block font-mono">
+            ≈ ₹{(earnings.todayCommissionUsdt * 91.5).toFixed(0)} {t('merchantDash.earned')}
+          </span>
         </div>
 
-        <div className="p-3 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 text-center space-y-0.5 shadow-2xs">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Active Escrows</span>
-          <p className="text-sm font-black text-blue-600 dark:text-blue-400 font-mono">
-            {activeOrders.length} Orders
+        {/* Active Escrows */}
+        <div className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 shadow-2xs space-y-1">
+          <div className="flex items-center justify-between text-amber-500">
+            <span className="text-[10px] font-black uppercase tracking-wider">{t('merchantDash.activeEscrows')}</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+          </div>
+          <p className="text-base font-black text-slate-900 dark:text-white font-mono tracking-tight">
+            {activeOrders.length} {t('merchantDash.orders')}
           </p>
+          <span className="text-[10px] text-amber-600 dark:text-amber-400 block font-medium">
+            {lockedUsdt.toFixed(2)} {t('merchantDash.locked')}
+          </span>
         </div>
 
-        <div className="p-3 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 text-center space-y-0.5 shadow-2xs">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Completion</span>
-          <p className="text-sm font-black text-slate-900 dark:text-white font-mono">
+        {/* Completion */}
+        <div className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 shadow-2xs space-y-1">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[10px] font-black uppercase tracking-wider">{t('merchantDash.completion')}</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          </div>
+          <p className="text-base font-black text-slate-900 dark:text-white font-mono tracking-tight">
             {completionRate}%
           </p>
+          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block font-medium">
+            {rating} ★ {t('merchantDash.rating')}
+          </span>
         </div>
       </div>
 
       {/* 4. QUICK ACTION GRID */}
       <div className="grid grid-cols-4 gap-2 py-1">
         {[
-          { label: 'Available', icon: Store, to: '/merchant/available-orders', badge: `${availableOrders.length}` },
-          { label: 'Escrows', icon: Lock, to: '/merchant/active-orders', badge: activeOrders.length > 0 ? `${activeOrders.length}` : undefined },
-          { label: 'All Orders', icon: History, to: '/merchant/orders' },
-          { label: 'Earnings', icon: TrendingUp, to: '/merchant/earnings' },
-          { label: 'Banks / UPI', icon: Building2, to: '/merchant/payment-methods' },
-          { label: 'Limits', icon: Sliders, to: '/merchant/settings' },
-          { label: 'Arbitrator', icon: ShieldCheck, to: '/customer/support' },
-          { label: 'Profile', icon: UserCheck, to: '/merchant/profile' },
+          { label: t('merchantQuick.available'), icon: Store, to: '/merchant/available-orders', badge: `${availableOrders.length}` },
+          { label: t('merchantQuick.escrows'), icon: Lock, to: '/merchant/active-orders', badge: activeOrders.length > 0 ? `${activeOrders.length}` : undefined },
+          { label: t('merchantQuick.allOrders'), icon: History, to: '/merchant/orders' },
+          { label: t('merchantQuick.earnings'), icon: TrendingUp, to: '/merchant/earnings' },
+          { label: t('merchantQuick.banks'), icon: Building2, to: '/merchant/payment-methods' },
+          { label: t('merchantQuick.limits'), icon: Sliders, to: '/merchant/settings' },
+          { label: t('merchantQuick.alerts'), icon: Bell, to: '/merchant/notifications' },
+          { label: t('merchantQuick.profile'), icon: UserCheck, to: '/merchant/profile' },
         ].map((item) => (
           <Link
             key={item.label}

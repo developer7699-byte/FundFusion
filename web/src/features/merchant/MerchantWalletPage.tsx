@@ -16,8 +16,11 @@ import { BackButton } from '@/components/ui/BackButton'
 import { useMerchantStore } from '@/lib/merchant-store'
 import { DepositLiquidityModal, WithdrawPayoutModal } from './components/MerchantModals'
 import { cn } from '@/lib/utils'
+import { useLanguage } from '@/lib/language'
+import { ToastNotification } from '@/components/ui/ToastNotification'
 
 export function MerchantWallet() {
+  const { t } = useLanguage()
   const { availableUsdt, lockedUsdt, inrReserve, ledger, accounts } = useMerchantStore()
   const [isDepositOpen, setIsDepositOpen] = useState(false)
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false)
@@ -35,12 +38,7 @@ export function MerchantWallet() {
   return (
     <div className="space-y-4 max-w-lg mx-auto w-full pb-4 relative">
       {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-full bg-slate-900/90 text-white text-xs font-bold shadow-2xl backdrop-blur-md border border-slate-700 flex items-center gap-2 animate-in fade-in slide-in-from-top duration-300">
-          <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+      <ToastNotification message={toastMessage} onClose={() => setToastMessage(null)} />
 
       {/* Top Header */}
       <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
@@ -48,9 +46,9 @@ export function MerchantWallet() {
           <BackButton fallback="/merchant/dashboard" />
           <div>
             <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
-              Merchant Vault & Wallet
+              {t('merchantWallet.title')}
             </h1>
-            <p className="text-[11px] text-slate-500">Non-custodial desk liquidity management</p>
+            <p className="text-[11px] text-slate-500">{t('merchantWallet.subtitle')}</p>
           </div>
         </div>
       </div>
@@ -99,19 +97,19 @@ export function MerchantWallet() {
           <button
             type="button"
             onClick={() => setIsDepositOpen(true)}
-            className="py-3 px-4 rounded-2xl bg-[#22c55e] hover:bg-[#16a34a] text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer"
+            className="h-12 px-2.5 rounded-2xl bg-[#22c55e] hover:bg-[#16a34a] text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
           >
-            <span>Deposit USDT</span>
-            <ArrowDown className="w-4 h-4 stroke-[2.5]" />
+            <span>{t('merchantDash.deposit')}</span>
+            <ArrowDown className="w-4 h-4 stroke-[2.5] shrink-0" />
           </button>
 
           <button
             type="button"
             onClick={() => setIsWithdrawOpen(true)}
-            className="py-3 px-4 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer border border-white/20"
+            className="h-12 px-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-black text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer border border-white/20 whitespace-nowrap"
           >
-            <span>Withdraw / Settle</span>
-            <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+            <span>{t('merchantDash.withdraw')}</span>
+            <ArrowUp className="w-4 h-4 stroke-[2.5] shrink-0" />
           </button>
         </div>
       </div>

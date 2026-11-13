@@ -40,6 +40,16 @@ export interface MerchantLedgerItem {
   status: 'COMPLETED' | 'PENDING'
 }
 
+export interface MerchantNotice {
+  id: string
+  title: string
+  desc: string
+  time: string
+  read: boolean
+  type: 'ORDER' | 'UTR' | 'COMMISSION' | 'SYSTEM'
+  link?: string
+}
+
 export interface MerchantState {
   availableOrders: MerchantOrder[]
   myOrders: MerchantOrder[]
@@ -56,6 +66,7 @@ export interface MerchantState {
   commissionRate: number // e.g. 0.015 = 1.5%
   accounts: SettlementAccount[]
   ledger: MerchantLedgerItem[]
+  notices: MerchantNotice[]
   earnings: {
     todayVolumeInr: number
     todayCommissionUsdt: number
@@ -298,6 +309,43 @@ const INITIAL_STATE: MerchantState = {
       status: 'COMPLETED',
     },
   ],
+  notices: [
+    {
+      id: 'n1',
+      title: 'Action Needed: Bank UTR Submitted',
+      desc: 'Buyer @aarav_crypto submitted UTR: 429104829104 for ₹9,150. Please check your bank and release USDT.',
+      time: '6 mins ago',
+      read: false,
+      type: 'UTR',
+      link: '/merchant/orders/FF-8921',
+    },
+    {
+      id: 'n2',
+      title: 'Commission Credited (+7.50 USDT)',
+      desc: 'Order #FF-8920 successfully settled. 1.5% desk volume rebate has been added to your available vault balance.',
+      time: '45 mins ago',
+      read: false,
+      type: 'COMMISSION',
+      link: '/merchant/earnings',
+    },
+    {
+      id: 'n3',
+      title: 'Order Matched: 250 USDT',
+      desc: 'Order #FF-8922 accepted for buyer @priya_trader. 250 USDT locked safely in multi-sig escrow.',
+      time: '1 hr ago',
+      read: true,
+      type: 'ORDER',
+      link: '/merchant/orders/FF-8922',
+    },
+    {
+      id: 'n4',
+      title: 'Zero Bank Payout Fees Active',
+      desc: 'All IMPS & RTGS settlement payouts to your registered bank account carry 0% network fees today.',
+      time: 'Yesterday',
+      read: true,
+      type: 'SYSTEM',
+    },
+  ],
 }
 
 function loadState(): MerchantState {
@@ -305,7 +353,11 @@ function loadState(): MerchantState {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      return { ...INITIAL_STATE, ...parsed }
+      return {
+        ...INITIAL_STATE,
+        ...parsed,
+        notices: parsed.notices || INITIAL_STATE.notices,
+      }
     }
   } catch {}
   return INITIAL_STATE
@@ -614,8 +666,37 @@ export function useMerchantStore() {
     setState(nextState)
   }, [])
 
+  // 12. Mark All Notices As Read
+  const markAllNoticesRead = useCallback(() => {
+    const current = loadState()
+    const list = current.notices || INITIAL_STATE.notices
+    const nextState: MerchantState = {
+      ...current,
+      notices: list.map((n) => ({ ...n, read: true })),
+    }
+    saveState(nextState)
+    setState(nextState)
+  }, [])
+
+  // 13. Mark Single Notice Read
+  const markNoticeRead = useCallback((id: string) => {
+    const current = loadState()
+    const list = current.notices || INITIAL_STATE.notices
+    const nextState: MerchantState = {
+      ...current,
+      notices: list.map((n) => (n.id === id ? { ...n, read: true } : n)),
+    }
+    saveState(nextState)
+    setState(nextState)
+  }, [])
+
+  const unreadNoticesCount = (state.notices || INITIAL_STATE.notices).filter((n) => !n.read).length
+
   return {
     ...state,
+    unreadNoticesCount,
+    markAllNoticesRead,
+    markNoticeRead,
     acceptOrder,
     submitUtr,
     releaseEscrow,

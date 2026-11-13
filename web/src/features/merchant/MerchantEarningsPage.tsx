@@ -1,8 +1,10 @@
 import { BackButton } from '@/components/ui/BackButton'
 import { useMerchantStore } from '@/lib/merchant-store'
+import { useLanguage } from '@/lib/language'
 import { TrendingUp, Sparkles, Percent, Award, ShieldCheck, CheckCircle2 } from 'lucide-react'
 
 export function MerchantEarnings() {
+  const { t } = useLanguage()
   const { earnings, commissionRate, totalTrades } = useMerchantStore()
 
   const todayInrEquivalent = (earnings.todayCommissionUsdt * 91.5).toFixed(2)
@@ -16,9 +18,9 @@ export function MerchantEarnings() {
           <BackButton fallback="/merchant/dashboard" />
           <div>
             <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
-              Earnings & Commission
+              {t('merchantEarnings.title')}
             </h1>
-            <p className="text-[11px] text-slate-500">P2P liquidity spread & trade rebates</p>
+            <p className="text-[11px] text-slate-500">{t('merchantEarnings.subtitle')}</p>
           </div>
         </div>
       </div>

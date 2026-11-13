@@ -15,9 +15,12 @@ import { BackButton } from '@/components/ui/BackButton'
 import { useMerchantStore, type MerchantOrder } from '@/lib/merchant-store'
 import { ReleaseEscrowModal, DisputeOrderModal } from './components/MerchantModals'
 import { cn } from '@/lib/utils'
+import { useLanguage } from '@/lib/language'
+import { ToastNotification } from '@/components/ui/ToastNotification'
 
 export function MerchantOrders({ filter: defaultFilter }: { filter?: 'active' | 'done' | string }) {
   const navigate = useNavigate()
+  const { t } = useLanguage()
   const { myOrders } = useMerchantStore()
   const [activeTab, setActiveTab] = useState<'ALL' | 'ACTIVE' | 'COMPLETED'>(
     defaultFilter === 'active' ? 'ACTIVE' : defaultFilter === 'done' ? 'COMPLETED' : 'ALL'
@@ -58,12 +61,7 @@ export function MerchantOrders({ filter: defaultFilter }: { filter?: 'active' | 
   return (
     <div className="space-y-4 max-w-lg mx-auto w-full pb-4 relative">
       {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-full bg-slate-900/90 text-white text-xs font-bold shadow-2xl backdrop-blur-md border border-slate-700 flex items-center gap-2 animate-in fade-in slide-in-from-top duration-300">
-          <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+      <ToastNotification message={toastMessage} onClose={() => setToastMessage(null)} />
 
       {/* Top Header */}
       <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
@@ -71,9 +69,9 @@ export function MerchantOrders({ filter: defaultFilter }: { filter?: 'active' | 
           <BackButton fallback="/merchant/dashboard" />
           <div>
             <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
-              Merchant Orders
+              {t('merchantOrders.title')}
             </h1>
-            <p className="text-[11px] text-slate-500">Track escrow lifecycle & release settlements</p>
+            <p className="text-[11px] text-slate-500">{t('merchantOrders.subtitle')}</p>
           </div>
         </div>
 
@@ -110,7 +108,7 @@ export function MerchantOrders({ filter: defaultFilter }: { filter?: 'active' | 
               : 'text-slate-500 hover:text-slate-800'
           )}
         >
-          All ({myOrders.length})
+          {t('merchantOrders.tabAll')} ({myOrders.length})
         </button>
         <button
           type="button"
@@ -122,7 +120,7 @@ export function MerchantOrders({ filter: defaultFilter }: { filter?: 'active' | 
               : 'text-slate-500 hover:text-slate-800'
           )}
         >
-          <span>Active Escrows</span>
+          <span>{t('merchantOrders.tabActive')}</span>
           {activeEscrowsCount > 0 && (
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           )}
@@ -132,6 +130,14 @@ export function MerchantOrders({ filter: defaultFilter }: { filter?: 'active' | 
           onClick={() => setActiveTab('COMPLETED')}
           className={cn(
             'flex-1 py-1.5 rounded-xl font-bold transition-all cursor-pointer',
+            activeTab === 'COMPLETED'
+              ? 'bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white shadow-xs'
+              : 'text-slate-500 hover:text-slate-800'
+          )}
+        >
+          {t('merchantOrders.tabCompleted')}
+        </button>
+      </div>
             activeTab === 'COMPLETED'
               ? 'bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white shadow-xs'
               : 'text-slate-500 hover:text-slate-800'
