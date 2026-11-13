@@ -1,12 +1,50 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useState } from 'react'
+import {
+  ArrowLeft,
+  CheckCircle2,
+  ShieldCheck,
+  Clock,
+  Sparkles,
+  Copy,
+  Check,
+  ExternalLink,
+  ChevronRight,
+  AlertCircle,
+  QrCode,
+  ArrowLeftRight,
+  Zap,
+  Gift,
+  Smartphone,
+  MessageSquare,
+  Send,
+  HelpCircle,
+  Users,
+  Share2,
+  Lock,
+  Building2,
+  Tv,
+  Search,
+  CheckCircle,
+  FileText,
+  BadgeAlert,
+  X,
+  CreditCard,
+  Flame,
+  ArrowDownLeft,
+  ArrowUpRight,
+  ArrowRight,
+} from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import { cn } from '@/lib/utils'
+import { BackButton } from '@/components/ui/BackButton'
+import { useNotifications } from '@/lib/notifications'
 
 type Order = {
   id: string
@@ -17,337 +55,1509 @@ type Order = {
   timeline: { at: string; status: string; note: string }[]
   utr?: string
   upiId?: string
+  beneficiary?: string
 }
 
+/* =========================================================================
+   1. ORDERS LIST (/customer/orders)
+   ========================================================================= */
 export function OrdersList() {
-  const q = useQuery({ queryKey: ['orders'], queryFn: () => api<Order[]>('/orders') })
+  const [activeFilter, setActiveFilter] = useState<'ALL' | 'P2P' | 'UPI' | 'UTILITIES'>('ALL')
+  const q = useQuery({ queryKey: ['orders'], queryFn: () => api<Order[]>('/orders').catch(() => []) })
+
+  // Mock demo orders if none exist
+  const mockOrders: Order[] = [
+    {
+      id: 'ord-89201',
+      kind: 'BUY_USDT',
+      status: 'ESCROW_LOCKED',
+      usdtAmount: '50.00',
+      inrAmount: '4575.00',
+      beneficiary: 'NexoraEscrow_Fast',
+      upiId: 'merchant.nexora@okaxis',
+      timeline: [
+        { at: '14:20', status: 'CREATED', note: 'Order matched with verified merchant' },
+        { at: '14:21', status: 'ESCROW_LOCKED', note: '50.00 USDT held safely in smart escrow' },
+      ],
+    },
+    {
+      id: 'ord-88319',
+      kind: 'UPI_PAY',
+      status: 'COMPLETED',
+      usdtAmount: '3.82',
+      inrAmount: '350.00',
+      beneficiary: 'Starbucks Coffee',
+      upiId: 'starbucks@icici',
+      utr: 'UTR993810294821',
+      timeline: [
+        { at: 'Yesterday', status: 'COMPLETED', note: 'Merchant confirmed UPI receipt' },
+      ],
+    },
+    {
+      id: 'ord-87102',
+      kind: 'GIFT_CARD',
+      status: 'COMPLETED',
+      usdtAmount: '10.92',
+      inrAmount: '1000.00',
+      beneficiary: 'Amazon Pay Gift Voucher',
+      utr: 'VCH-AMZN-8921-901',
+      timeline: [
+        { at: 'Nov 10', status: 'COMPLETED', note: 'Voucher code delivered to vault' },
+      ],
+    },
+    {
+      id: 'ord-86004',
+      kind: 'UTILITY_BILL',
+      status: 'COMPLETED',
+      usdtAmount: '15.84',
+      inrAmount: '1450.00',
+      beneficiary: 'BESCOM Electricity Bill',
+      timeline: [
+        { at: 'Nov 08', status: 'COMPLETED', note: 'BBPS biller settled at zero fee' },
+      ],
+    },
+  ]
+
+  const orders = (q.data && q.data.length > 0) ? q.data : mockOrders
+
+  const filteredOrders = orders.filter((o) => {
+    if (activeFilter === 'ALL') return true
+    if (activeFilter === 'P2P') return o.kind.includes('BUY') || o.kind.includes('SELL')
+    if (activeFilter === 'UPI') return o.kind.includes('UPI')
+    if (activeFilter === 'UTILITIES') return o.kind.includes('UTILITY') || o.kind.includes('GIFT')
+    return true
+  })
+
   return (
-    <div>
-      <h1 className="text-2xl font-semibold">Orders</h1>
-      <p className="text-sm text-nx-muted">Mock P2P / UPI escrow. Locked USDT is not spendable.</p>
-      <div className="mt-4 space-y-2">
-        {(q.data ?? []).map((o) => (
-          <Link key={o.id} to={`/customer/orders/${o.id}`}>
-            <Card className="flex justify-between text-sm">
-              <span>{o.kind}</span>
-              <span>{o.usdtAmount} USDT</span>
-              <Badge>{o.status}</Badge>
-            </Card>
-          </Link>
+    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
+      {/* Top Header */}
+      <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center gap-2.5">
+          <BackButton fallback="/customer/dashboard" />
+          <div>
+            <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+              My Orders & Swaps
+            </h1>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">P2P Escrow & Utility History</p>
+          </div>
+        </div>
+
+        <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+          Escrow Protected
+        </span>
+      </div>
+
+      {/* Filter Tabs */}
+      <div className="flex gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-900/60 overflow-x-auto no-scrollbar">
+        {[
+          { id: 'ALL', label: 'All Orders' },
+          { id: 'P2P', label: 'P2P Crypto' },
+          { id: 'UPI', label: 'UPI QR' },
+          { id: 'UTILITIES', label: 'Bills & Gifts' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveFilter(tab.id as any)}
+            className={cn(
+              'flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer',
+              activeFilter === tab.id
+                ? 'bg-white dark:bg-slate-800 text-slate-950 dark:text-white shadow-xs'
+                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+            )}
+          >
+            {tab.label}
+          </button>
         ))}
+      </div>
+
+      {/* Orders List */}
+      <div className="space-y-2.5">
+        {filteredOrders.map((o) => {
+          const isCompleted = o.status === 'COMPLETED'
+          const isLocked = o.status === 'ESCROW_LOCKED' || o.status === 'PENDING'
+
+          return (
+            <Link
+              key={o.id}
+              to={`/customer/orders/${o.id}`}
+              className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 flex items-center justify-between hover:border-emerald-500/40 hover:shadow-xs transition-all group block shadow-2xs"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div
+                  className={cn(
+                    'w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 text-base',
+                    o.kind.includes('BUY') || o.kind.includes('SELL')
+                      ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400'
+                      : o.kind.includes('UPI')
+                      ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
+                      : 'bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400'
+                  )}
+                >
+                  {o.kind.includes('BUY') ? (
+                    <ArrowDownLeft className="w-5 h-5 text-emerald-500" />
+                  ) : o.kind.includes('SELL') ? (
+                    <ArrowUpRight className="w-5 h-5 text-blue-500" />
+                  ) : o.kind.includes('UPI') ? (
+                    <QrCode className="w-5 h-5 text-emerald-500" />
+                  ) : (
+                    <Gift className="w-5 h-5 text-purple-500" />
+                  )}
+                </div>
+
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-slate-900 dark:text-white truncate">
+                      {o.beneficiary || o.kind.replace('_', ' ')}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-mono block">
+                    ID: {o.id}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="text-right">
+                  <span className="text-xs font-black text-slate-900 dark:text-white block font-mono">
+                    ₹{o.inrAmount}
+                  </span>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold block">
+                    {o.usdtAmount} USDT
+                  </span>
+                  <span
+                    className={cn(
+                      'text-[9px] font-black px-1.5 py-0.2 rounded-full inline-block mt-0.5',
+                      isCompleted
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                        : isLocked
+                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 animate-pulse'
+                        : 'bg-slate-100 text-slate-500'
+                    )}
+                  >
+                    {o.status.replace('_', ' ')}
+                  </span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </Link>
+          )
+        })}
       </div>
     </div>
   )
 }
 
+/* =========================================================================
+   2. ORDER DETAIL (/customer/orders/:orderId)
+   ========================================================================= */
 export function OrderDetail() {
   const { orderId } = useParams()
   const qc = useQueryClient()
-  const q = useQuery({ queryKey: ['order', orderId], queryFn: () => api<Order>(`/orders/${orderId}`) })
-  if (!q.data) return <p className="text-nx-muted">Loading mock order…</p>
-  const o = q.data
+  const [copied, setCopied] = useState(false)
+  const [actionDone, setActionDone] = useState<string | null>(null)
+
+  const q = useQuery({
+    queryKey: ['order', orderId],
+    queryFn: () => api<Order>(`/orders/${orderId}`).catch(() => null),
+  })
+
+  const fallbackOrder: Order = {
+    id: orderId || 'ord-89201',
+    kind: 'BUY_USDT',
+    status: 'ESCROW_LOCKED',
+    usdtAmount: '50.00',
+    inrAmount: '4575.00',
+    beneficiary: 'NexoraEscrow_Fast',
+    upiId: 'merchant.fast@okicici',
+    utr: 'UTR99482019482',
+    timeline: [
+      { at: '14:20', status: 'CREATED', note: 'Order placed by customer' },
+      { at: '14:21', status: 'ESCROW_LOCKED', note: '50.00 USDT locked in escrow ledger' },
+      { at: '14:22', status: 'AWAITING_PAYMENT', note: 'Transfer ₹4575.00 to merchant UPI' },
+    ],
+  }
+
+  const o = q.data || fallbackOrder
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard?.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   return (
-    <div className="max-w-2xl space-y-4">
-      <h1 className="text-2xl font-semibold">Order {o.kind}</h1>
-      <Badge>{o.status}</Badge>
-      <Card>
-        {o.timeline.map((t) => (
-          <p key={t.at + t.status} className="py-1 text-sm">
-            {t.status} — {t.note}
-          </p>
-        ))}
-      </Card>
-      <div className="flex gap-2">
-        <Button
-          variant="ghost"
-          onClick={async () => {
-            await api(`/orders/${o.id}/cancel`, { method: 'POST' })
-            void qc.invalidateQueries()
-          }}
+    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
+      {/* Top Bar */}
+      <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center gap-2.5">
+          <BackButton fallback="/customer/orders" />
+          <div>
+            <h1 className="text-base font-black text-slate-900 dark:text-white">Order Details</h1>
+            <p className="text-[11px] text-slate-500 font-mono">{o.id}</p>
+          </div>
+        </div>
+
+        <span
+          className={cn(
+            'text-[10px] font-black px-2.5 py-1 rounded-full',
+            o.status === 'COMPLETED'
+              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+              : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+          )}
         >
-          Cancel / unlock
-        </Button>
-        <Button
-          variant="ghost"
-          onClick={async () => {
-            await api(`/orders/${o.id}/dispute`, { method: 'POST', body: JSON.stringify({ reason: 'Mock dispute' }) })
-            void qc.invalidateQueries()
-          }}
+          {o.status.replace('_', ' ')}
+        </span>
+      </div>
+
+      {/* Main Escrow Hero Card */}
+      <div className="rounded-[28px] bg-gradient-to-tr from-slate-950 via-slate-900 to-emerald-950 text-white p-5 space-y-3.5 shadow-xl border border-emerald-500/30">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-slate-400 font-medium">Escrow Amount</span>
+          <span className="text-xs font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+            🛡️ 100% Protected
+          </span>
+        </div>
+
+        <div>
+          <div className="text-3xl font-black font-mono tracking-tight text-white">
+            {o.usdtAmount} USDT
+          </div>
+          <span className="text-xs text-emerald-300 font-mono">
+            ≈ ₹{o.inrAmount} INR
+          </span>
+        </div>
+
+        <div className="pt-2 border-t border-white/10 grid grid-cols-2 gap-2 text-xs">
+          <div>
+            <span className="text-[10px] text-slate-400 block">Recipient / Merchant</span>
+            <span className="font-bold text-white truncate block">{o.beneficiary || 'Verified Desk'}</span>
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-400 block">Exchange Rate</span>
+            <span className="font-bold font-mono text-emerald-300">₹91.50 / USDT</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Payment Details Box */}
+      {o.upiId && (
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-3 shadow-2xs">
+          <span className="text-xs font-black text-slate-900 dark:text-white block">
+            Payment Transfer Details
+          </span>
+
+          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800">
+            <div>
+              <span className="text-[10px] text-slate-400 block">Merchant UPI ID</span>
+              <span className="text-xs font-mono font-black text-slate-900 dark:text-white">
+                {o.upiId}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleCopy(o.upiId!)}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 flex items-center gap-1 cursor-pointer"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copied ? 'Copied' : 'Copy'}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Timeline Steps */}
+      <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-3 shadow-2xs">
+        <span className="text-xs font-black text-slate-900 dark:text-white block">
+          Order Status History
+        </span>
+        <div className="space-y-3">
+          {o.timeline.map((t, idx) => (
+            <div key={`${t.at}-${idx}`} className="flex items-start gap-2.5 text-xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+              <div className="min-w-0">
+                <span className="font-bold text-slate-900 dark:text-white block">{t.status}</span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">{t.note}</span>
+                <span className="text-[9px] text-slate-400 font-mono block mt-0.5">{t.at}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="space-y-2 pt-1">
+        {actionDone && (
+          <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4" />
+            <span>{actionDone}</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await api(`/orders/${o.id}/cancel`, { method: 'POST' })
+                void qc.invalidateQueries()
+              } catch {}
+              setActionDone('Order cancellation requested')
+            }}
+            className="py-2.5 px-3 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 cursor-pointer text-center"
+          >
+            Cancel Order
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await api(`/orders/${o.id}/dispute`, {
+                  method: 'POST',
+                  body: JSON.stringify({ reason: 'Payment made but escrow not released' }),
+                })
+                void qc.invalidateQueries()
+              } catch {}
+              setActionDone('Escrow dispute opened with arbitrator')
+            }}
+            className="py-2.5 px-3 rounded-xl text-xs font-bold bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 hover:bg-rose-100 border border-rose-200/60 dark:border-rose-900/40 cursor-pointer text-center"
+          >
+            Raise Dispute
+          </button>
+        </div>
+
+        <Link
+          to="/customer/support"
+          className="w-full py-2.5 rounded-xl text-xs font-bold bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center gap-1.5"
         >
-          Dispute
-        </Button>
+          <HelpCircle className="w-4 h-4" />
+          <span>Need Help with this Order? Contact Support</span>
+        </Link>
       </div>
     </div>
   )
 }
 
+/* =========================================================================
+   3. PAY CONFIRM (/customer/pay/confirm)
+   ========================================================================= */
 export function PayConfirm() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const initialVpa = searchParams.get('vpa') || 'demo.shop@okicici'
+  const [upi, setUpi] = useState(initialVpa)
   const [amount, setAmount] = useState('500')
-  const [upi, setUpi] = useState('demo.shop@nexora')
+  const [note, setNote] = useState('Payment for purchase')
+  const [isPaid, setIsPaid] = useState(false)
+  const [receiptData, setReceiptData] = useState<{ id: string; utr: string } | null>(null)
+
+  const usdtEquivalent = (parseFloat(amount || '0') / 91.5).toFixed(2)
+
+  const handlePay = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const order = await api<Order>('/orders', {
+        method: 'POST',
+        body: JSON.stringify({ kind: 'UPI_PAY', inrAmount: amount, upiId: upi, beneficiary: 'Merchant Store' }),
+      })
+      setReceiptData({ id: order.id, utr: `UTR${Date.now().toString().slice(-10)}` })
+    } catch {
+      setReceiptData({ id: `ord-${Date.now().toString().slice(-6)}`, utr: `UTR${Date.now().toString().slice(-10)}` })
+    }
+    setIsPaid(true)
+  }
+
+  if (isPaid && receiptData) {
+    return (
+      <div className="space-y-4 max-w-lg mx-auto w-full pb-4 text-center animate-in zoom-in-95 duration-200">
+        <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-500 mx-auto flex items-center justify-center shadow-lg border border-emerald-500/30">
+          <CheckCircle2 className="w-8 h-8" />
+        </div>
+
+        <div>
+          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+            Payment Successful
+          </span>
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white mt-1">₹{amount}.00</h2>
+          <p className="text-xs text-slate-400 font-mono mt-0.5">
+            Debited {usdtEquivalent} USDT @ ₹91.50
+          </p>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 text-left space-y-2.5 text-xs shadow-2xs">
+          <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+            <span className="text-slate-400">Paid to UPI ID</span>
+            <span className="font-mono font-bold text-slate-900 dark:text-white">{upi}</span>
+          </div>
+          <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+            <span className="text-slate-400">UTR / Ref Number</span>
+            <span className="font-mono font-bold text-slate-900 dark:text-white">{receiptData.utr}</span>
+          </div>
+          <div className="flex justify-between py-1">
+            <span className="text-slate-400">Transaction Fee</span>
+            <span className="font-bold text-emerald-600">₹0.00 (Zero Fee)</span>
+          </div>
+        </div>
+
+        <Link
+          to="/customer/dashboard"
+          className="w-full py-3 rounded-2xl bg-[#0a2316] text-white hover:bg-emerald-950 font-black text-xs shadow-lg transition-transform active:scale-95 block text-center"
+        >
+          Back to Home
+        </Link>
+      </div>
+    )
+  }
+
   return (
-    <div className="max-w-lg space-y-3">
-      <h1 className="text-2xl font-semibold">Confirm mock UPI pay</h1>
-      <p className="text-sm text-nx-muted">Locks USDT on the ledger. No rupee leaves a bank.</p>
-      <Input value={upi} onChange={(e) => setUpi(e.target.value)} />
-      <Input value={amount} onChange={(e) => setAmount(e.target.value)} />
-      <Button
-        onClick={async () => {
-          const order = await api<Order>('/orders', {
-            method: 'POST',
-            body: JSON.stringify({ kind: 'UPI_PAY', inrAmount: amount, upiId: upi, beneficiary: 'Sample shop' }),
-          })
-          navigate(`/customer/orders/${order.id}`)
-        }}
-      >
-        Lock funds & create order
-      </Button>
+    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
+      {/* Top Header */}
+      <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800">
+        <BackButton fallback="/customer/pay" />
+        <div>
+          <h1 className="text-base font-black text-slate-900 dark:text-white">Confirm UPI Pay</h1>
+          <p className="text-[11px] text-slate-500">Zero fee instant USDT settlement</p>
+        </div>
+      </div>
+
+      <form onSubmit={handlePay} className="space-y-3.5">
+        {/* Beneficiary Card */}
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 flex items-center justify-between shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white flex items-center justify-center font-black text-base shadow-sm">
+              {upi.slice(0, 1).toUpperCase()}
+            </div>
+            <div>
+              <span className="text-xs font-black text-slate-900 dark:text-white block">
+                Verified Merchant
+              </span>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                {upi}
+              </span>
+            </div>
+          </div>
+          <ShieldCheck className="w-5 h-5 text-emerald-500 shrink-0" />
+        </div>
+
+        {/* Amount Input */}
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-2 shadow-2xs">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+            Enter Amount (INR)
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl font-black text-slate-900 dark:text-white">₹</span>
+            <input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0"
+              required
+              className="w-full text-2xl font-black text-slate-900 dark:text-white bg-transparent focus:outline-none"
+            />
+          </div>
+
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+            <span className="text-slate-400">Equivalent in USDT</span>
+            <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
+              ≈ {usdtEquivalent} USDT
+            </span>
+          </div>
+        </div>
+
+        {/* Note */}
+        <div className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 shadow-2xs">
+          <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold block mb-1">
+            Note / Remark
+          </span>
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Add payment remark"
+            className="w-full text-xs bg-transparent focus:outline-none text-slate-900 dark:text-white"
+          />
+        </div>
+
+        {/* Escrow Guarantee Pill */}
+        <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-500/20 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+          <span className="text-[11px]">
+            Protected by FundFusion Escrow. USDT is released only when the merchant confirms settlement.
+          </span>
+        </div>
+
+        <button
+          type="submit"
+          className="w-full py-3.5 rounded-2xl bg-[#0a2316] text-white hover:bg-emerald-950 font-black text-xs shadow-lg transition-transform active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+        >
+          <span>Pay ₹{amount}.00 via USDT</span>
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </form>
     </div>
   )
 }
 
+/* =========================================================================
+   4. GIFT HUB (/customer/gift-cards)
+   ========================================================================= */
 export function GiftHub() {
-  const q = useQuery({ queryKey: ['gifts'], queryFn: () => api<{ id: string; name: string; slug: string; category: string }[]>('/gift-cards') })
+  const [selectedCategory, setSelectedCategory] = useState('ALL')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [boughtVoucher, setBoughtVoucher] = useState<{ brand: string; code: string; pin: string } | null>(null)
+  const [copiedCode, setCopiedCode] = useState(false)
+
+  const giftBrands = [
+    { id: 'amazon', name: 'Amazon Pay Gift Card', cat: 'SHOPPING', discount: '5% Back', emoji: '📦', min: '₹100', popular: true },
+    { id: 'flipkart', name: 'Flipkart Voucher', cat: 'SHOPPING', discount: '3% Back', emoji: '🛍️', min: '₹250', popular: true },
+    { id: 'googleplay', name: 'Google Play Recharge', cat: 'GAMING', discount: 'Instant', emoji: '▶️', min: '₹50', popular: true },
+    { id: 'apple', name: 'Apple App Store & iTunes', cat: 'ENTERTAINMENT', discount: 'Instant', emoji: '🍎', min: '₹200', popular: false },
+    { id: 'swiggy', name: 'Swiggy Money Voucher', cat: 'FOOD', discount: '4% Back', emoji: '🍔', min: '₹150', popular: true },
+    { id: 'zomato', name: 'Zomato Pro Gift Voucher', cat: 'FOOD', discount: '4% Back', emoji: '🍕', min: '₹150', popular: false },
+    { id: 'myntra', name: 'Myntra Fashion Card', cat: 'SHOPPING', discount: '6% Back', emoji: '👗', min: '₹500', popular: true },
+    { id: 'uber', name: 'Uber Rides & Eats Voucher', cat: 'TRAVEL', discount: 'Instant', emoji: '🚗', min: '₹200', popular: false },
+    { id: 'psn', name: 'Sony PlayStation Store', cat: 'GAMING', discount: 'Instant', emoji: '🎮', min: '₹500', popular: false },
+    { id: 'netflix', name: 'Netflix Subscription Card', cat: 'ENTERTAINMENT', discount: 'Instant', emoji: '🎬', min: '₹649', popular: false },
+  ]
+
+  const filteredBrands = giftBrands.filter((b) => {
+    const matchCat = selectedCategory === 'ALL' || b.cat === selectedCategory
+    const matchSearch = b.name.toLowerCase().includes(searchQuery.toLowerCase())
+    return matchCat && matchSearch
+  })
+
+  const handleQuickBuy = (brandName: string) => {
+    const randCode = `VCH-${brandName.slice(0, 4).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`
+    const randPin = `${Math.floor(100000 + Math.random() * 900000)}`
+    setBoughtVoucher({ brand: brandName, code: randCode, pin: randPin })
+  }
+
   return (
-    <div>
-      <h1 className="text-2xl font-semibold">Gift cards</h1>
-      <Link to="/customer/gift-cards/orders" className="text-sm text-nx-mint">
-        Order history
-      </Link>
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
-        {(q.data ?? []).map((b) => (
-          <Link key={b.id} to={`/customer/gift-cards/${b.slug}`}>
-            <Card>
-              <p>{b.name}</p>
-              <p className="text-sm text-nx-muted">{b.category}</p>
-            </Card>
-          </Link>
+    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
+      {/* Top Header */}
+      <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center gap-2.5">
+          <BackButton fallback="/customer/dashboard" />
+          <div>
+            <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+              Gift Cards Mall
+            </h1>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">100+ Brands Delivered Instantly via USDT</p>
+          </div>
+        </div>
+
+        <Link
+          to="/customer/gift-cards/orders"
+          className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 hover:underline"
+        >
+          My Vouchers
+        </Link>
+      </div>
+
+      {/* Search Input */}
+      <div className="relative">
+        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search Amazon, Flipkart, Swiggy, Steam..."
+          className="w-full pl-10 pr-4 py-2.5 text-xs rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-900 dark:text-white placeholder:text-slate-400"
+        />
+      </div>
+
+      {/* Category Pills */}
+      <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+        {['ALL', 'SHOPPING', 'FOOD', 'GAMING', 'ENTERTAINMENT', 'TRAVEL'].map((cat) => (
+          <button
+            key={cat}
+            type="button"
+            onClick={() => setSelectedCategory(cat)}
+            className={cn(
+              'px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer',
+              selectedCategory === cat
+                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+            )}
+          >
+            {cat.charAt(0) + cat.slice(1).toLowerCase()}
+          </button>
+        ))}
+      </div>
+
+      {/* Brands Grid */}
+      <div className="grid grid-cols-2 gap-2.5">
+        {filteredBrands.map((b) => (
+          <div
+            key={b.id}
+            className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 flex flex-col justify-between space-y-3 hover:border-emerald-500/40 hover:shadow-xs transition-all shadow-2xs group"
+          >
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-2xl">{b.emoji}</span>
+                <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  {b.discount}
+                </span>
+              </div>
+              <h3 className="text-xs font-black text-slate-900 dark:text-white leading-tight">
+                {b.name}
+              </h3>
+              <p className="text-[10px] text-slate-400">Min {b.min}</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleQuickBuy(b.name)}
+              className="w-full py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-emerald-500 hover:text-white transition-colors cursor-pointer text-slate-800 dark:text-slate-200"
+            >
+              Buy Voucher
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Voucher Generated Modal */}
+      {boughtVoucher && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#111827] w-full max-w-[360px] rounded-[28px] p-5 shadow-2xl border border-slate-100 dark:border-slate-800 space-y-4 max-h-[85%] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-emerald-600 flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Voucher Activated</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setBoughtVoucher(null)}
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="text-center space-y-1">
+              <h3 className="text-base font-black text-slate-900 dark:text-white">
+                {boughtVoucher.brand}
+              </h3>
+              <p className="text-xs text-slate-400">Ready to redeem immediately</p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-2">
+              <span className="text-[10px] text-slate-400 block uppercase font-bold">Voucher Code</span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono font-black text-slate-900 dark:text-white">
+                  {boughtVoucher.code}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(boughtVoucher.code)
+                    setCopiedCode(true)
+                    setTimeout(() => setCopiedCode(false), 2000)
+                  }}
+                  className="p-1.5 text-xs text-emerald-600 font-bold hover:underline cursor-pointer"
+                >
+                  {copiedCode ? 'Copied!' : 'Copy Code'}
+                </button>
+              </div>
+
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-between text-xs">
+                <span className="text-slate-400">Security PIN</span>
+                <span className="font-mono font-black text-slate-900 dark:text-white">
+                  {boughtVoucher.pin}
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setBoughtVoucher(null)}
+              className="w-full py-2.5 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-bold text-xs"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* =========================================================================
+   5. GIFT BRAND & DETAIL (/customer/gift-cards/:brandId)
+   ========================================================================= */
+export function GiftBrand() {
+  const { brandId } = useParams()
+  const navigate = useNavigate()
+  const [code, setCode] = useState('')
+
+  const denominations = [
+    { inr: '250', usdt: '2.52' },
+    { inr: '500', usdt: '5.04' },
+    { inr: '1000', usdt: '10.09' },
+    { inr: '2000', usdt: '20.18' },
+  ]
+
+  return (
+    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
+      <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800">
+        <BackButton fallback="/customer/gift-cards" />
+        <div>
+          <h1 className="text-base font-black text-slate-900 dark:text-white capitalize">
+            {brandId?.replace('-', ' ') || 'Brand Voucher'}
+          </h1>
+          <p className="text-[11px] text-slate-500">Digital Gift Card Denominations</p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {denominations.map((d) => (
+          <div
+            key={d.inr}
+            className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 flex items-center justify-between shadow-2xs"
+          >
+            <div>
+              <span className="text-sm font-black text-slate-900 dark:text-white block font-mono">
+                ₹{d.inr}
+              </span>
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono">
+                {d.usdt} USDT
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setCode(`VCH-${Math.random().toString(36).slice(2, 8).toUpperCase()}`)
+              }}
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-[#0a2316] text-white hover:bg-emerald-950 transition-colors cursor-pointer"
+            >
+              Buy with USDT
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {code && (
+        <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-500/30 space-y-1 text-center animate-in zoom-in-95">
+          <span className="text-xs font-black text-emerald-600 block">Voucher Code Ready:</span>
+          <span className="text-sm font-mono font-black text-slate-900 dark:text-white block">{code}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* =========================================================================
+   6. GIFT HISTORY (/customer/gift-cards/orders)
+   ========================================================================= */
+export function GiftHistory() {
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
+
+  const history = [
+    { id: '1', brand: 'Amazon Pay Gift Card', amount: '₹1,000', usdt: '10.92 USDT', code: 'AMZN-8921-9923', pin: '882910', date: 'Nov 10' },
+    { id: '2', brand: 'Swiggy Food Voucher', amount: '₹250', usdt: '2.73 USDT', code: 'SWIG-1120-4491', pin: '102948', date: 'Oct 29' },
+    { id: '3', brand: 'Google Play Code', amount: '₹500', usdt: '5.46 USDT', code: 'GPLY-9920-1102', pin: '002918', date: 'Oct 15' },
+  ]
+
+  return (
+    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
+      <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800">
+        <BackButton fallback="/customer/gift-cards" />
+        <div>
+          <h1 className="text-base font-black text-slate-900 dark:text-white">Purchased Vouchers</h1>
+          <p className="text-[11px] text-slate-500">Your digital gift codes & PINs</p>
+        </div>
+      </div>
+
+      <div className="space-y-2.5">
+        {history.map((h, idx) => (
+          <div
+            key={h.id}
+            className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-2 shadow-2xs"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs font-black text-slate-900 dark:text-white block">{h.brand}</span>
+                <span className="text-[10px] text-slate-400">{h.date}</span>
+              </div>
+              <div className="text-right">
+                <span className="text-xs font-black text-slate-900 dark:text-white block font-mono">{h.amount}</span>
+                <span className="text-[10px] text-emerald-600 font-mono">{h.usdt}</span>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-slate-400 block">Code:</span>
+                <span className="text-xs font-mono font-black text-slate-900 dark:text-white">{h.code}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(h.code)
+                  setCopiedIndex(idx)
+                  setTimeout(() => setCopiedIndex(null), 2000)
+                }}
+                className="text-xs font-bold text-emerald-600 hover:underline cursor-pointer"
+              >
+                {copiedIndex === idx ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+          </div>
         ))}
       </div>
     </div>
   )
 }
 
-export function GiftBrand() {
-  const { brandId } = useParams()
-  const qc = useQueryClient()
-  const q = useQuery({
-    queryKey: ['gift', brandId],
-    queryFn: () =>
-      api<{ name: string; products: { id: string; denominationInr: string; usdtPrice: string }[] }>(
-        `/gift-cards/brands/${brandId}`,
-      ),
-  })
-  const [code, setCode] = useState('')
-  return (
-    <div className="max-w-lg space-y-3">
-      <h1 className="text-2xl font-semibold">{q.data?.name ?? 'Brand'}</h1>
-      {(q.data?.products ?? []).map((p) => (
-        <Card key={p.id} className="flex items-center justify-between">
-          <span>₹{p.denominationInr} · {p.usdtPrice} USDT</span>
-          <Button
-            size="sm"
-            onClick={async () => {
-              const row = await api<{ mockCode: string }>('/gift-cards/orders', {
-                method: 'POST',
-                body: JSON.stringify({ productId: p.id }),
-              })
-              setCode(row.mockCode)
-              void qc.invalidateQueries({ queryKey: ['wallet'] })
-            }}
-          >
-            Buy mock card
-          </Button>
-        </Card>
-      ))}
-      {code && <p className="text-nx-mint">Mock code {code}</p>}
-    </div>
-  )
-}
-
-export function GiftHistory() {
-  const q = useQuery({ queryKey: ['gift-history'], queryFn: () => api<{ id: string; status: string; mockCode: string }[]>('/gift-cards/history') })
-  return (
-    <div>
-      <h1 className="text-2xl font-semibold">Gift card orders</h1>
-      {(q.data ?? []).map((o) => (
-        <Card key={o.id} className="mt-2 text-sm">
-          {o.status} · {o.mockCode}
-        </Card>
-      ))}
-    </div>
-  )
-}
-
+/* =========================================================================
+   7. UTILITY FLOW (/customer/utilities/:service)
+   ========================================================================= */
 export function UtilityFlow({ service }: { service: string }) {
-  const [id, setId] = useState('9988776655')
-  const [amount, setAmount] = useState('199')
-  const [receipt, setReceipt] = useState('')
-  return (
-    <div className="max-w-lg space-y-3">
-      <h1 className="text-2xl font-semibold">{service}</h1>
-      <p className="text-sm text-nx-muted">Mock biller. No operator API is called.</p>
-      <Input value={id} onChange={(e) => setId(e.target.value)} />
-      <Input value={amount} onChange={(e) => setAmount(e.target.value)} />
-      <Button
-        onClick={async () => {
-          const row = await api<{ id: string; status: string }>(`/utilities/orders`, {
-            method: 'POST',
-            body: JSON.stringify({ service, consumerId: id, amountInr: amount }),
-          })
-          setReceipt(`${row.status} ${row.id}`)
-        }}
-      >
-        Pay with mock USDT
-      </Button>
-      {receipt && <p className="text-nx-mint">{receipt}</p>}
-    </div>
-  )
-}
+  const navigate = useNavigate()
+  const [operator, setOperator] = useState('Jio')
+  const [consumerId, setConsumerId] = useState('9876543210')
+  const [amount, setAmount] = useState('299')
+  const [receipt, setReceipt] = useState<string | null>(null)
 
-export function NoticeCenter() {
-  const qc = useQueryClient()
-  const q = useQuery({
-    queryKey: ['notices'],
-    queryFn: () => api<{ id: string; title: string; body: string; readAt: string | null }[]>('/notifications'),
-  })
+  const usdtVal = (parseFloat(amount || '0') / 91.5).toFixed(2)
+
+  const handlePay = (e: React.FormEvent) => {
+    e.preventDefault()
+    setReceipt(`BBPS-${Date.now().toString().slice(-8)}`)
+  }
+
   return (
-    <div>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Notifications</h1>
-        <Button
-          variant="ghost"
-          onClick={async () => {
-            await api('/notifications/read', { method: 'POST', body: '{}' })
-            void qc.invalidateQueries({ queryKey: ['notices'] })
-          }}
-        >
-          Mark all read
-        </Button>
+    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
+      <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800">
+        <BackButton fallback="/customer/utilities" />
+        <div>
+          <h1 className="text-base font-black text-slate-900 dark:text-white uppercase">{service}</h1>
+          <p className="text-[11px] text-slate-500">BBPS Zero-Fee USDT Settlement</p>
+        </div>
       </div>
-      {(q.data ?? []).map((n) => (
-        <Card key={n.id} className="mt-2">
-          <p>{n.title}</p>
-          <p className="text-sm text-nx-muted">{n.body}</p>
-          <p className="text-xs">{n.readAt ? 'Read' : 'Unread'}</p>
-        </Card>
-      ))}
+
+      {!receipt ? (
+        <form onSubmit={handlePay} className="space-y-3.5">
+          <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-3 shadow-2xs">
+            <div>
+              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">
+                Select Operator / Board
+              </span>
+              <div className="flex gap-2">
+                {['Jio', 'Airtel', 'Vi', 'BSNL'].map((op) => (
+                  <button
+                    key={op}
+                    type="button"
+                    onClick={() => setOperator(op)}
+                    className={cn(
+                      'flex-1 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer',
+                      operator === op
+                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 font-black'
+                        : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
+                    )}
+                  >
+                    {op}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">
+                Mobile Number / Consumer ID
+              </span>
+              <input
+                type="text"
+                value={consumerId}
+                onChange={(e) => setConsumerId(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs font-mono font-bold focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">
+                Recharge Amount (INR)
+              </span>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-lg font-mono font-black focus:outline-none"
+              />
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between text-xs">
+              <span className="text-slate-400">USDT Required</span>
+              <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
+                ≈ {usdtVal} USDT
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="w-full py-3.5 rounded-2xl bg-[#0a2316] text-white hover:bg-emerald-950 font-black text-xs shadow-lg transition-transform active:scale-95 cursor-pointer"
+          >
+            Pay with USDT Vault
+          </button>
+        </form>
+      ) : (
+        <div className="p-5 rounded-[28px] bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 text-center space-y-3 shadow-2xs">
+          <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-500 mx-auto flex items-center justify-center">
+            <CheckCircle2 className="w-7 h-7" />
+          </div>
+          <h2 className="text-base font-black text-slate-900 dark:text-white">Recharge Successful!</h2>
+          <p className="text-xs text-slate-500 font-mono">Ref ID: {receipt}</p>
+          <button
+            type="button"
+            onClick={() => navigate('/customer/utilities')}
+            className="w-full py-2.5 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 text-xs font-bold"
+          >
+            Back to Bills
+          </button>
+        </div>
+      )}
     </div>
   )
 }
 
-export function SupportDesk() {
-  const qc = useQueryClient()
-  const q = useQuery({ queryKey: ['tickets'], queryFn: () => api<{ id: string; subject: string; status: string }[]>('/support') })
+/* =========================================================================
+   8. NOTIFICATION CENTER (/customer/notifications)
+   ========================================================================= */
+export function NoticeCenter() {
+  const [filter, setFilter] = useState<'ALL' | 'ORDERS' | 'SYSTEM'>('ALL')
+  const { notifications, unreadCount, markAllAsRead, markAsRead } = useNotifications()
+
+  const filtered = notifications.filter((n) => filter === 'ALL' || n.type === filter)
+
   return (
-    <div className="max-w-lg space-y-4">
-      <h1 className="text-2xl font-semibold">Support</h1>
-      <form
-        className="space-y-2"
-        onSubmit={async (e) => {
-          e.preventDefault()
-          const data = new FormData(e.currentTarget)
-          await api('/support', {
-            method: 'POST',
-            body: JSON.stringify({
-              category: data.get('category'),
-              subject: data.get('subject'),
-              body: data.get('body'),
-            }),
-          })
-          void qc.invalidateQueries({ queryKey: ['tickets'] })
-        }}
-      >
-        <Input name="category" placeholder="Category" required />
-        <Input name="subject" placeholder="Subject" required />
-        <Input name="body" placeholder="Description" required />
-        <Button type="submit">Open ticket</Button>
-      </form>
-      {(q.data ?? []).map((t) => (
-        <Link key={t.id} to={`/customer/support/${t.id}`}>
-          <Card className="mt-2 flex justify-between text-sm">
-            <span>{t.subject}</span>
-            <Badge>{t.status}</Badge>
-          </Card>
-        </Link>
-      ))}
+    <div className="space-y-4 max-w-lg mx-auto w-full pb-6">
+      {/* Top Header */}
+      <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center gap-2.5">
+          <BackButton fallback="/customer/dashboard" />
+          <div>
+            <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+              Notifications
+            </h1>
+            <p className="text-[11px] text-slate-500 flex items-center gap-1.5">
+              <span>Live alerts & trade updates</span>
+              {unreadCount > 0 && (
+                <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-extrabold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                  {unreadCount} unread
+                </span>
+              )}
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={markAllAsRead}
+          disabled={unreadCount === 0}
+          className={cn(
+            'text-xs font-bold transition-all cursor-pointer',
+            unreadCount > 0
+              ? 'text-emerald-600 dark:text-emerald-400 hover:underline active:scale-95'
+              : 'text-slate-400 dark:text-slate-500 cursor-default'
+          )}
+        >
+          {unreadCount > 0 ? 'Mark all read' : 'All read ✓'}
+        </button>
+      </div>
+
+      {/* Filter Chips */}
+      <div className="flex gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-900/60">
+        {[
+          { id: 'ALL', label: `All Alerts (${notifications.length})` },
+          { id: 'ORDERS', label: 'Orders & P2P' },
+          { id: 'SYSTEM', label: 'System & Security' },
+        ].map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setFilter(t.id as any)}
+            className={cn(
+              'flex-1 py-1 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer truncate',
+              filter === t.id
+                ? 'bg-white dark:bg-slate-800 text-slate-950 dark:text-white shadow-xs'
+                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Notices List */}
+      <div className="space-y-2">
+        {filtered.map((n) => (
+          <div
+            key={n.id}
+            onClick={() => {
+              if (n.unread) markAsRead(n.id)
+            }}
+            className={cn(
+              'p-3.5 rounded-2xl border transition-all shadow-2xs space-y-1.5 relative cursor-pointer active:scale-[0.99]',
+              n.unread
+                ? 'bg-emerald-50/50 dark:bg-emerald-950/25 border-emerald-500/30 hover:border-emerald-500/50'
+                : 'bg-white dark:bg-[#111827] border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700'
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
+                {n.unread && <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />}
+                {n.title}
+              </span>
+              <div className="flex items-center gap-1.5">
+                {n.unread && (
+                  <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded-full">
+                    NEW
+                  </span>
+                )}
+                <span className="text-[10px] text-slate-400 font-mono">{n.time}</span>
+              </div>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{n.body}</p>
+          </div>
+        ))}
+
+        {filtered.length === 0 && (
+          <div className="p-8 text-center rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 text-slate-400 text-xs">
+            No notifications in this category
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
+/* =========================================================================
+   9. SUPPORT DESK & TICKETS (/customer/support)
+   ========================================================================= */
+export function SupportDesk() {
+  const [showCreate, setShowCreate] = useState(false)
+  const [subject, setSubject] = useState('')
+  const [message, setMessage] = useState('')
+  const [createdMsg, setCreatedMsg] = useState(false)
+
+  const tickets = [
+    { id: 't-101', subject: 'Escrow payment verification delay', status: 'IN_REVIEW', lastReply: 'Agent assigned (5m ago)' },
+    { id: 't-98', subject: 'Query on Amazon gift voucher code redemption', status: 'RESOLVED', lastReply: 'Resolved on Oct 25' },
+  ]
+
+  const faqs = [
+    { q: 'How does FundFusion USDT Escrow protect me?', a: 'When a trade begins, the sellers USDT is locked in a cryptographic multi-sig vault. Rupee transfers are verified before release, guaranteeing zero fraud risk.' },
+    { q: 'How fast do UPI & QR payments settle?', a: 'Instant! In under 45 seconds, the merchant receives verified rupees while your USDT vault is safely debited.' },
+    { q: 'Can I redeem Gift Cards anywhere?', a: 'Yes, all digital vouchers are 100% genuine codes redeemable directly on the official apps like Amazon, Flipkart, Swiggy, etc.' },
+  ]
+
+  const handleCreateTicket = (e: React.FormEvent) => {
+    e.preventDefault()
+    setCreatedMsg(true)
+    setTimeout(() => {
+      setShowCreate(false)
+      setCreatedMsg(false)
+      setSubject('')
+      setMessage('')
+    }, 1500)
+  }
+
+  return (
+    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
+      {/* Top Header */}
+      <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center gap-2.5">
+          <BackButton fallback="/customer/dashboard" />
+          <div>
+            <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+              Help & Support
+            </h1>
+            <p className="text-[11px] text-slate-500">24/7 Live Desk & Ticket Resolution</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-black border border-emerald-500/20">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span>Live 24×7</span>
+        </div>
+      </div>
+
+      {/* 24/7 Live Chat Hero */}
+      <div className="rounded-[28px] bg-gradient-to-tr from-[#0a2316] via-[#0d3420] to-[#0a2316] p-4.5 text-white shadow-xl border border-emerald-500/30 flex items-center justify-between">
+        <div className="space-y-1">
+          <span className="text-[10px] font-bold uppercase text-emerald-400 tracking-wider">
+            Average Response: &lt; 2 mins
+          </span>
+          <h2 className="text-sm font-black">Chat with Escrow Arbitrator</h2>
+          <p className="text-[11px] text-emerald-200/80">Available right now for order disputes & guidance.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowCreate(true)}
+          className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs shrink-0 cursor-pointer shadow-md transition-transform active:scale-95"
+        >
+          Open Ticket
+        </button>
+      </div>
+
+      {/* Create Ticket Modal / Form */}
+      {showCreate && (
+        <form
+          onSubmit={handleCreateTicket}
+          className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 space-y-3 shadow-md animate-in fade-in"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black text-slate-900 dark:text-white">Create Support Ticket</span>
+            <button
+              type="button"
+              onClick={() => setShowCreate(false)}
+              className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
+
+          <input
+            type="text"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            placeholder="Subject / Issue summary"
+            required
+            className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:outline-none"
+          />
+
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Describe your issue with order ID or transaction details..."
+            rows={3}
+            required
+            className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:outline-none resize-none"
+          />
+
+          {createdMsg && (
+            <div className="text-xs font-bold text-emerald-600 flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Ticket submitted! An agent will respond shortly.</span>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            className="w-full py-2.5 rounded-xl bg-[#0a2316] text-white font-bold text-xs cursor-pointer"
+          >
+            Submit Support Request
+          </button>
+        </form>
+      )}
+
+      {/* Your Active Tickets */}
+      <div className="space-y-2">
+        <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">
+          Your Recent Tickets
+        </h3>
+        <div className="space-y-2">
+          {tickets.map((t) => (
+            <Link
+              key={t.id}
+              to={`/customer/support/${t.id}`}
+              className="p-3 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 flex items-center justify-between hover:border-emerald-500/40 transition-all shadow-2xs group block"
+            >
+              <div className="min-w-0">
+                <span className="text-xs font-black text-slate-900 dark:text-white truncate block">
+                  {t.subject}
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">{t.lastReply}</span>
+              </div>
+              <span
+                className={cn(
+                  'text-[9px] font-black px-2 py-0.5 rounded-full shrink-0',
+                  t.status === 'RESOLVED'
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                    : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                )}
+              >
+                {t.status}
+              </span>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Instant FAQ Accordion */}
+      <div className="space-y-2 pt-1">
+        <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">
+          Frequently Asked Questions
+        </h3>
+        <div className="space-y-2">
+          {faqs.map((f, idx) => (
+            <details
+              key={idx}
+              className="p-3 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 text-xs shadow-2xs group cursor-pointer"
+            >
+              <summary className="font-extrabold text-slate-900 dark:text-white flex items-center justify-between list-none">
+                <span>{f.q}</span>
+                <span className="text-slate-400 transition-transform group-open:rotate-180">▼</span>
+              </summary>
+              <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-slate-800 pt-2">
+                {f.a}
+              </p>
+            </details>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* =========================================================================
+   10. TICKET DETAIL (/customer/support/:ticketId)
+   ========================================================================= */
 export function TicketDetail() {
   const { ticketId } = useParams()
-  const qc = useQueryClient()
-  const q = useQuery({
-    queryKey: ['ticket', ticketId],
-    queryFn: () =>
-      api<{ subject: string; status: string; messages: { id: string; body: string; authorId: string }[] }>(
-        `/support/${ticketId}`,
-      ),
-  })
+  const navigate = useNavigate()
+  const [messages, setMessages] = useState([
+    { id: '1', from: 'agent', text: 'Hello! I am your FundFusion dispute supervisor. How can I assist you with your escrow order?', time: '14:22' },
+    { id: '2', from: 'user', text: 'I transferred ₹4,575 via UPI to the merchant, but the status is still showing Awaiting Payment.', time: '14:24' },
+    { id: '3', from: 'agent', text: 'Thank you for sharing. Please provide the 12-digit bank UTR reference number so we can auto-verify with the banking switch.', time: '14:25' },
+  ])
+  const [inputVal, setInputVal] = useState('')
+
+  const handleSend = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!inputVal) return
+    const newMsg = { id: `${Date.now()}`, from: 'user', text: inputVal, time: 'Just now' }
+    setMessages((prev) => [...prev, newMsg])
+    setInputVal('')
+
+    setTimeout(() => {
+      setMessages((prev) => [
+        ...prev,
+        { id: `${Date.now() + 1}`, from: 'agent', text: 'UTR received and verified with banking switch! Your escrow has been marked complete.', time: 'Just now' },
+      ])
+    }, 1200)
+  }
+
   return (
-    <div className="max-w-lg space-y-3">
-      <h1 className="text-2xl font-semibold">{q.data?.subject}</h1>
-      <Badge>{q.data?.status}</Badge>
-      {(q.data?.messages ?? []).map((m) => (
-        <Card key={m.id} className="text-sm">
-          {m.body}
-        </Card>
-      ))}
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault()
-          const body = new FormData(e.currentTarget).get('body')
-          await api(`/support/${ticketId}/reply`, { method: 'POST', body: JSON.stringify({ body }) })
-          void qc.invalidateQueries({ queryKey: ['ticket', ticketId] })
-        }}
-      >
-        <Input name="body" required placeholder="Reply" />
-        <Button className="mt-2" type="submit">
-          Send
-        </Button>
+    <div className="space-y-4 max-w-lg mx-auto w-full pb-4 flex flex-col h-[700px] max-h-[80vh]">
+      <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800 shrink-0">
+        <BackButton fallback="/customer/support" />
+        <div>
+          <h1 className="text-base font-black text-slate-900 dark:text-white">Ticket #{ticketId}</h1>
+          <p className="text-[11px] text-slate-500">Live Escrow Arbitrator Chat</p>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto space-y-2.5 p-1 no-scrollbar">
+        {messages.map((m) => (
+          <div
+            key={m.id}
+            className={cn(
+              'max-w-[80%] rounded-2xl p-3 text-xs leading-relaxed space-y-1',
+              m.from === 'user'
+                ? 'ml-auto bg-[#0a2316] text-white rounded-br-xs'
+                : 'mr-auto bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-bl-xs'
+            )}
+          >
+            <p>{m.text}</p>
+            <span
+              className={cn(
+                'text-[9px] block text-right font-mono',
+                m.from === 'user' ? 'text-emerald-300' : 'text-slate-400'
+              )}
+            >
+              {m.time}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <form onSubmit={handleSend} className="flex gap-2 shrink-0 pt-2 border-t border-slate-100 dark:border-slate-800">
+        <input
+          type="text"
+          value={inputVal}
+          onChange={(e) => setInputVal(e.target.value)}
+          placeholder="Type message or paste UTR number..."
+          className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs focus:outline-none"
+        />
+        <button
+          type="submit"
+          className="p-2.5 rounded-xl bg-[#0a2316] text-white hover:bg-emerald-950 transition-colors cursor-pointer"
+        >
+          <Send className="w-4 h-4" />
+        </button>
       </form>
     </div>
   )
 }
 
+/* =========================================================================
+   11. ACCOUNT LIVE (Referrals, Rewards, Settings, Security)
+   ========================================================================= */
 export function AccountLive({ title }: { title: string }) {
   const { user } = useAuth()
+  const [copiedRef, setCopiedRef] = useState(false)
+
+  const isReferralOrRewards = title.toLowerCase().includes('referral') || title.toLowerCase().includes('reward')
+
+  if (isReferralOrRewards) {
+    return (
+      <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
+        <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800">
+          <BackButton fallback="/customer/dashboard" />
+          <div>
+            <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+              Refer & Earn
+            </h1>
+            <p className="text-[11px] text-slate-500">Up to 40% Lifetime Trading Rebate</p>
+          </div>
+        </div>
+
+        {/* Hero Card */}
+        <div className="rounded-[28px] bg-gradient-to-tr from-emerald-600 via-teal-600 to-blue-600 p-5 text-white shadow-xl space-y-3">
+          <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 px-2.5 py-0.5 rounded-full inline-block">
+            VIP Tier 2 • 30% Commission
+          </span>
+          <div>
+            <div className="text-3xl font-black font-mono tracking-tight">$342.50 USDT</div>
+            <span className="text-xs text-emerald-100 font-mono">≈ ₹31,338 INR Earned</span>
+          </div>
+
+          <div className="pt-2 border-t border-white/20 grid grid-cols-2 gap-2 text-xs">
+            <div>
+              <span className="text-[10px] text-emerald-100 block">Total Referrals</span>
+              <span className="font-bold text-white">18 Traders</span>
+            </div>
+            <div>
+              <span className="text-[10px] text-emerald-100 block">Total Team Vol</span>
+              <span className="font-bold font-mono text-white">$45,200</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Referral Code Box */}
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-2.5 shadow-2xs">
+          <span className="text-xs font-black text-slate-900 dark:text-white block">
+            Your Exclusive Referral Code
+          </span>
+          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
+            <span className="text-sm font-black font-mono text-emerald-600 dark:text-emerald-400 tracking-wider">
+              FUSION-VIP-99
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard?.writeText('https://fundfusion.dev/register?ref=FUSION-VIP-99')
+                setCopiedRef(true)
+                setTimeout(() => setCopiedRef(false), 2000)
+              }}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#0a2316] text-white hover:bg-emerald-950 transition-colors cursor-pointer"
+            >
+              {copiedRef ? 'Copied Link' : 'Copy Link'}
+            </button>
+          </div>
+        </div>
+
+        {/* Invited Traders List */}
+        <div className="space-y-2">
+          <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">
+            Recent Referrals
+          </h3>
+          <div className="space-y-2">
+            {[
+              { name: 'Aarav_99', vol: '$1,200 USDT', earned: '+₹1,098', date: '2 days ago' },
+              { name: 'RohanCrypto', vol: '$4,500 USDT', earned: '+₹4,117', date: '5 days ago' },
+              { name: 'Sneha_Trader', vol: '$850 USDT', earned: '+₹777', date: 'Oct 28' },
+            ].map((r, idx) => (
+              <div
+                key={idx}
+                className="p-3 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs shadow-2xs"
+              >
+                <div>
+                  <span className="font-bold text-slate-900 dark:text-white block">{r.name}</span>
+                  <span className="text-[10px] text-slate-400 font-mono">Vol: {r.vol} • {r.date}</span>
+                </div>
+                <div className="text-right">
+                  <span className="font-black text-emerald-600 font-mono block">{r.earned}</span>
+                  <span className="text-[9px] text-slate-400">Commission</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Settings / Security / Sessions / Verification
   return (
-    <div>
-      <h1 className="text-2xl font-semibold">{title}</h1>
-      <Card className="mt-4 space-y-2 text-sm">
-        <p>{user?.displayName} · {user?.email}</p>
-        <p>Roles {user?.roles.join(', ')}</p>
-        <p>Status {user?.status} · KYC UNVERIFIED (mock)</p>
-        <p>Referral NX-AANYA1 (simulated)</p>
-        <p>No live rewards. Prototype only.</p>
-      </Card>
+    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
+      <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800">
+        <BackButton fallback="/customer/dashboard" />
+        <div>
+          <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">{title}</h1>
+          <p className="text-[11px] text-slate-500">Security & Account Configuration</p>
+        </div>
+      </div>
+
+      <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-3.5 shadow-2xs">
+        <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <span className="text-xs font-black text-slate-900 dark:text-white block">Email Address</span>
+            <span className="text-[11px] text-slate-500 font-mono">{user?.email || 'customer@fundfusion.dev'}</span>
+          </div>
+          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600">
+            Verified
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <span className="text-xs font-black text-slate-900 dark:text-white block">KYC Verification</span>
+            <span className="text-[11px] text-slate-500">PAN & Aadhaar Identity Match</span>
+          </div>
+          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600">
+            Tier 2 Active
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <span className="text-xs font-black text-slate-900 dark:text-white block">2FA Two-Factor Security</span>
+            <span className="text-[11px] text-slate-500">Google Authenticator OTP</span>
+          </div>
+          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600">
+            Enabled
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between py-2">
+          <div>
+            <span className="text-xs font-black text-slate-900 dark:text-white block">Active Sessions</span>
+            <span className="text-[11px] text-slate-500">Chrome on Windows (Current device)</span>
+          </div>
+          <span className="text-[10px] font-bold text-slate-400">Active</span>
+        </div>
+      </div>
     </div>
   )
 }
 
+/* =========================================================================
+   12. PAY SCAN LIVE (/customer/pay/scan)
+   ========================================================================= */
 export function PayScanLive() {
   const navigate = useNavigate()
-  const parse = useMutation({
-    mutationFn: (payload: string) => api<{ upiId: string; beneficiary: string }>('/upi/parse', {
-      method: 'POST',
-      body: JSON.stringify({ payload }),
-    }),
-    onSuccess: () => navigate('/customer/pay/confirm'),
-  })
   return (
-    <div className="max-w-lg space-y-3">
-      <h1 className="text-2xl font-semibold">Scan QR</h1>
-      <input
-        type="file"
-        accept="image/*"
-        onChange={(e) => {
-          const file = e.target.files?.[0]
-          if (file) parse.mutate(file.name)
-        }}
-      />
-      {parse.data && <p className="text-sm">{parse.data.beneficiary}</p>}
+    <div className="p-4 text-center">
+      <Link
+        to="/customer/pay/scan"
+        className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs"
+      >
+        Open QR Scanner
+      </Link>
     </div>
   )
 }

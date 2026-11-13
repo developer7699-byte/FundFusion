@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -214,10 +214,19 @@ const loginSchema = z.object({
 })
 
 export function LoginPage() {
-  const { login } = useAuth()
+  const { user, login } = useAuth()
   const navigate = useNavigate()
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Redirect immediately if already authenticated
+  useEffect(() => {
+    if (user) {
+      if (user.roles.includes('ADMIN')) navigate('/admin/dashboard', { replace: true })
+      else if (user.roles.includes('MERCHANT')) navigate('/merchant/dashboard', { replace: true })
+      else navigate('/customer/dashboard', { replace: true })
+    }
+  }, [user, navigate])
 
   const form = useForm({
     resolver: zodResolver(loginSchema),

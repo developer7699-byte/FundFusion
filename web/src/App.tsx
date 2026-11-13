@@ -35,6 +35,8 @@ import { DeskLayout, adminLinks, merchantLinks } from '@/layouts/DeskLayout'
 import { useAuth } from '@/lib/auth'
 import { Skeleton } from '@/components/ui/skeleton'
 import { CustomerProfilePage } from '@/features/customer/CustomerProfilePage'
+import { CustomerScanPayPage } from '@/features/customer/CustomerScanPayPage'
+import { RequestMoneyPage } from '@/features/customer/RequestMoneyPage'
 import {
   AccountLive,
   GiftBrand,
@@ -146,8 +148,10 @@ export function App() {
               <Route path="sell" element={<QuoteFlow side="SELL" />} />
               <Route path="convert" element={<QuoteFlow side="CONVERT" />} />
               <Route path="pay" element={<PayHome />} />
-              <Route path="pay/scan" element={<PayScanLive />} />
+              <Route path="pay/scan" element={<CustomerScanPayPage />} />
               <Route path="pay/confirm" element={<PayConfirm />} />
+              <Route path="pay/request" element={<RequestMoneyPage />} />
+              <Route path="request" element={<RequestMoneyPage />} />
               <Route path="orders" element={<OrdersList />} />
               <Route path="orders/:orderId" element={<OrderDetail />} />
               <Route path="transactions" element={<TransactionsFlow />} />

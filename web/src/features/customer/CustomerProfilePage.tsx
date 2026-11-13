@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { BackButton } from '@/components/ui/BackButton'
 import {
   User,
   Copy,
@@ -11,10 +12,7 @@ import {
   Moon,
   Sun,
   Send,
-  Volume2,
-  VolumeX,
   Bell,
-  Bot,
   TrendingUp,
   Compass,
   MessageSquare,
@@ -28,18 +26,13 @@ import {
   X,
   Plus,
   Trash2,
-  Star,
-  SendHorizontal,
-  Lock,
-  ArrowUpRight,
-  AlertCircle,
-  RefreshCw,
-  Sliders,
-  ChevronLeft,
+  Mail,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import { useTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
+import { useLanguage } from '@/lib/language'
+import { usePaymentMethods } from '@/lib/payment-methods'
 
 type ModalType =
   | null
@@ -49,21 +42,12 @@ type ModalType =
   | 'display_currency'
   | 'withdraw_address'
   | 'notification_settings'
-  | 'ai_assistant'
   | 'rate_alerts'
   | 'app_tour'
   | 'contact_support'
   | 'share_feedback'
   | 'privacy_policy'
   | 'logout_confirm'
-
-interface PaymentMethod {
-  id: string
-  type: 'UPI' | 'BANK' | 'CRYPTO'
-  label: string
-  details: string
-  isDefault: boolean
-}
 
 interface WithdrawAddress {
   id: string
@@ -72,35 +56,44 @@ interface WithdrawAddress {
   chain: string
 }
 
+const WITHDRAW_STORAGE_KEY = 'fundfusion_saved_withdraw_addresses'
+
+function getInitialWithdrawAddrs(): WithdrawAddress[] {
+  try {
+    const raw = localStorage.getItem(WITHDRAW_STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+    }
+  } catch {}
+  return [
+    { id: 'w1', label: 'Binance USDT TRC20', address: 'T9xZ8v...K3pQ9', chain: 'TRON (TRC20)' },
+    { id: 'w2', label: 'Trust Wallet ERC20', address: '0x71C...892F', chain: 'Ethereum (ERC20)' },
+  ]
+}
+
 export function CustomerProfilePage() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const { theme, toggle } = useTheme()
+  const { language, setLanguage, t } = useLanguage()
 
   // State
   const [copiedUser, setCopiedUser] = useState(false)
-  const [soundEnabled, setSoundEnabled] = useState(true)
   const [displayCurrency, setDisplayCurrency] = useState<'USDT' | 'INR' | 'USD' | 'EUR'>('USDT')
-  const [language, setLanguage] = useState('English')
   const [activeModal, setActiveModal] = useState<ModalType>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   // Sub-states
-  // 1. Manage Payments
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([
-    { id: '1', type: 'UPI', label: 'Google Pay / PhonePe', details: 'user@okicici', isDefault: true },
-    { id: '2', type: 'BANK', label: 'HDFC Bank Ltd', details: 'A/C ****4892 (IFSC: HDFC0001234)', isDefault: false },
-  ])
+  // 1. Manage Payments (Persistent via usePaymentMethods hook)
+  const { paymentMethods, addPaymentMethod, deletePaymentMethod } = usePaymentMethods()
   const [newPayType, setNewPayType] = useState<'UPI' | 'BANK'>('UPI')
   const [newPayLabel, setNewPayLabel] = useState('')
   const [newPayDetails, setNewPayDetails] = useState('')
   const [showAddPayForm, setShowAddPayForm] = useState(false)
 
-  // 2. Withdraw Addresses
-  const [withdrawAddresses, setWithdrawAddresses] = useState<WithdrawAddress[]>([
-    { id: 'w1', label: 'Binance USDT TRC20', address: 'T9xZ8v...K3pQ9', chain: 'TRON (TRC20)' },
-    { id: 'w2', label: 'Trust Wallet ERC20', address: '0x71C...892F', chain: 'Ethereum (ERC20)' },
-  ])
+  // 2. Withdraw Addresses (Persistent via localStorage)
+  const [withdrawAddresses, setWithdrawAddresses] = useState<WithdrawAddress[]>(getInitialWithdrawAddrs)
   const [newAddrLabel, setNewAddrLabel] = useState('')
   const [newAddrValue, setNewAddrValue] = useState('')
   const [newAddrChain, setNewAddrChain] = useState('TRC20')
@@ -117,21 +110,19 @@ export function CustomerProfilePage() {
   const [alertEnabled, setAlertEnabled] = useState(true)
   const [alertType, setAlertType] = useState<'ABOVE' | 'BELOW'>('ABOVE')
 
-  // 5. AI Assistant Chat
-  const [chatMessages, setChatMessages] = useState<Array<{ sender: 'user' | 'bot'; text: string }>>([
-    { sender: 'bot', text: 'Hello! I am FundFusion AI. How can I assist you with your P2P trades, wallet, or account today?' },
-  ])
-  const [chatInput, setChatInput] = useState('')
-
-  // 6. App Tour
+  // 5. App Tour
   const [tourStep, setTourStep] = useState(0)
 
-  // 7. Share Feedback
+  // 6. Share Feedback
   const [feedbackRating, setFeedbackRating] = useState(5)
   const [feedbackCategory, setFeedbackCategory] = useState('P2P Trading')
   const [feedbackText, setFeedbackText] = useState('')
 
   const username = user?.displayName
+    ? `@${user.displayName.toLowerCase().replace(/\s+/g, '')}`
+    : user?.email
+    ? `@${user.email.split('@')[0]}`
+    : '@developer7699'
     ? `@${user.displayName.toLowerCase().replace(/\s+/g, '')}`
     : user?.email
     ? `@${user.email.split('@')[0]}`
@@ -156,22 +147,19 @@ export function CustomerProfilePage() {
       showToast('Please fill in all payment method fields.')
       return
     }
-    const newEntry: PaymentMethod = {
-      id: Date.now().toString(),
+    addPaymentMethod({
       type: newPayType,
-      label: newPayLabel,
-      details: newPayDetails,
-      isDefault: paymentMethods.length === 0,
-    }
-    setPaymentMethods([...paymentMethods, newEntry])
+      label: newPayLabel.trim(),
+      details: newPayDetails.trim(),
+    })
     setNewPayLabel('')
     setNewPayDetails('')
     setShowAddPayForm(false)
-    showToast('New payment method added successfully!')
+    showToast('New payment method saved successfully!')
   }
 
   const handleDeletePayment = (id: string) => {
-    setPaymentMethods(paymentMethods.filter((p) => p.id !== id))
+    deletePaymentMethod(id)
     showToast('Payment method removed.')
   }
 
@@ -181,12 +169,16 @@ export function CustomerProfilePage() {
       return
     }
     const newEntry: WithdrawAddress = {
-      id: Date.now().toString(),
-      label: newAddrLabel,
-      address: newAddrValue,
+      id: `w-${Date.now()}`,
+      label: newAddrLabel.trim(),
+      address: newAddrValue.trim(),
       chain: newAddrChain === 'TRC20' ? 'TRON (TRC20)' : 'Ethereum (ERC20)',
     }
-    setWithdrawAddresses([...withdrawAddresses, newEntry])
+    const updated = [...withdrawAddresses, newEntry]
+    setWithdrawAddresses(updated)
+    try {
+      localStorage.setItem(WITHDRAW_STORAGE_KEY, JSON.stringify(updated))
+    } catch {}
     setNewAddrLabel('')
     setNewAddrValue('')
     setShowAddAddrForm(false)
@@ -194,31 +186,12 @@ export function CustomerProfilePage() {
   }
 
   const handleDeleteWithdrawAddr = (id: string) => {
-    setWithdrawAddresses(withdrawAddresses.filter((w) => w.id !== id))
+    const updated = withdrawAddresses.filter((w) => w.id !== id)
+    setWithdrawAddresses(updated)
+    try {
+      localStorage.setItem(WITHDRAW_STORAGE_KEY, JSON.stringify(updated))
+    } catch {}
     showToast('Address removed.')
-  }
-
-  const handleSendMessage = (textToSend?: string) => {
-    const msg = textToSend || chatInput
-    if (!msg.trim()) return
-
-    const newMsgs = [...chatMessages, { sender: 'user' as const, text: msg }]
-    setChatMessages(newMsgs)
-    if (!textToSend) setChatInput('')
-
-    // Simulated AI response
-    setTimeout(() => {
-      let botReply = "I've noted your request. You can check your wallet status or transaction history anytime from the navigation bar."
-      const lower = msg.toLowerCase()
-      if (lower.includes('deposit') || lower.includes('buy')) {
-        botReply = 'To buy or deposit USDT, tap the Scan & Pay button or navigate to Wallet -> Deposit for instant UPI/Bank processing.'
-      } else if (lower.includes('fee') || lower.includes('charge')) {
-        botReply = 'FundFusion charges 0% fees on P2P trading and internal USDT transfers!'
-      } else if (lower.includes('verify') || lower.includes('kyc') || lower.includes('bank')) {
-        botReply = 'Your Level 1 identity is verified! To increase your limit to $50,000/day, complete Tier-2 Bank Verification.'
-      }
-      setChatMessages((prev) => [...prev, { sender: 'bot', text: botReply }])
-    }, 700)
   }
 
   const handleSubmitFeedback = () => {
@@ -259,7 +232,7 @@ export function CustomerProfilePage() {
   ]
 
   return (
-    <div className="space-y-4 max-w-lg mx-auto pb-8 relative">
+    <div className="space-y-4 max-w-lg mx-auto pb-3 relative">
       {/* Toast Notification overlay */}
       {toastMessage && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-full bg-slate-900/90 text-white text-xs font-bold shadow-2xl backdrop-blur-md border border-slate-700 flex items-center gap-2 animate-in fade-in slide-in-from-top duration-300">
@@ -267,6 +240,15 @@ export function CustomerProfilePage() {
           <span>{toastMessage}</span>
         </div>
       )}
+
+      {/* Top Header with Back */}
+      <div className="flex items-center gap-2.5 pb-1 border-b border-slate-100 dark:border-slate-800">
+        <BackButton fallback="/customer/dashboard" />
+        <div>
+          <h1 className="text-base font-black text-slate-900 dark:text-white">{t('profile.title')}</h1>
+          <p className="text-[11px] text-slate-500">{t('profile.subtitle')}</p>
+        </div>
+      </div>
 
       {/* Top Profile Card (Deep blue gradient matching screenshot) */}
       <div className="rounded-3xl bg-gradient-to-b from-indigo-600 via-indigo-700 to-indigo-900 text-white p-6 text-center space-y-4 shadow-xl shadow-indigo-600/30 relative overflow-hidden">
@@ -292,7 +274,7 @@ export function CustomerProfilePage() {
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-white/15 hover:bg-white/25 text-white backdrop-blur-md transition-all cursor-pointer border border-white/20 active:scale-95"
           >
             {copiedUser ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{copiedUser ? 'Copied Username!' : 'Copy Username'}</span>
+            <span>{copiedUser ? t('profile.copied') : t('profile.copyUsername')}</span>
           </button>
         </div>
 
@@ -302,7 +284,7 @@ export function CustomerProfilePage() {
             <div className="h-full bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-200 rounded-full w-[12%] shadow-xs" />
           </div>
           <div className="flex justify-between items-center text-[11px] font-bold text-indigo-200">
-            <span>500 USDT to Silver</span>
+            <span>{t('profile.vipProgress')}</span>
             <span className="font-mono text-amber-300">0%</span>
           </div>
         </div>
@@ -311,75 +293,91 @@ export function CustomerProfilePage() {
       {/* GENERAL SETTINGS Card Group */}
       <div className="space-y-2">
         <p className="text-[11px] font-extrabold tracking-wider uppercase text-slate-500 dark:text-slate-400 px-3">
-          GENERAL SETTINGS
+          {t('profile.generalSettings')}
         </p>
 
         <div className="rounded-3xl bg-white dark:bg-[#121829] border border-slate-200/90 dark:border-slate-800/90 divide-y divide-slate-100 dark:divide-slate-800/60 shadow-xs overflow-hidden">
           {/* 1. Manage Payments */}
           <button
             onClick={() => setActiveModal('manage_payments')}
-            className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
+            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
                 <CreditCard className="w-4 h-4" />
               </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Manage Payments</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                {t('profile.managePayments')}
+              </span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-semibold">
-              <span>{paymentMethods.length} Methods</span>
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                {paymentMethods.length} {t('profile.methods')}
+              </span>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
             </div>
           </button>
 
           {/* 2. Buy Methods */}
           <button
             onClick={() => setActiveModal('buy_methods')}
-            className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
+            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
                 <Building2 className="w-4 h-4" />
               </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Buy Methods</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                {t('profile.buyMethods')}
+              </span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-semibold">
-              <span>Verify bank</span>
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                {t('profile.verifyBank')}
+              </span>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
             </div>
           </button>
 
-          {/* 3. Language */}
+          {/* 3. Language (Only English & Hindi) */}
           <button
             onClick={() => setActiveModal('language')}
-            className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
+            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-9 h-9 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center shrink-0">
                 <Globe className="w-4 h-4" />
               </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Language</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                {t('profile.language')}
+              </span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-semibold">
-              <span>{language}</span>
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                {language === 'hi' ? 'हिंदी' : 'English'}
+              </span>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
             </div>
           </button>
 
           {/* 4. Display Currency */}
           <button
             onClick={() => setActiveModal('display_currency')}
-            className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
+            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                 <DollarSign className="w-4 h-4" />
               </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Display Currency</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                {t('profile.displayCurrency')}
+              </span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-semibold">
-              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{displayCurrency}</span>
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                {displayCurrency}
+              </span>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
             </div>
           </button>
 
@@ -387,105 +385,81 @@ export function CustomerProfilePage() {
           <div
             onClick={(e) => {
               toggle(e)
-              showToast(theme === 'dark' ? 'Switched to White Mode' : 'Switched to Dark Mode')
+              showToast(theme === 'dark' ? 'Switched to Light Mode' : 'Switched to Dark Mode')
             }}
-            className="flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer"
+            className="flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
                 {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
               </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Appearance</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                {t('profile.appearance')}
+              </span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-semibold">
-              <span>{theme === 'dark' ? 'Dark Mode' : 'White Mode'}</span>
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                {theme === 'dark' ? t('profile.darkMode') : t('profile.whiteMode')}
+              </span>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
             </div>
           </div>
 
-          {/* 6. Withdraw Address */}
+          {/* 6. Withdraw Address (Image 2: Fixed Spacing & Never Stuck Together) */}
           <button
             onClick={() => setActiveModal('withdraw_address')}
-            className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
+            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                 <Send className="w-4 h-4" />
               </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Withdraw Address</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                {t('profile.withdrawAddress')}
+              </span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-semibold">
-              <span>{withdrawAddresses.length} Addresses</span>
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                {withdrawAddresses.length} {t('profile.addresses')}
+              </span>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
             </div>
           </button>
 
-          {/* 7. Sound Toggle */}
-          <div
-            onClick={() => {
-              const nextState = !soundEnabled
-              setSoundEnabled(nextState)
-              showToast(nextState ? 'Sound notifications turned ON' : 'Sound muted')
-            }}
-            className="flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400 flex items-center justify-center">
-                {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-              </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Sound</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-semibold">
-              <span>{soundEnabled ? 'On' : 'Off'}</span>
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-          </div>
-
-          {/* 8. Notification Settings */}
+          {/* 7. Notification Settings */}
           <button
             onClick={() => setActiveModal('notification_settings')}
-            className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
+            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
                 <Bell className="w-4 h-4" />
               </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Notification Settings</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                {t('profile.notificationSettings')}
+              </span>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
           </button>
 
-          {/* 9. AI Assistant */}
-          <button
-            onClick={() => setActiveModal('ai_assistant')}
-            className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                <Bot className="w-4 h-4" />
-              </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">AI Assistant</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-semibold">
-              <span>Chat helper</span>
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-          </button>
-
-          {/* 10. Rate Alerts */}
+          {/* 8. Rate Alerts */}
           <button
             onClick={() => setActiveModal('rate_alerts')}
-            className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
+            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                 <TrendingUp className="w-4 h-4" />
               </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Rate Alerts</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                {t('profile.rateAlerts')}
+              </span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-semibold">
-              <span>Price ping</span>
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                Active
+              </span>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
             </div>
           </button>
         </div>
@@ -494,84 +468,92 @@ export function CustomerProfilePage() {
       {/* HELP & SUPPORT Card Group */}
       <div className="space-y-2 pt-2">
         <p className="text-[11px] font-extrabold tracking-wider uppercase text-slate-500 dark:text-slate-400 px-3">
-          HELP & SUPPORT
+          {t('profile.helpSupport')}
         </p>
 
         <div className="rounded-3xl bg-white dark:bg-[#121829] border border-slate-200/90 dark:border-slate-800/90 divide-y divide-slate-100 dark:divide-slate-800/60 shadow-xs overflow-hidden">
-          {/* 11. Take the App Tour */}
+          {/* 9. Take the App Tour */}
           <button
             onClick={() => {
               setTourStep(0)
               setActiveModal('app_tour')
             }}
-            className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
+            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
                 <Compass className="w-4 h-4" />
               </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Take the App Tour</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                {t('profile.appTour')}
+              </span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-semibold">
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-semibold shrink-0">
               <span>Replay</span>
               <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
             </div>
           </button>
 
-          {/* 12. Contact Support */}
+          {/* 10. Contact Support */}
           <button
             onClick={() => setActiveModal('contact_support')}
-            className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
+            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-9 h-9 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
                 <MessageSquare className="w-4 h-4" />
               </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Contact Support</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                {t('profile.contactSupport')}
+              </span>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
           </button>
 
-          {/* 13. Share Feedback */}
+          {/* 11. Share Feedback */}
           <button
             onClick={() => setActiveModal('share_feedback')}
-            className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
+            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
                 <HelpCircle className="w-4 h-4" />
               </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Share Feedback</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                {t('profile.shareFeedback')}
+              </span>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
           </button>
 
-          {/* 14. Privacy Policy */}
+          {/* 12. Privacy Policy */}
           <button
             onClick={() => setActiveModal('privacy_policy')}
-            className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
+            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-slate-500/10 text-slate-600 dark:text-slate-400 flex items-center justify-center">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-9 h-9 rounded-xl bg-slate-500/10 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0">
                 <FileText className="w-4 h-4" />
               </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Privacy Policy</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                {t('profile.privacyPolicy')}
+              </span>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
           </button>
 
-          {/* 15. Log out */}
+          {/* 13. Log out */}
           <button
             onClick={() => setActiveModal('logout_confirm')}
-            className="w-full flex items-center justify-between p-4 hover:bg-rose-500/10 transition-colors group cursor-pointer text-rose-600 dark:text-rose-400 text-left"
+            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-rose-500/10 transition-colors group cursor-pointer text-rose-600 dark:text-rose-400 text-left"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-rose-500/15 flex items-center justify-center">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-9 h-9 rounded-xl bg-rose-500/15 flex items-center justify-center shrink-0">
                 <LogOut className="w-4 h-4" />
               </div>
-              <span className="text-xs sm:text-sm font-black">Log out</span>
+              <span className="text-xs sm:text-sm font-black truncate">{t('profile.logout')}</span>
             </div>
-            <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+            <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform shrink-0" />
           </button>
         </div>
       </div>
@@ -580,8 +562,8 @@ export function CustomerProfilePage() {
 
       {/* 1. MANAGE PAYMENTS MODAL */}
       {activeModal === 'manage_payments' && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md p-6 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-[28px] w-full max-w-[360px] p-4 sm:p-5 space-y-4 shadow-2xl relative max-h-[85%] overflow-y-auto">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-blue-500" />
@@ -696,8 +678,8 @@ export function CustomerProfilePage() {
 
       {/* 2. BUY METHODS MODAL */}
       {activeModal === 'buy_methods' && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md p-6 space-y-4 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-[28px] w-full max-w-[360px] p-4 sm:p-5 space-y-4 shadow-2xl relative max-h-[85%] overflow-y-auto">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <Building2 className="w-5 h-5 text-indigo-500" />
@@ -747,14 +729,16 @@ export function CustomerProfilePage() {
         </div>
       )}
 
-      {/* 3. LANGUAGE MODAL */}
+      {/* 3. LANGUAGE MODAL (ONLY ENGLISH & HINDI) */}
       {activeModal === 'language' && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-sm p-6 space-y-4 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-[28px] w-full max-w-[360px] p-4 sm:p-5 space-y-4 shadow-2xl relative max-h-[85%] overflow-y-auto">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <Globe className="w-5 h-5 text-cyan-500" />
-                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">Select Language</h3>
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                  {t('modal.selectLanguage')}
+                </h3>
               </div>
               <button
                 onClick={() => setActiveModal(null)}
@@ -764,33 +748,33 @@ export function CustomerProfilePage() {
               </button>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {[
-                { name: 'English', native: 'English (US)' },
-                { name: 'Hindi', native: 'हिंदी' },
-                { name: 'Spanish', native: 'Español' },
-                { name: 'French', native: 'Français' },
-                { name: 'German', native: 'Deutsch' },
+                { id: 'en', name: 'English', native: 'English (US)', flag: '🇺🇸' },
+                { id: 'hi', name: 'हिंदी', native: 'Hindi (हिंदी)', flag: '🇮🇳' },
               ].map((lang) => (
                 <button
-                  key={lang.name}
+                  key={lang.id}
                   onClick={() => {
-                    setLanguage(lang.name)
+                    setLanguage(lang.id as 'en' | 'hi')
                     setActiveModal(null)
-                    showToast(`Language set to ${lang.name}`)
+                    showToast(lang.id === 'hi' ? 'भाषा बदलकर हिंदी कर दी गई है' : 'Language set to English')
                   }}
                   className={cn(
-                    'w-full p-3 rounded-2xl flex items-center justify-between text-xs font-bold transition-all cursor-pointer',
-                    language === lang.name
-                      ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30'
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                    'w-full p-3.5 rounded-2xl flex items-center justify-between text-xs font-bold transition-all cursor-pointer',
+                    language === lang.id
+                      ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 shadow-xs'
+                      : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-transparent'
                   )}
                 >
-                  <div className="flex items-center gap-2">
-                    <span>{lang.name}</span>
-                    <span className="text-slate-400 font-normal">({lang.native})</span>
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-lg">{lang.flag}</span>
+                    <div className="text-left">
+                      <span className="block font-black text-xs text-slate-900 dark:text-white">{lang.name}</span>
+                      <span className="text-[10px] text-slate-400 font-normal">{lang.native}</span>
+                    </div>
                   </div>
-                  {language === lang.name && <Check className="w-4 h-4 text-cyan-500" />}
+                  {language === lang.id && <Check className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />}
                 </button>
               ))}
             </div>
@@ -800,8 +784,8 @@ export function CustomerProfilePage() {
 
       {/* 4. DISPLAY CURRENCY MODAL */}
       {activeModal === 'display_currency' && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-sm p-6 space-y-4 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-[28px] w-full max-w-[360px] p-4 sm:p-5 space-y-4 shadow-2xl relative max-h-[85%] overflow-y-auto">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <DollarSign className="w-5 h-5 text-emerald-500" />
@@ -852,8 +836,8 @@ export function CustomerProfilePage() {
 
       {/* 6. WITHDRAW ADDRESS MODAL */}
       {activeModal === 'withdraw_address' && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md p-6 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-[28px] w-full max-w-[360px] p-4 sm:p-5 space-y-4 shadow-2xl relative max-h-[85%] overflow-y-auto">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <Send className="w-5 h-5 text-emerald-500" />
@@ -960,8 +944,8 @@ export function CustomerProfilePage() {
 
       {/* 8. NOTIFICATION SETTINGS MODAL */}
       {activeModal === 'notification_settings' && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md p-6 space-y-4 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-[28px] w-full max-w-[360px] p-4 sm:p-5 space-y-4 shadow-2xl relative max-h-[85%] overflow-y-auto">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <Bell className="w-5 h-5 text-amber-500" />
@@ -1011,90 +995,10 @@ export function CustomerProfilePage() {
         </div>
       )}
 
-      {/* 9. AI ASSISTANT MODAL */}
-      {activeModal === 'ai_assistant' && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md h-[520px] p-5 flex flex-col justify-between shadow-2xl relative">
-            {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">
-                  <Bot className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">FundFusion AI Support</h3>
-                  <p className="text-[10px] text-emerald-500 font-bold flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Online 24/7
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setActiveModal(null)}
-                className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Chat Body */}
-            <div className="flex-1 overflow-y-auto py-3 space-y-2.5 pr-1">
-              {chatMessages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    'max-w-[80%] p-3 rounded-2xl text-xs leading-relaxed',
-                    msg.sender === 'user'
-                      ? 'ml-auto bg-indigo-600 text-white rounded-br-xs'
-                      : 'mr-auto bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-bl-xs border border-slate-200 dark:border-slate-700/60'
-                  )}
-                >
-                  {msg.text}
-                </div>
-              ))}
-            </div>
-
-            {/* Suggested Prompts */}
-            <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-none text-[11px]">
-              <button
-                onClick={() => handleSendMessage('How to deposit USDT?')}
-                className="px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 whitespace-nowrap font-semibold hover:bg-indigo-500/20"
-              >
-                How to deposit USDT?
-              </button>
-              <button
-                onClick={() => handleSendMessage('What are the trading fees?')}
-                className="px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 whitespace-nowrap font-semibold hover:bg-indigo-500/20"
-              >
-                What are fees?
-              </button>
-            </div>
-
-            {/* Input Bar */}
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Ask AI Assistant anything..."
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
-              />
-              <button
-                onClick={() => handleSendMessage()}
-                className="p-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white transition-all shadow-md shadow-indigo-600/20"
-              >
-                <SendHorizontal className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 10. RATE ALERTS MODAL */}
+      {/* 9. RATE ALERTS MODAL */}
       {activeModal === 'rate_alerts' && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md p-6 space-y-4 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-[28px] w-full max-w-[360px] p-4 sm:p-5 space-y-4 shadow-2xl relative max-h-[85%] overflow-y-auto">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-emerald-500" />
@@ -1170,8 +1074,8 @@ export function CustomerProfilePage() {
 
       {/* 11. APP TOUR MODAL */}
       {activeModal === 'app_tour' && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-sm p-6 text-center space-y-5 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-[28px] w-full max-w-[360px] p-4 sm:p-5 text-center space-y-4 shadow-2xl relative max-h-[85%] overflow-y-auto">
             <button
               onClick={() => setActiveModal(null)}
               className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
@@ -1244,14 +1148,16 @@ export function CustomerProfilePage() {
         </div>
       )}
 
-      {/* 12. CONTACT SUPPORT MODAL */}
+      {/* 11. CONTACT SUPPORT MODAL (EMAIL SUPPORT ONLY) */}
       {activeModal === 'contact_support' && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md p-6 space-y-4 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-[28px] w-full max-w-[360px] p-5 space-y-4 shadow-2xl relative max-h-[85%] overflow-y-auto">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-teal-500" />
-                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">Contact Customer Support</h3>
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                  {t('modal.contactSupport')}
+                </h3>
               </div>
               <button
                 onClick={() => setActiveModal(null)}
@@ -1261,29 +1167,52 @@ export function CustomerProfilePage() {
               </button>
             </div>
 
-            <div className="space-y-3">
-              <button
-                onClick={() => {
-                  setActiveModal('ai_assistant')
-                }}
-                className="w-full p-4 rounded-2xl bg-teal-500/10 border border-teal-500/20 hover:bg-teal-500/20 transition-colors flex items-center justify-between text-left group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-teal-600 text-white flex items-center justify-center">
-                    <Bot className="w-4 h-4" />
+            <div className="space-y-3.5">
+              <div className="p-4.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
+                    <Mail className="w-4.5 h-4.5" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-black text-slate-900 dark:text-white">Live AI Support Chat</h4>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Average response time: &lt; 5 seconds</p>
+                    <h4 className="text-xs font-black text-slate-900 dark:text-white">
+                      {t('modal.emailSupport')}
+                    </h4>
+                    <p className="text-[10px] text-emerald-500 font-bold flex items-center gap-1 mt-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      24/7 Priority Resolution Desk
+                    </p>
                   </div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-teal-500 group-hover:translate-x-0.5 transition-transform" />
-              </button>
 
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-2">
-                <h4 className="text-xs font-bold text-slate-900 dark:text-white">Email Support</h4>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">support@fundfusion.io</p>
-                <p className="text-[10px] text-slate-400">Response within 2 hours for transaction disputes.</p>
+                <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between gap-2">
+                  <span className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200 truncate">
+                    support@fundfusion.io
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText('support@fundfusion.io')
+                      showToast('Support email copied to clipboard!')
+                    }}
+                    className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1"
+                    title="Copy Email"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span className="text-[10px]">Copy</span>
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                  {t('modal.emailResponse')}
+                </p>
+
+                <a
+                  href="mailto:support@fundfusion.io?subject=Support%20Request%20-%20FundFusion%20User"
+                  className="w-full py-2.5 px-4 rounded-xl bg-teal-600 hover:bg-teal-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-teal-600/20 flex items-center justify-center gap-2"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{t('modal.sendEmail')}</span>
+                </a>
               </div>
             </div>
           </div>
@@ -1292,8 +1221,8 @@ export function CustomerProfilePage() {
 
       {/* 13. SHARE FEEDBACK MODAL */}
       {activeModal === 'share_feedback' && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md p-6 space-y-4 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-[28px] w-full max-w-[360px] p-4 sm:p-5 space-y-4 shadow-2xl relative max-h-[85%] overflow-y-auto">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <HelpCircle className="w-5 h-5 text-amber-500" />
@@ -1348,8 +1277,8 @@ export function CustomerProfilePage() {
 
       {/* 14. PRIVACY POLICY MODAL */}
       {activeModal === 'privacy_policy' && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md p-6 space-y-4 shadow-2xl relative max-h-[80vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-[28px] w-full max-w-[360px] p-4 sm:p-5 space-y-4 shadow-2xl relative max-h-[85%] overflow-y-auto">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-slate-500" />
@@ -1385,8 +1314,8 @@ export function CustomerProfilePage() {
 
       {/* 15. LOGOUT CONFIRMATION MODAL */}
       {activeModal === 'logout_confirm' && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-sm p-6 text-center space-y-4 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-[28px] w-full max-w-[360px] p-4 sm:p-5 text-center space-y-4 shadow-2xl relative max-h-[85%] overflow-y-auto">
             <div className="w-12 h-12 rounded-full bg-rose-500/15 text-rose-500 mx-auto flex items-center justify-center">
               <LogOut className="w-6 h-6" />
             </div>

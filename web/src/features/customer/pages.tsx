@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { useState, useEffect } from 'react'
 import {
@@ -19,6 +19,20 @@ import {
   CheckCircle2,
   Send,
   Navigation,
+  ArrowLeft,
+  Tv,
+  Wifi,
+  Flame,
+  Droplets,
+  Car,
+  CreditCard,
+  Building2,
+  Clock,
+  RefreshCw,
+  Search,
+  ScanLine,
+  Check,
+  ArrowDownCircle,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -28,6 +42,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { activity } from '@/lib/demo-data'
 import { cn, inr, usdt } from '@/lib/utils'
+import { BillPaymentModal } from './components/BillPaymentModal'
+import { BackButton } from '@/components/ui/BackButton'
 
 type Overview = {
   simulated: boolean
@@ -37,336 +53,7 @@ type Overview = {
   recent: { id: string; type: string; status: string; amount: string; asset: string; createdAt: string }[]
 }
 
-export function CustomerDashboard() {
-  const q = useQuery({
-    queryKey: ['overview'],
-    queryFn: () => api<Overview>('/customer/overview'),
-  })
-
-  // 5 Promo Banner Slides matching Reference Images 1-5
-  const slides = [
-    {
-      id: 'slide-1',
-      title: '0% Account Freeze',
-      subtitle: '100% Refund Guarantee',
-      btnText: 'Safe Trade',
-      link: '/customer/buy',
-      bgClass: 'bg-gradient-to-r from-[#ca233a] via-[#e11d48] to-[#f43f5e]',
-      btnTextClass: 'text-[#e11d48]',
-    },
-    {
-      id: 'slide-2',
-      title: 'Refer & Earn',
-      subtitle: 'Invite friends, earn on their trades',
-      btnText: 'Invite Now',
-      link: '/customer/referrals',
-      bgClass: 'bg-gradient-to-r from-[#3f7c16] via-[#4d971a] to-[#70c72c]',
-      btnTextClass: 'text-[#4d971a]',
-    },
-    {
-      id: 'slide-3',
-      title: 'Guaranteed Cashback',
-      subtitle: 'On each P2P Sell & Buy Order',
-      btnText: 'Trade Now',
-      link: '/customer/sell',
-      bgClass: 'bg-gradient-to-r from-[#2f55e5] via-[#3b61f8] to-[#5b7cf9]',
-      btnTextClass: 'text-[#3b61f8]',
-    },
-    {
-      id: 'slide-4',
-      title: 'Instant Mobile Recharge',
-      subtitle: 'Every operator, done in seconds',
-      btnText: 'Recharge Now',
-      link: '/customer/utilities',
-      bgClass: 'bg-gradient-to-r from-[#1b526b] via-[#246d8e] to-[#3aa1c8]',
-      btnTextClass: 'text-[#246d8e]',
-    },
-    {
-      id: 'slide-5',
-      title: 'My Wallet',
-      subtitle: 'Add money & withdraw easily',
-      btnText: 'Open Wallet',
-      link: '/customer/wallet',
-      bgClass: 'bg-gradient-to-r from-[#a36109] via-[#c4770d] to-[#e69818]',
-      btnTextClass: 'text-[#c4770d]',
-    },
-  ]
-
-  const [activeSlide, setActiveSlide] = useState(0)
-
-  // Auto-slide every 3.5 seconds
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveSlide((prev) => (prev + 1) % slides.length)
-    }, 3500)
-    return () => clearInterval(timer)
-  }, [slides.length])
-
-  if (q.isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-64 rounded-3xl" />
-        <Skeleton className="h-20 rounded-2xl" />
-        <div className="grid grid-cols-3 gap-3">
-          <Skeleton className="h-28 rounded-2xl" />
-          <Skeleton className="h-28 rounded-2xl" />
-          <Skeleton className="h-28 rounded-2xl" />
-        </div>
-      </div>
-    )
-  }
-
-  if (q.error) {
-    return <p className="text-rose-500 p-4 text-xs font-bold bg-rose-500/10 rounded-2xl border border-rose-500/20">{q.error.message}</p>
-  }
-
-  const d = q.data!
-  const rawAvailable = parseFloat(d.wallet.availableUsdt || '0')
-  const availableVal = isNaN(rawAvailable)
-    ? '0.00'
-    : rawAvailable.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  const currentBanner = slides[activeSlide]
-
-  return (
-    <div className="space-y-3.5 max-w-lg mx-auto pb-4 w-full overflow-x-hidden min-w-0">
-      {/* 1. Hero QR Scanner Card (Matching Reference Scanner Image) */}
-      <div className="rounded-[32px] bg-gradient-to-b from-[#3b59f8] via-[#2f46e5] to-[#2538b3] text-white p-5 pt-6 relative overflow-hidden shadow-xl shadow-blue-600/30 space-y-4">
-        {/* Subtle Decorative Background Icons */}
-        <div className="absolute top-3 right-4 text-white/10 font-mono text-4xl font-black select-none pointer-events-none">$</div>
-        <div className="absolute top-4 left-3 text-white/10 font-mono text-3xl font-black select-none pointer-events-none">₹</div>
-        <div className="absolute bottom-16 left-4 text-white/10 font-mono text-3xl font-black select-none pointer-events-none">$</div>
-
-        {/* Center Scanner Viewfinder Container */}
-        <div className="relative py-2 px-4 flex flex-col items-center justify-center min-h-[160px]">
-          <Link to="/customer/pay/scan" className="relative group cursor-pointer w-full max-w-[220px] flex flex-col items-center py-4">
-            {/* Curved Lime Green Corner Brackets with Pulse Glow */}
-            <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-[#bbf225] rounded-tl-2xl shadow-[0_0_12px_rgba(187,242,37,0.7)] animate-pulse" />
-            <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-[#bbf225] rounded-tr-2xl shadow-[0_0_12px_rgba(187,242,37,0.7)] animate-pulse" />
-            <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-[#bbf225] rounded-bl-2xl shadow-[0_0_12px_rgba(187,242,37,0.7)] animate-pulse" />
-            <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-[#bbf225] rounded-br-2xl shadow-[0_0_12px_rgba(187,242,37,0.7)] animate-pulse" />
-
-            {/* Animated Laser Scanning Line */}
-            <div className="absolute left-2 right-2 h-0.5 rounded-full bg-gradient-to-r from-transparent via-[#bbf225] to-transparent shadow-[0_0_12px_#bbf225] animate-scan-beam pointer-events-none" />
-
-            {/* Stylized QR Code Element matching Reference Image */}
-            <div className="relative flex flex-col items-center justify-center space-y-1.5 my-1 group-hover:scale-105 transition-transform duration-300">
-              {/* Top Row Rounded Squares */}
-              <div className="flex items-center gap-4 text-white/80 font-black tracking-widest text-lg">
-                <span className="w-6 h-6 rounded-lg border-2 border-white/90 flex items-center justify-center">
-                  <span className="w-2.5 h-2.5 bg-white/90 rounded-sm" />
-                </span>
-                <span className="w-6 h-6 rounded-lg border-2 border-white/90 flex items-center justify-center">
-                  <span className="w-2.5 h-2.5 bg-white/90 rounded-sm" />
-                </span>
-              </div>
-
-              {/* Floating Dark Glass Pill: Tap to scan with pulse ring */}
-              <div className="relative my-0.5">
-                <span className="absolute inset-0 rounded-full bg-white/20 animate-ping opacity-30 pointer-events-none" />
-                <div className="relative bg-[#1c2d82]/90 backdrop-blur-md text-white font-extrabold text-[11px] px-4 py-1 rounded-full border border-white/30 shadow-lg tracking-tight z-10 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#bbf225] animate-pulse" />
-                  <span>Tap to scan</span>
-                </div>
-              </div>
-
-              {/* Bottom Row Rounded Squares & Dots */}
-              <div className="flex items-center gap-4 text-white/80 font-black tracking-widest text-lg">
-                <span className="w-6 h-6 rounded-lg border-2 border-white/90 flex items-center justify-center">
-                  <span className="w-2.5 h-2.5 bg-white/90 rounded-sm" />
-                </span>
-                <span className="w-6 h-6 rounded-lg border-2 border-white/90 flex items-center justify-center relative">
-                  <span className="w-1.5 h-1.5 bg-white/90 rounded-full absolute -top-0.5 -right-0.5" />
-                  <span className="w-1.5 h-1.5 bg-white/90 rounded-full" />
-                </span>
-              </div>
-            </div>
-          </Link>
-
-          {/* Yellow Cashback Subtext */}
-          <p className="text-xs sm:text-sm font-black text-white flex items-center justify-center gap-1.5 mt-2">
-            <span className="text-[#bbf225] font-black text-sm animate-bounce">⚡</span>
-            <span>Get up to 10% cashback!</span>
-          </p>
-        </div>
-
-        {/* Action Buttons: Buy USDT & Sell USDT */}
-        <div className="grid grid-cols-2 gap-3 pt-1">
-          <Link to="/customer/buy" className="w-full">
-            <Button className="w-full rounded-full py-5 text-xs font-black bg-white/25 hover:bg-white/35 text-white border border-white/40 backdrop-blur-md shadow-lg flex items-center justify-center gap-2 cursor-pointer transition-all duration-300 hover:scale-[1.03] active:scale-95 group">
-              <span className="w-6 h-6 rounded-full bg-white/20 group-hover:bg-[#bbf225] group-hover:text-slate-900 border border-white/40 flex items-center justify-center text-white text-[11px] transition-colors">
-                <Navigation className="w-3.5 h-3.5 rotate-45" />
-              </span>
-              <span className="whitespace-nowrap">Buy USDT</span>
-            </Button>
-          </Link>
-          <Link to="/customer/sell" className="w-full">
-            <Button className="w-full rounded-full py-5 text-xs font-black bg-white/25 hover:bg-white/35 text-white border border-white/40 backdrop-blur-md shadow-lg flex items-center justify-center gap-2 cursor-pointer transition-all duration-300 hover:scale-[1.03] active:scale-95 group">
-              <span className="w-6 h-6 rounded-full bg-white/20 group-hover:bg-[#bbf225] group-hover:text-slate-900 border border-white/40 flex items-center justify-center text-white text-[11px] transition-colors">
-                <Send className="w-3.5 h-3.5" />
-              </span>
-              <span className="whitespace-nowrap">Sell USDT</span>
-            </Button>
-          </Link>
-        </div>
-      </div>
-
-      {/* 2. High-Tech Animated Crypto Wallet Balance Card */}
-      <div className="rounded-[28px] bg-gradient-to-r from-[#eef4ff] via-[#f5f8ff] to-[#e8f0fe] dark:from-[#0d162a] dark:via-[#121c35] dark:to-[#0f1930] border border-blue-200/60 dark:border-blue-800/40 p-3.5 sm:p-4 shadow-md shadow-blue-500/5 hover:shadow-lg hover:shadow-blue-500/10 transition-all flex items-center justify-between gap-2.5 relative overflow-hidden group min-w-0">
-        {/* Glowing Ambient Light Spheres */}
-        <div className="absolute -top-10 -left-10 w-28 h-28 bg-blue-500/15 dark:bg-blue-500/25 rounded-full blur-2xl pointer-events-none group-hover:scale-125 transition-transform duration-700" />
-        <div className="absolute -bottom-10 -right-10 w-28 h-28 bg-emerald-500/15 dark:bg-emerald-500/20 rounded-full blur-2xl pointer-events-none group-hover:scale-125 transition-transform duration-700" />
-
-        {/* Futuristic Interconnected Blockchain Grid Watermark SVG */}
-        <svg className="absolute right-0 top-0 h-full w-48 text-blue-500/10 dark:text-blue-400/10 pointer-events-none select-none stroke-current" viewBox="0 0 200 100" fill="none" strokeWidth="1">
-          {/* Hexagonal / Blockchain Mesh Grid Lines */}
-          <path d="M 30 10 L 70 30 L 70 70 L 30 90 M 70 30 L 110 10 L 150 30 L 150 70 L 110 90 M 110 30 L 110 70" strokeDasharray="3 3" />
-          <circle cx="70" cy="30" r="3" fill="currentColor" />
-          <circle cx="110" cy="10" r="3" fill="currentColor" />
-          <circle cx="150" cy="30" r="3" fill="currentColor" />
-          <circle cx="110" cy="70" r="3" fill="currentColor" />
-        </svg>
-
-        {/* Floating Crypto Tether / Bitcoin Watermark Badge */}
-        <div className="absolute right-20 top-2 text-blue-400/20 dark:text-blue-400/15 font-black text-[9px] pointer-events-none select-none tracking-widest uppercase">
-          ₮ USDT ESCROW
-        </div>
-        <div className="absolute right-8 bottom-1 text-emerald-400/20 dark:text-emerald-400/15 font-mono font-black text-xl pointer-events-none select-none">
-          $
-        </div>
-
-        {/* Animated Subtle Shimmer Light Ray */}
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 dark:via-blue-400/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none" />
-
-        {/* Left Side: Glowing Squircle Wallet Icon & Un-truncated Balance */}
-        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1 z-10">
-          {/* 3D Glowing Gradient Squircle */}
-          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-[18px] bg-gradient-to-tr from-[#3b59f8] via-[#4d69f9] to-[#2542e3] text-white flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/35 border border-blue-400/30 group-hover:scale-105 transition-transform duration-300 relative">
-            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-white dark:border-[#0d162a] animate-pulse" />
-            <svg className="w-5.5 h-5.5 stroke-[2.2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M5 6h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z" />
-            </svg>
-          </div>
-
-          <div className="min-w-0 flex-1 flex flex-col justify-center">
-            <div className="flex items-baseline gap-1.5 min-w-0">
-              <span className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight whitespace-nowrap">
-                {availableVal}
-              </span>
-              <span className="text-xs font-black text-[#3b59f8] dark:text-blue-400 shrink-0 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded-md border border-blue-100 dark:border-blue-900/40">
-                USDT
-              </span>
-            </div>
-            <div className="flex items-center gap-1 mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">1 USDT = ₹99.11</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Side: Glowing Capsule Action Button */}
-        <Link to="/customer/wallet/deposit" className="shrink-0 z-10">
-          <button className="rounded-full pl-2 pr-4 sm:pr-4.5 py-2 sm:py-2.5 bg-gradient-to-r from-[#3b59f8] via-[#304ee7] to-[#2542e3] hover:from-[#2d46e5] hover:to-[#1b36cf] text-white shadow-xl shadow-blue-500/35 flex items-center gap-2 cursor-pointer transition-all duration-300 hover:scale-105 active:scale-95 shrink-0 whitespace-nowrap group/btn border border-blue-400/30">
-            <span className="w-6 h-6 sm:w-6.5 sm:h-6.5 rounded-full bg-white text-[#3b59f8] flex items-center justify-center text-xs font-black shrink-0 shadow-xs group-hover/btn:rotate-90 transition-transform duration-300">
-              +
-            </span>
-            <span className="text-xs font-black tracking-tight whitespace-nowrap">Add Money</span>
-          </button>
-        </Link>
-      </div>
-
-      {/* 3. Three Feature Action Grid (Matching Reference Images) */}
-      <div className="grid grid-cols-3 gap-2.5">
-        {/* Recharges & Bills */}
-        <Link
-          to="/customer/utilities"
-          className="rounded-2xl bg-white dark:bg-[#121829] border border-slate-100 dark:border-slate-800/80 p-3 text-center flex flex-col items-center justify-between space-y-2 hover:shadow-md hover:border-emerald-300/50 dark:hover:border-emerald-800/50 transition-all cursor-pointer shadow-sm group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-500 flex items-center justify-center font-bold group-hover:scale-110 transition-transform">
-            <Smartphone className="w-5 h-5" />
-          </div>
-          <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200 leading-tight">
-            Recharges & Bills
-          </span>
-        </Link>
-
-        {/* Buy Gift Cards */}
-        <Link
-          to="/customer/gift-cards"
-          className="rounded-2xl bg-white dark:bg-[#121829] border border-slate-100 dark:border-slate-800/80 p-3 text-center flex flex-col items-center justify-between space-y-2 hover:shadow-md hover:border-amber-300/50 dark:hover:border-amber-800/50 transition-all cursor-pointer shadow-sm group relative"
-        >
-          <span className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[8px] font-black bg-amber-100 text-amber-800 border border-amber-300 whitespace-nowrap shadow-xs">
-            Up to 15% Off
-          </span>
-          <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-500 flex items-center justify-center font-bold group-hover:scale-110 transition-transform mt-1">
-            <Gift className="w-5 h-5" />
-          </div>
-          <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200 leading-tight">
-            Buy Gift Cards
-          </span>
-        </Link>
-
-        {/* Refer & Earn */}
-        <Link
-          to="/customer/referrals"
-          className="rounded-2xl bg-white dark:bg-[#121829] border border-slate-100 dark:border-slate-800/80 p-3 text-center flex flex-col items-center justify-between space-y-2 hover:shadow-md hover:border-blue-300/50 dark:hover:border-blue-800/50 transition-all cursor-pointer shadow-sm group relative"
-        >
-          <span className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[8px] font-black bg-blue-100 text-blue-700 border border-blue-300 shadow-xs">
-            Invite
-          </span>
-          <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-500 flex items-center justify-center font-bold group-hover:scale-110 transition-transform mt-1">
-            <Users className="w-5 h-5" />
-          </div>
-          <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200 leading-tight">
-            Refer & Earn
-          </span>
-        </Link>
-      </div>
-
-      {/* 4. Interactive Auto-Rotating 5-Slide Promo Banner (Matching Images 1 - 5) */}
-      <div
-        className={cn(
-          'rounded-2xl text-white p-4 flex items-center justify-between shadow-md transition-all duration-500 relative overflow-hidden min-h-[96px]',
-          currentBanner.bgClass
-        )}
-      >
-        {/* Slide countdown top progress bar */}
-        <div key={activeSlide} className="absolute top-0 left-0 h-1 bg-white/40 w-full animate-shimmer" />
-
-        <div className="space-y-0.5 z-10 transition-opacity duration-300">
-          <h4 className="text-sm font-black tracking-tight leading-tight">
-            {currentBanner.title}
-          </h4>
-          <p className="text-[11px] text-white/90 font-medium">
-            {currentBanner.subtitle}
-          </p>
-        </div>
-
-        <Link to={currentBanner.link} className="z-10 shrink-0">
-          <Button className="rounded-full px-4 py-2 text-xs font-extrabold bg-white text-slate-900 hover:bg-slate-100 shadow-sm cursor-pointer transition-transform hover:scale-105 active:scale-95">
-            {currentBanner.btnText}
-          </Button>
-        </Link>
-
-        {/* Carousel Pagination Dots matching Reference Images */}
-        <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-10">
-          {slides.map((_, idx) => (
-            <button
-              key={idx}
-              onClick={() => setActiveSlide(idx)}
-              className={cn(
-                'transition-all duration-300 cursor-pointer',
-                idx === activeSlide
-                  ? 'w-6 h-1.5 bg-white rounded-full'
-                  : 'w-1.5 h-1.5 bg-white/40 hover:bg-white/70 rounded-full'
-              )}
-              title={`Slide ${idx + 1}`}
-            />
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
+export { CustomerDashboard } from './CustomerDashboard'
 
 function FilterBar() {
   const [params, setParams] = useSearchParams()
@@ -518,75 +205,332 @@ export function CatalogPage() {
 }
 
 export function UtilitiesHub() {
+  const [selectedCat, setSelectedCat] = useState<
+    'recharge' | 'electricity' | 'dth' | 'broadband' | 'gas' | 'water' | 'fastag'
+  >('recharge')
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const utilityServices = [
+    { id: 'recharge', label: 'Mobile Recharge', icon: Smartphone, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/50', badge: 'Fast' },
+    { id: 'electricity', label: 'Electricity Bill', icon: Zap, color: 'text-amber-500 bg-amber-50 dark:bg-amber-950/50', badge: 'Instant' },
+    { id: 'dth', label: 'DTH / Cable TV', icon: Tv, color: 'text-purple-500 bg-purple-50 dark:bg-purple-950/50', badge: '' },
+    { id: 'broadband', label: 'Broadband / Wi-Fi', icon: Wifi, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/50', badge: '' },
+    { id: 'gas', label: 'Piped Gas (PNG)', icon: Flame, color: 'text-rose-500 bg-rose-50 dark:bg-rose-950/50', badge: '' },
+    { id: 'water', label: 'Water Utility', icon: Droplets, color: 'text-cyan-500 bg-cyan-50 dark:bg-cyan-950/50', badge: '' },
+    { id: 'fastag', label: 'FASTag Toll', icon: Car, color: 'text-teal-500 bg-teal-50 dark:bg-teal-950/50', badge: 'Toll' },
+    { id: 'recharge', label: 'Credit Card Bill', icon: CreditCard, color: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-950/50', badge: '2% Back' },
+  ]
+
+  const recentBills = [
+    { id: '1', title: 'Jio Mobile Prepaid', idNum: '9876543210', amount: '₹299', usdt: '3.01 USDT', date: '2 days ago', cat: 'recharge' as const },
+    { id: '2', title: 'BESCOM Electricity', idNum: 'CA #99482104', amount: '₹1,450', usdt: '14.63 USDT', date: 'Oct 28', cat: 'electricity' as const },
+    { id: '3', title: 'Tata Play DTH', idNum: 'Sub #10029384', amount: '₹450', usdt: '4.54 USDT', date: 'Oct 15', cat: 'dth' as const },
+  ]
+
+  const openService = (cat: 'recharge' | 'electricity' | 'dth' | 'broadband' | 'gas' | 'water' | 'fastag') => {
+    setSelectedCat(cat)
+    setIsModalOpen(true)
+  }
+
+  const filteredServices = utilityServices.filter((s) =>
+    s.label.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
   return (
-    <div>
-      <h1 className="text-2xl font-semibold">Utilities</h1>
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
-        {[
-          ['mobile-recharge', 'Mobile recharge'],
-          ['dth', 'DTH'],
-          ['electricity', 'Electricity'],
-          ['bill-payment', 'Bill payment'],
-        ].map(([p, l]) => (
-          <Link key={p} to={`/customer/utilities/${p}`}>
-            <Card>{l}</Card>
-          </Link>
-        ))}
+    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
+      {/* Top Header */}
+      <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center gap-2.5">
+          <BackButton fallback="/customer/dashboard" />
+          <div>
+            <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+              Bills & Recharges
+            </h1>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">Pay directly with USDT at 0% fee</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40 text-[10px] font-black">
+          <ShieldCheck className="w-3 h-3" />
+          <span>BBPS Verified</span>
+        </div>
       </div>
+
+      {/* Search Input */}
+      <div className="relative">
+        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search biller, operator or board..."
+          className="w-full pl-10 pr-4 py-2.5 text-xs rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-900 dark:text-white placeholder:text-slate-400"
+        />
+      </div>
+
+      {/* Promotional Cashback Banner */}
+      <div className="rounded-[24px] bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-600 p-4 text-white shadow-md relative overflow-hidden">
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="space-y-1 max-w-[240px]">
+            <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full inline-block">
+              🎉 Festive Rebate
+            </span>
+            <h3 className="text-sm font-black leading-tight">2% Instant USDT Cashback</h3>
+            <p className="text-[11px] text-emerald-100 leading-snug">
+              On all Electricity, Mobile and DTH recharges settled via USDT escrow.
+            </p>
+          </div>
+          <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
+            <Zap className="w-6 h-6 text-amber-300" />
+          </div>
+        </div>
+      </div>
+
+      {/* Service Grid (4 columns) */}
+      <div className="space-y-2">
+        <h2 className="text-xs font-black uppercase tracking-wider text-slate-400">
+          Utility Services
+        </h2>
+        <div className="grid grid-cols-4 gap-2.5">
+          {filteredServices.map((service, idx) => (
+            <button
+              key={`${service.label}-${idx}`}
+              type="button"
+              onClick={() => openService(service.id as any)}
+              className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800/80 hover:border-emerald-500/40 hover:shadow-sm transition-all text-center group cursor-pointer relative"
+            >
+              {service.badge && (
+                <span className="absolute -top-1.5 right-1 text-[8px] font-black px-1.5 py-0.2 rounded-full bg-emerald-500 text-white shadow-2xs">
+                  {service.badge}
+                </span>
+              )}
+              <div
+                className={cn(
+                  'w-11 h-11 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-105 group-active:scale-95',
+                  service.color
+                )}
+              >
+                <service.icon className="w-5 h-5 stroke-[2]" />
+              </div>
+              <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200 leading-tight">
+                {service.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Recent Bills & Quick Repeat */}
+      <div className="space-y-2 pt-1">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-black uppercase tracking-wider text-slate-400">
+            Recent Payments
+          </h2>
+          <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+            Auto-fetch on
+          </span>
+        </div>
+
+        <div className="space-y-2">
+          {recentBills.map((b) => (
+            <div
+              key={b.id}
+              className="p-3 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 flex items-center justify-between shadow-2xs"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-black text-slate-900 dark:text-white truncate block">
+                    {b.title}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {b.idNum} • {b.date}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="text-right">
+                  <span className="text-xs font-black text-slate-900 dark:text-white block font-mono">
+                    {b.amount}
+                  </span>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono">
+                    {b.usdt}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openService(b.cat)}
+                  className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-slate-100 dark:bg-slate-800 hover:bg-emerald-500 hover:text-white transition-colors cursor-pointer text-slate-700 dark:text-slate-300"
+                >
+                  Repeat
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Interactive Bill Payment Modal */}
+      <BillPaymentModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        initialCategory={selectedCat}
+      />
     </div>
   )
 }
 
 export function AccountPage({ title, body }: { title: string; body: string }) {
   return (
-    <div>
-      <h1 className="text-2xl font-semibold">{title}</h1>
-      <Card className="mt-4">{body}</Card>
+    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
+      <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800">
+        <BackButton fallback="/customer/dashboard" />
+        <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">{title}</h1>
+      </div>
+      <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 leading-relaxed shadow-2xs">
+        {body}
+      </div>
     </div>
   )
 }
 
 export function PayHome() {
+  const [upiInput, setUpiInput] = useState('')
+  const navigate = useNavigate()
+
+  const recentPayees = [
+    { name: 'Starbucks Coffee', upiId: 'starbucks@icici', avatar: '☕' },
+    { name: 'Reliance Fresh', upiId: 'reliancefresh@hdfcbank', avatar: '🛒' },
+    { name: 'Aarav Sharma', upiId: 'aarav.sharma@okaxis', avatar: '👤' },
+    { name: 'Airtel Broadband', upiId: 'airtel.bb@airtel', avatar: '📶' },
+  ]
+
+  const handleProceedUpi = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!upiInput) return
+    navigate(`/customer/pay/confirm?vpa=${encodeURIComponent(upiInput)}`)
+  }
+
   return (
-    <div className="max-w-lg space-y-4">
-      <h1 className="text-2xl font-semibold">Pay</h1>
-      <p className="text-sm text-nx-muted">
-        Mock UPI only. Scan an image or type an ID. No bank transfer is executed.
-      </p>
-      <Link to="/customer/pay/scan">
-        <Button>Scan QR</Button>
-      </Link>
-      <Link to="/customer/pay/confirm">
-        <Button variant="ghost">Enter UPI ID</Button>
-      </Link>
+    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
+      {/* Top Header */}
+      <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center gap-2.5">
+          <BackButton fallback="/customer/dashboard" />
+          <div>
+            <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+              Scan & Pay UPI
+            </h1>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">Instant merchant settlements via USDT</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 text-[10px] font-black">
+          <Sparkles className="w-3 h-3" />
+          <span>Zero Fee</span>
+        </div>
+      </div>
+
+      {/* Main Scan Camera Hero Card */}
+      <div className="rounded-[28px] bg-gradient-to-tr from-[#0a2316] via-[#0d3420] to-[#0a2316] p-5 text-white shadow-xl border border-emerald-500/30 text-center space-y-4 relative overflow-hidden">
+        <div className="w-20 h-20 rounded-3xl bg-white/10 backdrop-blur-md border border-white/20 mx-auto flex items-center justify-center shadow-lg">
+          <QrCode className="w-10 h-10 text-emerald-400 animate-pulse" />
+        </div>
+
+        <div className="space-y-1">
+          <h2 className="text-base font-black">Scan Any UPI QR Code</h2>
+          <p className="text-xs text-emerald-200/80 max-w-xs mx-auto">
+            Pay at BharatPe, Paytm, GooglePay, PhonePe or any Indian merchant store instantly.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 justify-center">
+          <Link
+            to="/customer/pay/scan"
+            className="w-full py-3 px-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-1.5"
+          >
+            <ScanLine className="w-4 h-4" />
+            <span>Scan QR</span>
+          </Link>
+          <Link
+            to="/customer/request"
+            className="w-full py-3 px-3 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-black text-xs shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-1.5 border border-white/20"
+          >
+            <ArrowDownCircle className="w-4 h-4" />
+            <span>Request Money</span>
+          </Link>
+        </div>
+      </div>
+
+      {/* Direct UPI ID Entry Form */}
+      <form
+        onSubmit={handleProceedUpi}
+        className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-3 shadow-2xs"
+      >
+        <span className="text-xs font-black text-slate-900 dark:text-white block">
+          Or Enter UPI ID / Mobile Number
+        </span>
+
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={upiInput}
+            onChange={(e) => setUpiInput(e.target.value)}
+            placeholder="e.g. merchant@okicici or 9876543210"
+            className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-900 dark:text-white placeholder:text-slate-400"
+          />
+          <button
+            type="submit"
+            disabled={!upiInput}
+            className="px-4 py-2.5 rounded-xl bg-[#0a2316] text-white hover:bg-emerald-950 font-bold text-xs disabled:opacity-40 transition-all cursor-pointer"
+          >
+            Verify
+          </button>
+        </div>
+      </form>
+
+      {/* Recent Merchant Payees */}
+      <div className="space-y-2">
+        <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">
+          Recent Payees
+        </h3>
+        <div className="space-y-2">
+          {recentPayees.map((p) => (
+            <button
+              key={p.upiId}
+              type="button"
+              onClick={() => navigate(`/customer/pay/confirm?vpa=${encodeURIComponent(p.upiId)}`)}
+              className="w-full p-3 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 flex items-center justify-between hover:border-emerald-500/40 transition-all text-left cursor-pointer group shadow-2xs"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-base shrink-0">
+                  {p.avatar}
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-black text-slate-900 dark:text-white truncate block group-hover:text-emerald-500 transition-colors">
+                    {p.name}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">{p.upiId}</span>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
 
 export function PayScan() {
-  const [parsed, setParsed] = useState('')
-  return (
-    <div className="max-w-lg">
-      <h1 className="text-2xl font-semibold">Scan QR</h1>
-      <p className="text-sm text-nx-muted">Mock parser only. Upload any image to simulate a UPI payload.</p>
-      <input
-        type="file"
-        accept="image/*"
-        className="mt-4 text-sm"
-        onChange={(e) => {
-          const file = e.target.files?.[0]
-          setParsed(file ? `upi://pay?pa=demo@nexora&pn=Sample%20Shop&file=${file.name}` : '')
-        }}
-      />
-      {parsed && (
-        <Card className="mt-4">
-          <p>Parsed (mock): {parsed}</p>
-          <Link to="/customer/pay/confirm">
-            <Button className="mt-3">Continue</Button>
-          </Link>
-        </Card>
-      )}
-    </div>
-  )
+  const navigate = useNavigate()
+  useEffect(() => {
+    navigate('/customer/pay/scan', { replace: true })
+  }, [navigate])
+  return null
 }
 
