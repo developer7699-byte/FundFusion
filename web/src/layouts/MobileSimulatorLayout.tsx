@@ -399,28 +399,72 @@ export function MobileSimulatorLayout({
               </header>
             ) : (
               /* MERCHANT DESK HEADER */
-              <header className="bg-[#edf2f9] dark:bg-[#0d1424] px-3.5 sm:px-4 py-3 sm:py-3.5 flex items-center justify-between gap-1.5 sm:gap-2.5 border-b border-slate-200/60 dark:border-slate-800/80 z-20 shrink-0">
-                <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-                  <NavLink
-                    to="/merchant/profile"
-                    title="My Profile"
-                    className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white dark:bg-[#161d31] shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-none border border-slate-100/90 dark:border-slate-800 flex items-center justify-center text-slate-800 dark:text-slate-100 hover:scale-105 active:scale-95 transition-all duration-200 shrink-0 group cursor-pointer"
-                  >
-                    <User className="w-5 h-5 fill-slate-800 dark:fill-slate-200 text-slate-800 dark:text-slate-200 group-hover:fill-blue-600 group-hover:text-blue-600 transition-colors" />
-                  </NavLink>
+              <header className="bg-white/95 dark:bg-[#0b1020]/95 backdrop-blur-md px-3 sm:px-4 py-2.5 flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800/80 z-20 shrink-0 sticky top-0 transition-colors">
+                {/* 1. Green / Emerald Gradient Store Avatar Circle */}
+                <NavLink
+                  to="/merchant/profile"
+                  title="Merchant Desk Profile"
+                  className="relative group shrink-0 cursor-pointer"
+                  aria-label="View merchant profile"
+                >
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-emerald-600 via-teal-600 to-cyan-500 p-0.5 shadow-xs transition-transform group-hover:scale-105 active:scale-95 flex items-center justify-center">
+                    <div className="w-full h-full rounded-full bg-gradient-to-tr from-emerald-500 to-teal-700 flex items-center justify-center text-white">
+                      <Store className="w-4.5 h-4.5" />
+                    </div>
+                  </div>
+                </NavLink>
 
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white dark:bg-[#161d31] border border-slate-100/90 dark:border-slate-800">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="font-extrabold text-xs text-slate-800 dark:text-slate-200">Merchant Desk</span>
+                {/* 2. Middle Desk Status Pill */}
+                <div className="flex-1 min-w-0 flex items-center justify-center">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/25">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                    <span className="font-black text-xs text-slate-800 dark:text-slate-200 tracking-tight truncate">
+                      Merchant Desk
+                    </span>
+                    <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 px-1.5 py-0.2 rounded-full">
+                      LIVE
+                    </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                {/* 3. Right Action Icons (Theme Sun/Moon, Quick Orders, Notifications Bell) */}
+                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                  {/* Theme Toggle Button */}
+                  <button
+                    type="button"
+                    onClick={(e) => toggle(e)}
+                    className="p-1.5 sm:p-2 rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors cursor-pointer"
+                    title={theme === 'dark' ? t('header.themeLight') : t('header.themeDark')}
+                    aria-label="Toggle theme"
+                  >
+                    {theme === 'dark' ? (
+                      <Sun className="w-5 h-5 text-amber-400 fill-amber-400/20 stroke-[2]" />
+                    ) : (
+                      <Moon className="w-5 h-5 text-slate-700 fill-slate-700/20 stroke-[2]" />
+                    )}
+                  </button>
+
+                  {/* Quick Orders Shortcut */}
                   <NavLink
                     to="/merchant/orders"
-                    className="w-9 h-9 rounded-full bg-white dark:bg-[#161d31] border border-slate-100/90 dark:border-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200"
+                    className="p-1.5 sm:p-2 rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors"
+                    title="All Orders"
+                    aria-label="View orders"
                   >
-                    <History className="w-4.5 h-4.5" />
+                    <History className="w-5 h-5 stroke-[2]" />
+                  </NavLink>
+
+                  {/* Notification Bell */}
+                  <NavLink
+                    to="/merchant/notifications"
+                    className="p-1.5 sm:p-2 rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors relative"
+                    title="Notifications"
+                    aria-label="View notifications"
+                  >
+                    <Bell className="w-5 h-5 stroke-[2]" />
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center ring-2 ring-white dark:ring-[#0b1020] shadow-xs animate-in zoom-in-75 duration-200">
+                      2
+                    </span>
                   </NavLink>
                 </div>
               </header>
@@ -462,7 +506,7 @@ export function MobileSimulatorLayout({
                       key={item.to}
                       to={item.to}
                       className="-mt-7 flex flex-col items-center group cursor-pointer z-40"
-                      title="Scan & Pay"
+                      title={isMerchant ? 'Available Orders' : 'Scan & Pay'}
                     >
                       <div className="w-14 h-14 rounded-full bg-[#0a2316] dark:bg-[#07301f] text-white flex items-center justify-center shadow-xl shadow-emerald-950/40 border-[3.5px] border-white dark:border-[#0c1122] group-hover:scale-105 active:scale-95 transition-all duration-200">
                         <item.icon className="w-6 h-6 stroke-[2.2] text-white" />

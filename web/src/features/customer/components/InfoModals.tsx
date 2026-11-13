@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   X,
   Info,
@@ -115,6 +116,7 @@ export function AboutModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =
    2. BECOME A MERCHANT MODAL (Replaces jumping out to /merchant)
    ========================================================================= */
 export function BecomeMerchantModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const navigate = useNavigate()
   if (!isOpen) return null
   const [applied, setApplied] = useState(false)
 
@@ -131,9 +133,9 @@ export function BecomeMerchantModal({ isOpen, onClose }: { isOpen: boolean; onCl
             </div>
             <div>
               <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
-                Become a Verified Merchant
+                Merchant Liquidity Desk
               </h3>
-              <p className="text-[11px] text-slate-500">Earn up to 2.8% on daily volume</p>
+              <p className="text-[11px] text-slate-500">Earn up to 2.8% on daily P2P volume</p>
             </div>
           </div>
           <button
@@ -146,76 +148,39 @@ export function BecomeMerchantModal({ isOpen, onClose }: { isOpen: boolean; onCl
         </div>
 
         <div className="p-4 sm:p-5 overflow-y-auto space-y-4 text-xs">
-          {applied ? (
-            <div className="text-center space-y-3 py-4">
-              <div className="w-14 h-14 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
-                <CheckCircle2 className="w-8 h-8" />
-              </div>
-              <h4 className="text-base font-black text-slate-900 dark:text-white">Application Received!</h4>
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                Your merchant profile is under fast-track review. Our risk team will enable your Merchant Desk switch within 2 hours.
-              </p>
-              <Button
-                onClick={() => {
-                  setApplied(false)
-                  onClose()
-                }}
-                className="w-full py-2.5 rounded-xl font-bold bg-[#22c55e] hover:bg-[#16a34a] text-white text-xs"
-              >
-                Okay, Understood
-              </Button>
-            </div>
-          ) : (
-            <>
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-blue-500/10 border border-emerald-500/20 space-y-2">
-                <span className="text-[10px] uppercase font-black text-emerald-600 dark:text-emerald-400 tracking-wider">
-                  Partner Privileges
-                </span>
-                <ul className="space-y-1.5 text-[11px] text-slate-700 dark:text-slate-300">
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    <span>Priority order placement & custom spread rates</span>
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    <span>0% fee on all automated IMPS/UPI bank payouts</span>
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    <span>Dedicated dispute arbitrator & VIP support channel</span>
-                  </li>
-                </ul>
-              </div>
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-blue-500/10 border border-emerald-500/20 space-y-2">
+            <span className="text-[10px] uppercase font-black text-emerald-600 dark:text-emerald-400 tracking-wider">
+              Partner Privileges
+            </span>
+            <ul className="space-y-1.5 text-[11px] text-slate-700 dark:text-slate-300">
+              <li className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span>Priority order matching & custom spread rates</span>
+              </li>
+              <li className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span>0% fee on all automated IMPS/UPI bank payouts</span>
+              </li>
+              <li className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span>Dedicated dispute arbitrator & VIP support channel</span>
+              </li>
+            </ul>
+          </div>
 
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
-                  Daily Volume Capacity (USDT)
-                </label>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {['$1,000+', '$5,000+', '$25,000+'].map((vol, idx) => (
-                    <div
-                      key={vol}
-                      className={cn(
-                        'p-2.5 rounded-xl border text-center font-bold text-xs cursor-pointer',
-                        idx === 0
-                          ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-                      )}
-                    >
-                      {vol}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <Button
-                onClick={() => setApplied(true)}
-                className="w-full py-3 rounded-xl font-bold bg-[#22c55e] hover:bg-[#16a34a] text-white text-xs shadow-md shadow-emerald-500/20"
-              >
-                Apply for Merchant Desk Access
-              </Button>
-            </>
-          )}
+          <div className="space-y-2 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                onClose()
+                navigate('/merchant/dashboard')
+              }}
+              className="w-full py-3 rounded-2xl font-black bg-[#0a2316] dark:bg-emerald-600 hover:bg-emerald-700 text-white text-xs shadow-md transition-transform active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>Launch Merchant Desk</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

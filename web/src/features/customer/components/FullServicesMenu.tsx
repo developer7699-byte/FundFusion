@@ -103,7 +103,7 @@ export function FullServicesMenu({
     {
       title: 'Business Services',
       items: [
-        { id: 'merchant', label: 'Become a Merchant', icon: Store, action: onOpenMerchant },
+        { id: 'merchant', label: 'Merchant Desk', icon: Store, to: '/merchant/dashboard', badge: 'Live', badgeColor: 'bg-emerald-500 text-white' },
         { id: 'payout-api', label: 'Payout API', icon: Link2, action: onOpenPayoutApi },
         { id: 'bulk-payout', label: 'Bulk Payout', icon: Layers, action: onOpenBulkPayout },
       ],

@@ -31,6 +31,7 @@ import {
   FeesPage,
 } from '@/features/marketing/Pages'
 import { CustomerLayout } from '@/layouts/CustomerLayout'
+import { MerchantLayout } from '@/layouts/MerchantLayout'
 import { DeskLayout, adminLinks, merchantLinks } from '@/layouts/DeskLayout'
 import { useAuth } from '@/lib/auth'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -60,6 +61,8 @@ import {
   MerchantOrders,
   MerchantProfile,
   MerchantWallet,
+  MerchantEarnings,
+  MerchantPaymentMethods,
 } from '@/features/merchant/pages'
 import {
   AdminAudit,
@@ -178,7 +181,7 @@ export function App() {
           </Route>
 
           <Route element={<RequireAuth role="MERCHANT" />}>
-            <Route path="/merchant" element={<MerchantShell />}>
+            <Route path="/merchant" element={<MerchantLayout />}>
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<MerchantHome />} />
               <Route path="available-orders" element={<MerchantAvailable />} />
@@ -187,14 +190,14 @@ export function App() {
               <Route path="orders" element={<MerchantOrders />} />
               <Route path="orders/:orderId" element={<MerchantOrderDetail />} />
               <Route path="wallet" element={<MerchantWallet />} />
-              <Route path="earnings" element={<MerchantNote title="Earnings" body="Gross, fees, and net here are simulated. Not a guaranteed return." />} />
-              <Route path="settlements" element={<MerchantNote title="Settlements" body="No live INR settlement. History will list mock completions." />} />
-              <Route path="withdrawals" element={<MerchantNote title="Withdrawals" body="Use the customer withdraw flow pattern on mock USDT available only." />} />
-              <Route path="performance" element={<MerchantNote title="Performance" body="Completion rate comes from the merchant dashboard mock metrics." />} />
-              <Route path="payment-methods" element={<MerchantNote title="Payment methods" body="Mock UPI / IMPS rails only." />} />
+              <Route path="earnings" element={<MerchantEarnings />} />
+              <Route path="settlements" element={<MerchantWallet />} />
+              <Route path="withdrawals" element={<MerchantWallet />} />
+              <Route path="performance" element={<MerchantEarnings />} />
+              <Route path="payment-methods" element={<MerchantPaymentMethods />} />
               <Route path="notifications" element={<MerchantNotices />} />
               <Route path="profile" element={<MerchantProfile />} />
-              <Route path="settings" element={<MerchantNote title="Settings" body="Desk preferences are local to this prototype." />} />
+              <Route path="settings" element={<MerchantProfile />} />
             </Route>
           </Route>
           <Route element={<RequireAuth role="ADMIN" />}>
