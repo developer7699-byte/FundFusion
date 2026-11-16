@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blog agent questions</title>
+<style>
+  :root { --bg:#ececec; --fg:#222; --head:#111; --muted:#888; --line:#d4d4d4; --ok:#15803d; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#161616; --fg:#d6d6d6; --head:#f2f2f2; --muted:#8a8a8a; --line:#333; --ok:#4ade80; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.6 ui-monospace, "Geist Mono", Consolas, monospace; }
+  main { max-width:760px; margin:0 auto; padding:32px 16px 120px; }
+  h1 { font-size:12px; text-transform:uppercase; letter-spacing:.06em; font-weight:500; color:var(--muted); margin:0 0 24px; }
+  summary { cursor:pointer; list-style:none; }
+  summary::-webkit-details-marker { display:none; }
+  summary::before { content:"▸"; display:inline-block; width:1.2em; color:var(--muted); transition:transform 180ms; }
+  details[open] > summary::before { transform:rotate(90deg); }
+
+  details.round { margin-bottom:32px; }
+  details.round > summary { font-size:12px; text-transform:uppercase; letter-spacing:.06em; font-weight:500; color:var(--head); padding:8px 0; }
+  .rmeta { color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0; margin-left:8px; }
+  .settled { color:var(--muted); font-size:12px; margin:0 0 12px 1.2em; }
+
+  details.q { border-top:1px solid var(--line); margin-left:1.2em; }
+  details.q > summary { padding:10px 0; display:flex; gap:0; }
+  details.q > summary .st { flex:1; min-width:0; }
+  .qt { color:var(--head); font-weight:700; }
+  .pick { display:block; color:var(--muted); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pick b { color:var(--fg); font-weight:500; }
+  details.q[open] .pick { display:none; }
+  .body { padding:0 0 16px 1.2em; }
+  .ctx { color:var(--muted); font-size:13px; margin:0 0 8px; }
+  label.opt { display:flex; gap:10px; padding:5px 8px; margin:0 -8px; cursor:pointer; border-radius:4px; }
+  label.opt:hover { background:rgba(127,127,127,.08); }
+  label.opt input { margin-top:5px; accent-color:var(--fg); }
+  label.opt.sel span { color:var(--head); font-weight:500; }
+  .ro label.opt { cursor:default; }
+  .ro label.opt:not(.sel) { opacity:.45; }
+  .rec { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-left:6px; }
+  .why { color:var(--muted); font-size:12px; margin:6px 0 8px; }
+  .cl { font-size:10px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); }
+  .note { margin:4px 0 0; white-space:pre-wrap; }
+  textarea { width:100%; min-height:34px; resize:vertical; background:transparent; color:var(--fg); font:inherit; border:0; border-bottom:1px solid var(--line); padding:4px 0; outline:none; }
+  textarea:focus { border-bottom-color:var(--fg); }
+  button.next { margin-top:10px; }
+
+  footer { position:fixed; left:0; right:0; bottom:0; background:var(--bg); border-top:1px solid var(--line); }
+  footer div { max-width:760px; margin:0 auto; padding:12px 16px; display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
+  button { font:inherit; font-size:12px; text-transform:uppercase; font-weight:700; letter-spacing:.02em; background:none; border:0; color:var(--fg); cursor:pointer; padding:8px 0; text-decoration:underline; text-underline-offset:3px; }
+  button.sec { font-weight:400; color:var(--muted); }
+  #status { color:var(--ok); font-size:12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Blog agent · questions</h1>
+  <div id="rounds"></div>
+</main>
+<footer><div>
+  <button id="copy">Copy open round</button>
+  <button id="expand" class="sec">Expand all</button>
+  <button id="collapse" class="sec">Collapse all</button>
+  <button id="reset" class="sec">Reset open round</button>
+  <span id="status" aria-live="polite"></span>
+</div></footer>
+
+<script>
+const ROUNDS = [];
+const round = r => ROUNDS.push(r);
+const answer = (id, a) => Object.assign(ROUNDS.find(r => r.id === id), { done:true, answers:a });
+</script>
+<script src="data.js"></script>
+<script>
+/* One entry per round. Answered rounds carry `a` (picked index) and `n` (comment) per question and render read-only.
+   The last round without answers is the open one. */
+
+const open = ROUNDS.find(r => !r.done) || { id:"none", qs:[] };
+const KEY = `grill-round-${open.id}`;   // same key as the old per-round file, so answers already given carry over
+let state = {};
+try { state = JSON.parse(localStorage.getItem(KEY)) || {}; } catch {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} };
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+
+function pickLine(q, pick, note) {
+  const rec = pick === q.r ? " (recommended)" : "";
+  return `→ <b>${esc(q.o[pick])}</b>${rec}${note ? " · 💬" : ""}`;
+}
+
+function renderQ(q, round, firstOpen) {
+  const ro = round.done;
+  const ans = round.answers?.[q.id];
+  const s = ro ? (ans ? { pick:ans[0], note:ans[1] } : { pick:q.a, note:q.n }) : (state[q.id] ||= { pick:q.r, note:"" });
+  const d = document.createElement("details");
+  d.className = "q" + (ro ? " ro" : "");
+  d.open = !ro && firstOpen;
+  const sum = document.createElement("summary");
+  sum.innerHTML = `<span class="st"><span class="qt">${q.id} — ${esc(q.t)}</span><span class="pick">${pickLine(q, s.pick, s.note)}</span></span>`;
+  d.appendChild(sum);
+  const b = document.createElement("div");
+  b.className = "body";
+  if (q.ctx) b.insertAdjacentHTML("beforeend", `<p class="ctx">${esc(q.ctx)}</p>`);
+  q.o.forEach((txt, i) => {
+    const l = document.createElement("label");
+    l.className = "opt" + (s.pick === i ? " sel" : "");
+    l.innerHTML = `<input type="radio" name="${q.id}" ${s.pick === i ? "checked" : ""} ${ro ? "disabled" : ""}><span>${esc(txt)}${i === q.r ? '<span class="rec">recommended</span>' : ""}</span>`;
+    if (!ro) l.querySelector("input").onchange = () => {
+      s.pick = i; save();
+      b.querySelectorAll("label.opt").forEach((x, j) => x.classList.toggle("sel", j === i));
+      sum.querySelector(".pick").innerHTML = pickLine(q, s.pick, s.note);
+    };
+    b.appendChild(l);
+  });
+  if (q.why) b.insertAdjacentHTML("beforeend", `<p class="why">➡ ${esc(q.why)}</p>`);
+  if (ro) {
+    if (s.note) b.insertAdjacentHTML("beforeend", `<div class="cl">Your comment</div><p class="note">${esc(s.note)}</p>`);
+  } else {
+    b.insertAdjacentHTML("beforeend", `<div class="cl">Comment</div>`);
+    const ta = document.createElement("textarea");
+    ta.value = s.note;
+    ta.oninput = () => { s.note = ta.value; save(); sum.querySelector(".pick").innerHTML = pickLine(q, s.pick, s.note); };
+    b.appendChild(ta);
+    const nx = document.createElement("button");
+    nx.className = "next sec"; nx.textContent = "Done · next";
+    nx.onclick = () => {
+      d.open = false;
+      const n = d.nextElementSibling;
+      if (n && n.tagName === "DETAILS") { n.open = true; n.querySelector("summary").focus(); n.scrollIntoView({ block:"nearest" }); }
+    };
+    b.appendChild(nx);
+  }
+  d.appendChild(b);
+  return d;
+}
+
+function render() {
+  const root = document.getElementById("rounds");
+  root.innerHTML = "";
+  ROUNDS.forEach(r => {
+    const d = document.createElement("details");
+    d.className = "round";
+    d.open = !r.done;
+    d.innerHTML = `<summary>${esc(r.title)}<span class="rmeta">${r.qs.length} questions · ${r.done ? "answered" : "open"}</span></summary>`;
+    if (r.settled) d.insertAdjacentHTML("beforeend", `<p class="settled">${esc(r.settled)}</p>`);
+    r.qs.forEach((q, i) => d.appendChild(renderQ(q, r, i === 0)));
+    root.appendChild(d);
+  });
+}
+
+document.getElementById("copy").onclick = async () => {
+  const out = `Round ${open.id}\n\n` + open.qs.map(q => {
+    const s = state[q.id];
+    const tag = s.pick === q.r ? " [recommended]" : "";
+    return `${q.id} ${q.t}\n  → ${q.o[s.pick]}${tag}` + (s.note.trim() ? `\n  comment: ${s.note.trim()}` : "");
+  }).join("\n\n");
+  const st = document.getElementById("status");
+  try { await navigator.clipboard.writeText(out); st.textContent = "Copied. Paste it in the chat."; }
+  catch { prompt("Copy this:", out); }
+};
+const all = v => document.querySelectorAll("details").forEach(d => d.open = v);
+document.getElementById("expand").onclick = () => all(true);
+document.getElementById("collapse").onclick = () => all(false);
+document.getElementById("reset").onclick = () => { state = {}; save(); render(); };
+render();
+</script>
+</body>
+</html>
