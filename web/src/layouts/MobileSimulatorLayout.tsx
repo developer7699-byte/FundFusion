@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useLayoutEffect } from 'react'
-import { NavLink, Outlet, useNavigate, useLocation, useNavigationType } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom'
 import {
   Home,
   History,
@@ -7,37 +7,20 @@ import {
   Wallet,
   User,
   Bell,
-  Gift,
   Download,
-  Plus,
-  LogOut,
-  ChevronRight,
   Wifi,
   Battery,
   Sparkles,
   Sun,
   Moon,
-  Smartphone,
-  Tablet,
-  Monitor,
   Store,
-  Layers,
   Search,
-  ArrowRight,
-  CheckCircle2,
   X,
   Share2,
   Check,
   CheckCircle,
   ShieldCheck,
   ArrowDownToLine,
-  ExternalLink,
-  BarChart2,
-  LineChart,
-  ArrowLeftRight,
-  ScanLine,
-  Flame,
-  UserPlus,
   LayoutGrid,
   Trophy,
   ReceiptText,
@@ -45,9 +28,9 @@ import {
   HelpCircle,
 } from 'lucide-react'
 import { SearchTokenModal } from '@/features/customer/components/SearchTokenModal'
-import { Logo } from '@/components/brand/Logo'
+import {} from '@/components/brand/Logo'
 import { Button } from '@/components/ui/button'
-import { useAuth } from '@/lib/auth'
+import {} from '@/lib/auth'
 import { useTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { useNotifications } from '@/lib/notifications'
@@ -59,18 +42,14 @@ const scrollMemory = new Map<string, number>()
 
 export function MobileSimulatorLayout({
   panelType = 'customer',
-  sideLinks = [],
 }: {
   panelType?: 'customer' | 'merchant'
-  sideLinks?: [string, string][]
 }) {
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
   const location = useLocation()
   const navType = useNavigationType()
   const { theme, toggle, setTheme } = useTheme()
   const { unreadCount } = useNotifications()
-  const { language, t } = useLanguage()
+  const { t } = useLanguage()
   const { unreadNoticesCount } = useMerchantStore()
 
   // Scroll Container Ref & Dynamic Restoration
@@ -136,12 +115,8 @@ export function MobileSimulatorLayout({
   }
 
   // Layout & Device View States
-  const [viewMode, setViewMode] = useState<'phone' | 'tablet' | 'fluid'>('phone')
-  const isPhoneFrame = viewMode === 'phone'
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
   const [currentTime, setCurrentTime] = useState('')
-  const [sellRate, setSellRate] = useState('97.32')
-  const [isRateUp, setIsRateUp] = useState(true)
   const [showDownloadModal, setShowDownloadModal] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null)
@@ -158,17 +133,6 @@ export function MobileSimulatorLayout({
     updateTime()
     const timer = setInterval(updateTime, 1000)
     return () => clearInterval(timer)
-  }, [])
-
-  // Simulated live rate fluctuation centered near 97.32
-  useEffect(() => {
-    const rateTimer = setInterval(() => {
-      const delta = (Math.random() * 0.06 - 0.03).toFixed(2)
-      const newRate = (97.32 + parseFloat(delta)).toFixed(2)
-      setSellRate(newRate)
-      setIsRateUp(parseFloat(delta) >= 0)
-    }, 7000)
-    return () => clearInterval(rateTimer)
   }, [])
 
   const handleSimulatedDownload = () => {
@@ -199,36 +163,6 @@ export function MobileSimulatorLayout({
     setTimeout(() => setCopiedLink(false), 2000)
   }
 
-  const defaultCustomerSideLinks: [string, string][] = [
-    ['/customer/dashboard', 'Overview'],
-    ['/customer/wallet', 'Wallet'],
-    ['/customer/buy', 'Buy USDT'],
-    ['/customer/sell', 'Sell USDT'],
-    ['/customer/convert', 'Convert'],
-    ['/customer/pay', 'Scan & Pay QR'],
-    ['/customer/orders', 'My Orders'],
-    ['/customer/transactions', 'Transactions'],
-    ['/customer/gift-cards', 'Gift Cards'],
-    ['/customer/utilities', 'Recharges & Bills'],
-    ['/customer/notifications', 'Alerts & Notices'],
-    ['/customer/support', 'Support Desk'],
-    ['/customer/referrals', 'Referrals'],
-    ['/customer/profile', 'Profile'],
-    ['/customer/settings', 'Settings'],
-  ]
-
-  const defaultMerchantSideLinks: [string, string][] = [
-    ['/merchant/dashboard', 'Overview'],
-    ['/merchant/available-orders', 'Available Orders'],
-    ['/merchant/active-orders', 'Active Orders'],
-    ['/merchant/completed-orders', 'Completed Orders'],
-    ['/merchant/orders', 'All Orders'],
-    ['/merchant/wallet', 'Merchant Wallet'],
-    ['/merchant/earnings', 'Earnings & Fees'],
-    ['/merchant/profile', 'Merchant Profile'],
-  ]
-
-  const linksToUse = sideLinks.length > 0 ? sideLinks : panelType === 'merchant' ? defaultMerchantSideLinks : defaultCustomerSideLinks
   const isMerchant = panelType === 'merchant'
 
   // Navigation dock items (Matching Reference Screenshots 1, 2 & 3: Home, Leaderboard, Scan & Pay, Transactions, Menu)

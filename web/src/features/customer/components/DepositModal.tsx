@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, Copy, Check, QrCode, ShieldCheck, ArrowDownLeft, Zap } from 'lucide-react'
+import { X, Copy, Check, ArrowDownLeft, Zap } from 'lucide-react'
 
 interface DepositModalProps {
   isOpen: boolean

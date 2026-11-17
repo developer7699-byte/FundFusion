@@ -1,7 +1,7 @@
 import { MobileSimulatorLayout } from './MobileSimulatorLayout'
-import { merchantLinks } from './DeskLayout'
+import {} from './DeskLayout'
 
 export function MerchantLayout() {
-  return <MobileSimulatorLayout panelType="merchant" sideLinks={merchantLinks} />
+  return <MobileSimulatorLayout panelType="merchant" />
 }
 

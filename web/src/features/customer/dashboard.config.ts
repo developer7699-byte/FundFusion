@@ -1,21 +1,4 @@
-import type { LucideIcon } from 'lucide-react'
-import {
-  Wallet,
-  ArrowDownToLine,
-  Gift,
-  Receipt,
-  Percent,
-  CreditCard,
-  Users,
-  MoreHorizontal,
-  LayoutGrid,
-  Trophy,
-  ReceiptText,
-  Menu,
-  QrCode,
-  Smartphone,
-  Zap,
-} from 'lucide-react'
+import type {} from 'lucide-react'
 
 export interface TabCategory {
   id: string

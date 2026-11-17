@@ -1,30 +1,22 @@
 import { useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import {
-  Lock,
   CheckCircle2,
-  Clock,
-  AlertCircle,
   Copy,
   Check,
   Send,
   ShieldCheck,
-  Building2,
-  ArrowRight,
-  Sparkles,
   MessageSquare,
   ChevronRight,
-  ExternalLink,
 } from 'lucide-react'
 import { BackButton } from '@/components/ui/BackButton'
-import { useMerchantStore, type MerchantOrder } from '@/lib/merchant-store'
+import { useMerchantStore } from '@/lib/merchant-store'
 import { ReleaseEscrowModal, DisputeOrderModal } from './components/MerchantModals'
 import { cn } from '@/lib/utils'
 import { ToastNotification } from '@/components/ui/ToastNotification'
 
 export function MerchantOrderDetail() {
   const { orderId } = useParams()
-  const navigate = useNavigate()
   const { myOrders, submitUtr } = useMerchantStore()
 
   const order = myOrders.find((o) => o.id === orderId) || {

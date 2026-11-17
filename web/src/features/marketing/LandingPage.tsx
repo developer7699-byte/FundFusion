@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useInView, animate, AnimatePresence } from 'framer-motion'
-import type { LucideIcon } from 'lucide-react'
+import type {} from 'lucide-react'
 import {
   ArrowRight,
   Landmark,
   Lock,
   QrCode,
-  Shield,
   Sparkles,
   Wallet,
   Zap,
@@ -16,18 +15,12 @@ import {
   CheckCircle2,
   Check,
   Copy,
-  CreditCard,
   RefreshCw,
-  Smartphone,
   Receipt,
   ChevronRight,
-  TrendingUp,
-  UserCheck,
   Clock,
-  ArrowUpRight,
   Gift,
   UserPlus,
-  ChevronDown,
   Search,
   HelpCircle,
   XCircle,
@@ -38,7 +31,7 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { activity, prices, sampleTestimonials } from '@/lib/demo-data'
+import { activity, prices } from '@/lib/demo-data'
 
 function AnimatedCounter({
   target,
@@ -358,12 +351,6 @@ function InteractiveFAQSection() {
 }
 
 export function LandingPage() {
-  const features: { Icon: LucideIcon; t: string; d: string }[] = [
-    { Icon: Wallet, t: 'Digital wallet', d: 'Available, locked, and total balances with address books.' },
-    { Icon: Zap, t: 'Buy & sell', d: 'Quoted pairs, fee breakdowns, and merchant matching.' },
-    { Icon: QrCode, t: 'Pay by QR', d: 'Mock UPI parse, conversion quote, and confirmation.' },
-    { Icon: Sparkles, t: 'Lifestyle rails', d: 'Gift cards, recharge, and bills through mock providers.' },
-  ]
 
   return (
     <div>

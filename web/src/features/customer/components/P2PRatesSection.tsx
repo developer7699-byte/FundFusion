@@ -1,14 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ShieldCheck, ArrowRight, Zap, RefreshCw, CheckCircle2, UserCheck, Clock } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-interface P2PRatesSectionProps {
-  onOpenQuickBuy?: () => void
-  onOpenQuickSell?: () => void
-}
-
-export function P2PRatesSection({ onOpenQuickBuy, onOpenQuickSell }: P2PRatesSectionProps) {
+export function P2PRatesSection() {
   const [activeTab, setActiveTab] = useState<'BUY' | 'SELL'>('BUY')
 
   const buyDealers = [

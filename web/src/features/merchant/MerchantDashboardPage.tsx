@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   Store,
   ShieldCheck,
@@ -8,19 +8,9 @@ import {
   ArrowUp,
   Lock,
   History,
-  CheckCircle2,
-  AlertCircle,
-  Copy,
-  Check,
-  Sparkles,
   ChevronRight,
-  ExternalLink,
-  Layers,
   Building2,
-  CreditCard,
-  Percent,
   Sliders,
-  HelpCircle,
   Bell,
   Eye,
   EyeOff,
@@ -39,7 +29,6 @@ import {
 } from './components/MerchantModals'
 
 export function MerchantHome() {
-  const navigate = useNavigate()
   const { t } = useLanguage()
   const {
     deskName,

@@ -9,17 +9,12 @@ import {
   Sun,
   Globe,
   ShieldCheck,
-  Headphones,
   LogOut,
   ChevronRight,
-  Sparkles,
   Check,
-  CheckCircle2,
   X,
-  Mail,
   Copy,
   Send,
-  Bell,
 } from 'lucide-react'
 import { BackButton } from '@/components/ui/BackButton'
 import { useAuth } from '@/lib/auth'
@@ -39,7 +34,6 @@ export function MerchantProfile() {
     isOnline,
     toggleDeskOnline,
     rating,
-    totalTrades,
     accounts,
     minLimit,
     maxLimit,

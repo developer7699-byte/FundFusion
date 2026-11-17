@@ -18,7 +18,7 @@ export function DeskLayout({
   const isMerchant = location.pathname.startsWith('/merchant')
 
   if (isMerchant) {
-    return <MobileSimulatorLayout panelType="merchant" sideLinks={links} />
+    return <MobileSimulatorLayout panelType="merchant" />
   }
 
   const { user, logout } = useAuth()

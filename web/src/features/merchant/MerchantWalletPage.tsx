@@ -1,16 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Wallet,
   ArrowDown,
   ArrowUp,
   Lock,
   Building2,
-  ChevronRight,
-  Sparkles,
-  Receipt,
-  ShieldCheck,
-  CheckCircle2,
 } from 'lucide-react'
 import { BackButton } from '@/components/ui/BackButton'
 import { useMerchantStore } from '@/lib/merchant-store'
@@ -21,7 +15,7 @@ import { ToastNotification } from '@/components/ui/ToastNotification'
 
 export function MerchantWallet() {
   const { t } = useLanguage()
-  const { availableUsdt, lockedUsdt, inrReserve, ledger, accounts } = useMerchantStore()
+  const { availableUsdt, lockedUsdt, ledger, accounts } = useMerchantStore()
   const [isDepositOpen, setIsDepositOpen] = useState(false)
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)

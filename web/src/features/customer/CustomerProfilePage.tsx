@@ -117,7 +117,6 @@ export function CustomerProfilePage() {
 
   // 6. Share Feedback
   const [feedbackRating, setFeedbackRating] = useState(5)
-  const [feedbackCategory, setFeedbackCategory] = useState('P2P Trading')
   const [feedbackText, setFeedbackText] = useState('')
 
   const username = user?.displayName

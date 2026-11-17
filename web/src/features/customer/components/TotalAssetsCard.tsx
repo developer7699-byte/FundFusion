@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Eye, EyeOff, ArrowDown, ArrowUp } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import {} from '@/lib/utils'
 import { useLanguage } from '@/lib/language'
 
 interface TotalAssetsCardProps {
@@ -15,7 +15,6 @@ interface TotalAssetsCardProps {
 export function TotalAssetsCard({
   totalUsdt = '0.00',
   inrEstimate = '0.00',
-  usdtInrRate = '91.50',
   onOpenDeposit,
   onOpenSell,
 }: TotalAssetsCardProps) {

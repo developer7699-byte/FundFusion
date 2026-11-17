@@ -1,47 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
-import { useState, useEffect } from 'react'
-import {
-  QrCode,
-  Zap,
-  TrendingUp,
-  Wallet,
-  Plus,
-  Smartphone,
-  Gift,
-  Users,
-  ArrowUpRight,
-  ArrowDownLeft,
-  ChevronRight,
-  Sparkles,
-  ShieldCheck,
-  CheckCircle2,
-  Send,
-  Navigation,
-  ArrowLeft,
-  Tv,
-  Wifi,
-  Flame,
-  Droplets,
-  Car,
-  CreditCard,
-  Building2,
-  Clock,
-  RefreshCw,
-  Search,
-  ScanLine,
-  Check,
-  ArrowDownCircle,
-} from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { useState } from 'react'
+import {} from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Skeleton } from '@/components/ui/skeleton'
+import {} from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
-import { activity } from '@/lib/demo-data'
-import { cn, inr, usdt } from '@/lib/utils'
+import {} from '@/lib/demo-data'
 import { BackButton } from '@/components/ui/BackButton'
 
 type Overview = {

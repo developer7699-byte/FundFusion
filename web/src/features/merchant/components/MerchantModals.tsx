@@ -6,17 +6,11 @@ import {
   Copy,
   Check,
   Building2,
-  CreditCard,
   QrCode,
-  ShieldCheck,
   Send,
-  Plus,
-  Trash2,
   Lock,
-  ArrowRight,
-  TrendingUp,
 } from 'lucide-react'
-import { useMerchantStore, type MerchantOrder, type SettlementAccount } from '@/lib/merchant-store'
+import { useMerchantStore, type MerchantOrder } from '@/lib/merchant-store'
 import { cn } from '@/lib/utils'
 
 /* =========================================================================

@@ -1,21 +1,13 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import {} from 'react-router-dom'
 import {
   ArrowDownCircle,
-  QrCode,
   Copy,
   Check,
   Share2,
   Sparkles,
-  ArrowRight,
   ShieldCheck,
   Clock,
-  CheckCircle2,
-  Download,
-  Send,
-  RefreshCw,
-  AlertCircle,
-  ExternalLink,
 } from 'lucide-react'
 import { BackButton } from '@/components/ui/BackButton'
 import { useAuth } from '@/lib/auth'
@@ -34,7 +26,6 @@ interface MoneyRequest {
 }
 
 export function RequestMoneyPage() {
-  const navigate = useNavigate()
   const { user } = useAuth()
 
   // Form states

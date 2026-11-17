@@ -1,45 +1,26 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useState } from 'react'
 import {
-  ArrowLeft,
   CheckCircle2,
   ShieldCheck,
-  Clock,
-  Sparkles,
   Copy,
   Check,
-  ExternalLink,
   ChevronRight,
-  AlertCircle,
   QrCode,
-  ArrowLeftRight,
-  Zap,
   Gift,
-  Smartphone,
-  MessageSquare,
   Send,
   HelpCircle,
-  Users,
-  Share2,
-  Lock,
-  Building2,
-  Tv,
   Search,
-  CheckCircle,
-  FileText,
-  BadgeAlert,
   X,
-  CreditCard,
-  Flame,
   ArrowDownLeft,
   ArrowUpRight,
   ArrowRight,
 } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
+import {} from '@/components/ui/badge'
+import {} from '@/components/ui/button'
+import {} from '@/components/ui/card'
+import {} from '@/components/ui/input'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/utils'
@@ -442,10 +423,9 @@ export function OrderDetail() {
    3. PAY CONFIRM (/customer/pay/confirm)
    ========================================================================= */
 export function PayConfirm() {
-  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const initialVpa = searchParams.get('vpa') || 'demo.shop@okicici'
-  const [upi, setUpi] = useState(initialVpa)
+  const [upi] = useState(initialVpa)
   const [amount, setAmount] = useState('500')
   const [note, setNote] = useState('Payment for purchase')
   const [isPaid, setIsPaid] = useState(false)
@@ -787,7 +767,6 @@ export function GiftHub() {
    ========================================================================= */
 export function GiftBrand() {
   const { brandId } = useParams()
-  const navigate = useNavigate()
   const [code, setCode] = useState('')
 
   const denominations = [
@@ -1317,7 +1296,6 @@ export function SupportDesk() {
    ========================================================================= */
 export function TicketDetail() {
   const { ticketId } = useParams()
-  const navigate = useNavigate()
   const [messages, setMessages] = useState([
     { id: '1', from: 'agent', text: 'Hello! I am your FundFusion dispute supervisor. How can I assist you with your escrow order?', time: '14:22' },
     { id: '2', from: 'user', text: 'I transferred ₹4,575 via UPI to the merchant, but the status is still showing Awaiting Payment.', time: '14:24' },
@@ -1549,7 +1527,6 @@ export function AccountLive({ title }: { title: string }) {
    12. PAY SCAN LIVE (/customer/pay/scan)
    ========================================================================= */
 export function PayScanLive() {
-  const navigate = useNavigate()
   return (
     <div className="p-4 text-center">
       <Link

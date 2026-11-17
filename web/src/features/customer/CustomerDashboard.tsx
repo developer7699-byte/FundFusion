@@ -68,10 +68,7 @@ export function CustomerDashboard() {
 
       <QuickActionGrid onOpenMore={() => navigate('/customer/wallet')} />
 
-      <P2PRatesSection
-        onOpenQuickBuy={() => navigate('/customer/buy')}
-        onOpenQuickSell={() => navigate('/customer/sell')}
-      />
+      <P2PRatesSection />
 
       <DepositModal
         isOpen={isDepositOpen}

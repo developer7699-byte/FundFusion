@@ -5,23 +5,15 @@ import {
   Info,
   ShieldCheck,
   CheckCircle2,
-  ExternalLink,
   Store,
   Layers,
   Code2,
   Crown,
-  Zap,
   ArrowRight,
-  Copy,
-  Check,
-  Building2,
   FileText,
-  Lock,
-  Globe,
-  Sparkles,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import {} from '@/lib/utils'
 
 /* =========================================================================
    1. ABOUT MODAL (Replaces jumping out to public /about)
@@ -118,7 +110,6 @@ export function AboutModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 export function BecomeMerchantModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const navigate = useNavigate()
   if (!isOpen) return null
-  const [applied, setApplied] = useState(false)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/65 backdrop-blur-sm animate-in fade-in duration-200">

@@ -15,10 +15,8 @@ import {
   QrCode,
   Smartphone,
   Sparkles,
-  ArrowRight,
   Check,
   ArrowUpRight,
-  Shield,
   Eye,
   Key,
   FileCheck,
@@ -29,13 +27,9 @@ import {
   Minus,
   Plus,
   XCircle,
-  MessageSquare,
   Mail,
   Send,
   Copy,
-  ExternalLink,
-  Headphones,
-  BookOpen,
   MessageCircle,
 } from 'lucide-react'
 
@@ -616,7 +610,6 @@ export function HelpPage({ defaultTab = 'faq' }: { defaultTab?: 'faq' | 'contact
   const [isSending, setIsSending] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [ticketId, setTicketId] = useState('')
-  const [copiedEmail, setCopiedEmail] = useState(false)
 
   const categories = ['All', 'Safety & Legal', 'Trading & Speed', 'Lifestyle & Utility']
 

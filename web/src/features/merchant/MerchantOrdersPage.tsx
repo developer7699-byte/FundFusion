@@ -1,15 +1,9 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   History,
-  Lock,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
   Search,
   ChevronRight,
-  Sparkles,
-  ArrowRight,
 } from 'lucide-react'
 import { BackButton } from '@/components/ui/BackButton'
 import { useMerchantStore, type MerchantOrder } from '@/lib/merchant-store'
@@ -19,7 +13,6 @@ import { useLanguage } from '@/lib/language'
 import { ToastNotification } from '@/components/ui/ToastNotification'
 
 export function MerchantOrders({ filter: defaultFilter }: { filter?: 'active' | 'done' | string }) {
-  const navigate = useNavigate()
   const { t } = useLanguage()
   const { myOrders } = useMerchantStore()
   const [activeTab, setActiveTab] = useState<'ALL' | 'ACTIVE' | 'COMPLETED'>(

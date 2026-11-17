@@ -1,30 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
-  ArrowLeft,
   Copy,
   Check,
   QrCode,
-  ShieldCheck,
   CheckCircle2,
-  Wallet,
-  ExternalLink,
-  Plus,
-  Trash2,
   ArrowUpRight,
-  ArrowDownLeft,
-  Send,
-  Download,
 } from 'lucide-react'
 import { BackButton } from '@/components/ui/BackButton'
-import { Badge } from '@/components/ui/badge'
+import {} from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
+import {} from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
-import { cn, inr, usdt } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 export type WalletSnap = {
   simulated: boolean
@@ -238,7 +229,7 @@ export function WalletHome() {
 
 export function DepositFlow() {
   const qc = useQueryClient()
-  const [network, setNetwork] = useState('BNB')
+  const [network] = useState('BNB')
   const [amount, setAmount] = useState('')
   const [deposit, setDeposit] = useState<{
     id: string
@@ -802,7 +793,6 @@ export function AddressesFlow() {
 }
 
 export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
-  const qc = useQueryClient()
   const [step, setStep] = useState<'AMOUNT' | 'BANK' | 'CONFIRM'>(side === 'BUY' ? 'AMOUNT' : 'BANK')
   const [amount, setAmount] = useState('')
   const [hasPaymentMethod, setHasPaymentMethod] = useState(false)
@@ -1382,7 +1372,7 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
 export function TransactionsFlow() {
   const q = useWallet()
   const [filterType, setFilterType] = useState('ALL')
-  const [search, setSearch] = useState('')
+  const [search] = useState('')
 
   const allRows = [
     ...(q.data?.activity ?? []),

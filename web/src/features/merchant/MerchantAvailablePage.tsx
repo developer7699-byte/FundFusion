@@ -1,13 +1,7 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import {} from 'react-router-dom'
 import {
   Store,
-  CheckCircle2,
-  Lock,
-  ArrowLeft,
-  ChevronRight,
-  Filter,
-  Sparkles,
   Search,
 } from 'lucide-react'
 import { BackButton } from '@/components/ui/BackButton'

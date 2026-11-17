@@ -1,11 +1,11 @@
 import { BackButton } from '@/components/ui/BackButton'
 import { useMerchantStore } from '@/lib/merchant-store'
 import { useLanguage } from '@/lib/language'
-import { TrendingUp, Sparkles, Percent, Award, ShieldCheck, CheckCircle2 } from 'lucide-react'
+import { Award } from 'lucide-react'
 
 export function MerchantEarnings() {
   const { t } = useLanguage()
-  const { earnings, commissionRate, totalTrades } = useMerchantStore()
+  const { earnings, totalTrades } = useMerchantStore()
 
   const todayInrEquivalent = (earnings.todayCommissionUsdt * 91.5).toFixed(2)
   const totalInrEquivalent = (earnings.totalCommissionUsdt * 91.5).toFixed(2)

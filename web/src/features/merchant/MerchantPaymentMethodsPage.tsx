@@ -4,13 +4,9 @@ import {
   CreditCard,
   Plus,
   Trash2,
-  CheckCircle2,
-  Sparkles,
-  ShieldCheck,
-  Check,
 } from 'lucide-react'
 import { BackButton } from '@/components/ui/BackButton'
-import { useMerchantStore, type SettlementAccount } from '@/lib/merchant-store'
+import { useMerchantStore } from '@/lib/merchant-store'
 import { cn } from '@/lib/utils'
 import { ToastNotification } from '@/components/ui/ToastNotification'
 
