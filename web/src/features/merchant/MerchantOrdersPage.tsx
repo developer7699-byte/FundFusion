@@ -138,14 +138,6 @@ export function MerchantOrders({ filter: defaultFilter }: { filter?: 'active' | 
           {t('merchantOrders.tabCompleted')}
         </button>
       </div>
-            activeTab === 'COMPLETED'
-              ? 'bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white shadow-xs'
-              : 'text-slate-500 hover:text-slate-800'
-          )}
-        >
-          Completed
-        </button>
-      </div>
 
       {/* Orders List */}
       <div className="space-y-3">
