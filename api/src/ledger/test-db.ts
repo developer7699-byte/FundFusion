@@ -11,7 +11,8 @@ types.setTypeParser(types.builtins.NUMERIC, (v: string) => v);
 types.setTypeParser(types.builtins.INT8, (v: string) => v);
 
 const TEST_URL =
-  process.env.TEST_DATABASE_URL ?? 'postgresql://localhost:5432/fundfusion_test';
+  process.env.TEST_DATABASE_URL ??
+  'postgresql://localhost:5432/fundfusion_test';
 
 export interface TestDb {
   db: NodePgDatabase<typeof schema>;
@@ -46,7 +47,10 @@ export function makeTestDb(): TestDb {
 }
 
 /** A user row is the minimum context a wallet needs. */
-export async function seedUser(pool: Pool, email = 'ledger@example.test'): Promise<string> {
+export async function seedUser(
+  pool: Pool,
+  email = 'ledger@example.test',
+): Promise<string> {
   const res = await pool.query(
     `INSERT INTO "user" (email, password_hash, display_name, status)
      VALUES ($1, 'x', 'Ledger Test', 'ACTIVE') RETURNING id`,

@@ -8,7 +8,11 @@ import { Decimal as BaseDecimal } from 'decimal.js';
  * deliberately far above the column scale: intermediate products (a rate
  * multiplied by a quantity) need headroom, and only the boundary rounds.
  */
-export const Decimal = BaseDecimal.clone({ precision: 60, toExpNeg: -40, toExpPos: 40 });
+export const Decimal = BaseDecimal.clone({
+  precision: 60,
+  toExpNeg: -40,
+  toExpPos: 40,
+});
 export type Decimal = InstanceType<typeof Decimal>;
 
 /** NUMERIC(38,18): 18 fractional digits, leaving 20 for the integer part. */
@@ -25,10 +29,15 @@ function parse(
   integerDigits: number,
   label: string,
 ): Decimal {
-  const dec = value instanceof BaseDecimal ? new Decimal(value.toFixed()) : new Decimal(value);
+  const dec =
+    value instanceof BaseDecimal
+      ? new Decimal(value.toFixed())
+      : new Decimal(value);
 
   if (!dec.isFinite()) {
-    throw new RangeError(`${label} must be a finite amount, received "${String(value)}".`);
+    throw new RangeError(
+      `${label} must be a finite amount, received "${String(value)}".`,
+    );
   }
   if (dec.decimalPlaces() > scale) {
     throw new RangeError(

@@ -16,7 +16,11 @@ export class BalanceService {
    * subtracts, and the sum is computed by PostgreSQL in NUMERIC so no
    * intermediate value ever passes through a JavaScript number.
    */
-  async balance(accountId: string, bucket: Bucket, db: Db = this.db): Promise<string> {
+  async balance(
+    accountId: string,
+    bucket: Bucket,
+    db: Db = this.db,
+  ): Promise<string> {
     const res = await db.execute<{ balance: string }>(sql`
       SELECT COALESCE(
                SUM(CASE WHEN direction = 'CREDIT' THEN amount ELSE -amount END),
@@ -29,7 +33,10 @@ export class BalanceService {
     return res.rows[0].balance;
   }
 
-  async balances(accountId: string, db: Db = this.db): Promise<Record<Bucket, string>> {
+  async balances(
+    accountId: string,
+    db: Db = this.db,
+  ): Promise<Record<Bucket, string>> {
     const out = {} as Record<Bucket, string>;
     for (const bucket of BUCKETS) {
       out[bucket] = await this.balance(accountId, bucket, db);

@@ -55,18 +55,32 @@ function payout(source: string, paidToCustomer: string): PostingRequest {
     idempotencyKey: `payout-${source}-${paidToCustomer}`,
     memo: 'payout',
     lines: [
-      { accountId, accountType: 'AVAILABLE', direction: 'CREDIT', amount: paidToCustomer, assetSymbol: 'USDT' },
-      { accountType: 'EXTERNAL', direction: 'DEBIT', amount: source, assetSymbol: 'USDT' },
+      {
+        accountId,
+        accountType: 'AVAILABLE',
+        direction: 'CREDIT',
+        amount: paidToCustomer,
+        assetSymbol: 'USDT',
+      },
+      {
+        accountType: 'EXTERNAL',
+        direction: 'DEBIT',
+        amount: source,
+        assetSymbol: 'USDT',
+      },
     ],
   };
 }
 
 describe('ROUNDING account (PRD §5.1)', () => {
   it('a residue posts to ROUNDING so the journal still sums to zero', async () => {
-    const { id } = await posting.postWithRounding(payout('9700.005', '9700.00'), {
-      amount: '0.005',
-      assetSymbol: 'USDT',
-    });
+    const { id } = await posting.postWithRounding(
+      payout('9700.005', '9700.00'),
+      {
+        amount: '0.005',
+        assetSymbol: 'USDT',
+      },
+    );
     expect(await sumOfEntries(id)).toBe('0.000000000000000000');
     const legs = await legsAt(id, 'ROUNDING');
     expect(legs).toHaveLength(1);
@@ -74,19 +88,25 @@ describe('ROUNDING account (PRD §5.1)', () => {
   });
 
   it('a zero residue adds no ROUNDING leg', async () => {
-    const { id } = await posting.postWithRounding(payout('9700.00', '9700.00'), {
-      amount: '0',
-      assetSymbol: 'USDT',
-    });
+    const { id } = await posting.postWithRounding(
+      payout('9700.00', '9700.00'),
+      {
+        amount: '0',
+        assetSymbol: 'USDT',
+      },
+    );
     expect(await legsAt(id, 'ROUNDING')).toHaveLength(0);
     expect(await sumOfEntries(id)).toBe('0.000000000000000000');
   });
 
   it('a negative residue (customer payable rounded up) also balances', async () => {
-    const { id } = await posting.postWithRounding(payout('9700.00', '9700.009'), {
-      amount: '-0.009',
-      assetSymbol: 'USDT',
-    });
+    const { id } = await posting.postWithRounding(
+      payout('9700.00', '9700.009'),
+      {
+        amount: '-0.009',
+        assetSymbol: 'USDT',
+      },
+    );
     expect(await sumOfEntries(id)).toBe('0.000000000000000000');
     const legs = await legsAt(id, 'ROUNDING');
     expect(legs[0].direction).toBe('DEBIT');
@@ -104,12 +124,31 @@ describe('ROUNDING account (PRD §5.1)', () => {
       idempotencyKey: 'sell-settlement',
       memo: 'sell settlement 100 USDT @ 97.00',
       lines: [
-        { accountId, accountType: 'LOCKED', direction: 'DEBIT', amount: '100', assetSymbol: 'USDT' },
-        { accountId: merchantId, accountType: 'AVAILABLE', direction: 'CREDIT', amount: '97', assetSymbol: 'USDT' },
-        { accountType: 'REVENUE', direction: 'CREDIT', amount: '3', assetSymbol: 'USDT' },
+        {
+          accountId,
+          accountType: 'LOCKED',
+          direction: 'DEBIT',
+          amount: '100',
+          assetSymbol: 'USDT',
+        },
+        {
+          accountId: merchantId,
+          accountType: 'AVAILABLE',
+          direction: 'CREDIT',
+          amount: '97',
+          assetSymbol: 'USDT',
+        },
+        {
+          accountType: 'REVENUE',
+          direction: 'CREDIT',
+          amount: '3',
+          assetSymbol: 'USDT',
+        },
       ],
     });
     expect(await sumOfEntries(id)).toBe('0.000000000000000000');
-    expect((await legsAt(id, 'REVENUE'))[0].amount).toBe('3.000000000000000000');
+    expect((await legsAt(id, 'REVENUE'))[0].amount).toBe(
+      '3.000000000000000000',
+    );
   });
 });

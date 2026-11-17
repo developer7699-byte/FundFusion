@@ -37,7 +37,13 @@ async function rawEntry(
   await t.pool.query(
     `INSERT INTO ledger_entry (transaction_id, account_id, account_type, direction, amount, asset_symbol)
      VALUES ($1, $2, $3, $4, $5, 'USDT')`,
-    [(tx.rows[0] as { id: string }).id, accountId, accountType, direction, amount],
+    [
+      (tx.rows[0] as { id: string }).id,
+      accountId,
+      accountType,
+      direction,
+      amount,
+    ],
   );
 }
 
@@ -76,7 +82,9 @@ describe('BalanceService (PRD §5 rule 1 — derived, never stored)', () => {
     const id = await accounts.ensureAccount(userId, 'USDT');
     await rawEntry(id, 'AVAILABLE', 'CREDIT', '100');
     await rawEntry(id, 'AVAILABLE', 'DEBIT', '30');
-    expect(await balances.balance(id, 'AVAILABLE')).toBe('70.000000000000000000');
+    expect(await balances.balance(id, 'AVAILABLE')).toBe(
+      '70.000000000000000000',
+    );
   });
 
   it('keeps buckets independent', async () => {
@@ -84,13 +92,17 @@ describe('BalanceService (PRD §5 rule 1 — derived, never stored)', () => {
     await rawEntry(id, 'AVAILABLE', 'CREDIT', '70');
     await rawEntry(id, 'LOCKED', 'CREDIT', '30');
     expect(await balances.balance(id, 'LOCKED')).toBe('30.000000000000000000');
-    expect(await balances.balance(id, 'AVAILABLE')).toBe('70.000000000000000000');
+    expect(await balances.balance(id, 'AVAILABLE')).toBe(
+      '70.000000000000000000',
+    );
   });
 
   it('preserves all 18 decimal places', async () => {
     const id = await accounts.ensureAccount(userId, 'USDT');
     await rawEntry(id, 'AVAILABLE', 'CREDIT', '0.123456789012345678');
-    expect(await balances.balance(id, 'AVAILABLE')).toBe('0.123456789012345678');
+    expect(await balances.balance(id, 'AVAILABLE')).toBe(
+      '0.123456789012345678',
+    );
   });
 
   it('wallet_account still has no balance column to read', async () => {

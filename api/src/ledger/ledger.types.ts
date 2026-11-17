@@ -4,12 +4,7 @@ export type Bucket = 'AVAILABLE' | 'LOCKED' | 'BONDED' | 'PENDING';
 export const BUCKETS: Bucket[] = ['AVAILABLE', 'LOCKED', 'BONDED', 'PENDING'];
 
 export type LedgerAccountType =
-  | Bucket
-  | 'PLATFORM_FEE'
-  | 'ESCROW'
-  | 'EXTERNAL'
-  | 'ROUNDING'
-  | 'REVENUE';
+  Bucket | 'PLATFORM_FEE' | 'ESCROW' | 'EXTERNAL' | 'ROUNDING' | 'REVENUE';
 
 export interface PostingLine {
   /** Omitted for platform-side accounts that belong to no user wallet. */

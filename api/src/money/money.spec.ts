@@ -1,8 +1,18 @@
-import { Decimal, inr, inrString, payableUp, payoutDown, usdt, usdtString } from './money';
+import {
+  Decimal,
+  inr,
+  inrString,
+  payableUp,
+  payoutDown,
+  usdt,
+  usdtString,
+} from './money';
 
 describe('usdt (PRD §5.1 — NUMERIC(38,18))', () => {
   it('keeps 18 decimal places exactly', () => {
-    expect(usdtString(usdt('0.123456789012345678'))).toBe('0.123456789012345678');
+    expect(usdtString(usdt('0.123456789012345678'))).toBe(
+      '0.123456789012345678',
+    );
   });
 
   // A value the column cannot hold must fail loudly at the boundary. Arriving
@@ -42,12 +52,18 @@ describe('inr (PRD §5.1 — NUMERIC(20,2))', () => {
 describe('conservative rounding (PRD §5.1)', () => {
   it('rounds a customer payout down', () => {
     const r = payoutDown(new Decimal('9700.005'), 2);
-    expect([r.value.toFixed(2), r.residue.toFixed(3)]).toEqual(['9700.00', '0.005']);
+    expect([r.value.toFixed(2), r.residue.toFixed(3)]).toEqual([
+      '9700.00',
+      '0.005',
+    ]);
   });
 
   it('rounds a customer payable up', () => {
     const r = payableUp(new Decimal('9700.001'), 2);
-    expect([r.value.toFixed(2), r.residue.toFixed(3)]).toEqual(['9700.01', '-0.009']);
+    expect([r.value.toFixed(2), r.residue.toFixed(3)]).toEqual([
+      '9700.01',
+      '-0.009',
+    ]);
   });
 
   it('reports a zero residue when the value is already exact', () => {

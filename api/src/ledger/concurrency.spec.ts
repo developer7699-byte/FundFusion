@@ -27,8 +27,19 @@ beforeEach(async () => {
     idempotencyKey: 'seed-credit',
     memo: 'opening balance',
     lines: [
-      { accountId, accountType: 'AVAILABLE', direction: 'CREDIT', amount: '100', assetSymbol: 'USDT' },
-      { accountType: 'EXTERNAL', direction: 'DEBIT', amount: '100', assetSymbol: 'USDT' },
+      {
+        accountId,
+        accountType: 'AVAILABLE',
+        direction: 'CREDIT',
+        amount: '100',
+        assetSymbol: 'USDT',
+      },
+      {
+        accountType: 'EXTERNAL',
+        direction: 'DEBIT',
+        amount: '100',
+        assetSymbol: 'USDT',
+      },
     ],
   });
 });
@@ -42,14 +53,27 @@ function debit(amount: string, key: string): PostingRequest {
     idempotencyKey: key,
     memo: `debit ${amount}`,
     lines: [
-      { accountId, accountType: 'AVAILABLE', direction: 'DEBIT', amount, assetSymbol: 'USDT' },
-      { accountType: 'EXTERNAL', direction: 'CREDIT', amount, assetSymbol: 'USDT' },
+      {
+        accountId,
+        accountType: 'AVAILABLE',
+        direction: 'DEBIT',
+        amount,
+        assetSymbol: 'USDT',
+      },
+      {
+        accountType: 'EXTERNAL',
+        direction: 'CREDIT',
+        amount,
+        assetSymbol: 'USDT',
+      },
     ],
   };
 }
 
 async function countTransactions(): Promise<number> {
-  const r = await t.pool.query(`SELECT count(*)::int AS n FROM ledger_transaction`);
+  const r = await t.pool.query(
+    `SELECT count(*)::int AS n FROM ledger_transaction`,
+  );
   return (r.rows[0] as { n: number }).n;
 }
 
@@ -59,7 +83,12 @@ describe('concurrency (PRD §13.4)', () => {
   it('concurrent debits cannot overdraw an account', async () => {
     const results = await Promise.allSettled(
       Array.from({ length: 5 }, (_, i) =>
-        posting.postDebit(accountId, 'AVAILABLE', '30', debit('30', `debit-${i}`)),
+        posting.postDebit(
+          accountId,
+          'AVAILABLE',
+          '30',
+          debit('30', `debit-${i}`),
+        ),
       ),
     );
 
@@ -73,10 +102,17 @@ describe('concurrency (PRD §13.4)', () => {
   it('a balance never goes negative under concurrent load', async () => {
     await Promise.allSettled(
       Array.from({ length: 10 }, (_, i) =>
-        posting.postDebit(accountId, 'AVAILABLE', '25', debit('25', `many-${i}`)),
+        posting.postDebit(
+          accountId,
+          'AVAILABLE',
+          '25',
+          debit('25', `many-${i}`),
+        ),
       ),
     );
-    const remaining = new Decimal(await balances.balance(accountId, 'AVAILABLE'));
+    const remaining = new Decimal(
+      await balances.balance(accountId, 'AVAILABLE'),
+    );
     expect(remaining.isNegative()).toBe(false);
   });
 
@@ -84,7 +120,12 @@ describe('concurrency (PRD §13.4)', () => {
     const before = await countTransactions();
     await Promise.allSettled(
       Array.from({ length: 5 }, () =>
-        posting.postDebit(accountId, 'AVAILABLE', '10', debit('10', 'same-key')),
+        posting.postDebit(
+          accountId,
+          'AVAILABLE',
+          '10',
+          debit('10', 'same-key'),
+        ),
       ),
     );
     expect(await countTransactions()).toBe(before + 1);
@@ -93,7 +134,12 @@ describe('concurrency (PRD §13.4)', () => {
   it('every journal still sums to zero after concurrent load', async () => {
     await Promise.allSettled(
       Array.from({ length: 8 }, (_, i) =>
-        posting.postDebit(accountId, 'AVAILABLE', '15', debit('15', `mix-${i}`)),
+        posting.postDebit(
+          accountId,
+          'AVAILABLE',
+          '15',
+          debit('15', `mix-${i}`),
+        ),
       ),
     );
     const r = await t.pool.query(`

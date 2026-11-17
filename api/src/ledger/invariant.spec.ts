@@ -41,8 +41,14 @@ beforeAll(async () => {
 
   await t.reset();
   await seedAsset(t.pool);
-  customerId = await accounts.ensureAccount(await seedUser(t.pool, 'c@example.test'), 'USDT');
-  merchantId = await accounts.ensureAccount(await seedUser(t.pool, 'm@example.test'), 'USDT');
+  customerId = await accounts.ensureAccount(
+    await seedUser(t.pool, 'c@example.test'),
+    'USDT',
+  );
+  merchantId = await accounts.ensureAccount(
+    await seedUser(t.pool, 'm@example.test'),
+    'USDT',
+  );
 }, 60000);
 
 afterAll(async () => {
@@ -133,7 +139,9 @@ describe('ledger invariants', () => {
         await posting.post(req).catch(() => undefined);
       } else {
         // A rejection for insufficient funds is a legal outcome, not a failure.
-        await posting.postDebit(accountId, from, amount, req).catch(() => undefined);
+        await posting
+          .postDebit(accountId, from, amount, req)
+          .catch(() => undefined);
       }
 
       expect(await everyJournalSumsToZero()).toBe(true);
@@ -146,7 +154,9 @@ describe('ledger invariants', () => {
   });
 
   it('the sequence actually posted something', async () => {
-    const r = await t.pool.query(`SELECT count(*)::int AS n FROM ledger_transaction`);
+    const r = await t.pool.query(
+      `SELECT count(*)::int AS n FROM ledger_transaction`,
+    );
     expect((r.rows[0] as { n: number }).n).toBeGreaterThan(10);
   });
 });

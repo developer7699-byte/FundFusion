@@ -38,7 +38,12 @@ export class AccountService {
     const [walletRow] = await this.db
       .select({ id: schema.wallet.id })
       .from(schema.wallet)
-      .where(and(eq(schema.wallet.userId, userId), eq(schema.wallet.label, 'PRIMARY')))
+      .where(
+        and(
+          eq(schema.wallet.userId, userId),
+          eq(schema.wallet.label, 'PRIMARY'),
+        ),
+      )
       .limit(1);
 
     await this.db

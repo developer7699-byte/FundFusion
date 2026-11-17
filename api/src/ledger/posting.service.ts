@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Inject, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 import { createHash, randomUUID } from 'crypto';
 import { eq, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -129,9 +134,13 @@ export class PostingService {
 
     try {
       return await this.db.transaction(async (tx) => {
-        await tx.execute(sql`SELECT id FROM wallet_account WHERE id = ${accountId} FOR UPDATE`);
+        await tx.execute(
+          sql`SELECT id FROM wallet_account WHERE id = ${accountId} FOR UPDATE`,
+        );
 
-        const current = new Decimal(await this.balances.balance(accountId, bucket, tx));
+        const current = new Decimal(
+          await this.balances.balance(accountId, bucket, tx),
+        );
         if (current.lt(wanted)) {
           throw new BadRequestException(
             `Insufficient ${bucket} balance: have ${current.toFixed()}, need ${wanted.toFixed()}.`,
@@ -169,7 +178,10 @@ export class PostingService {
     }
   }
 
-  private async resolveReplay(req: PostingRequest, fingerprint: string): Promise<PostingResult> {
+  private async resolveReplay(
+    req: PostingRequest,
+    fingerprint: string,
+  ): Promise<PostingResult> {
     const [existing] = await this.db
       .select({
         id: schema.ledgerTransaction.id,

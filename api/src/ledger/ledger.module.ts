@@ -11,7 +11,11 @@ import { PostingService } from './posting.service';
  */
 @Module({
   providers: [
-    { provide: DRIZZLE, useFactory: (db: DbService) => db.db, inject: [DbService] },
+    {
+      provide: DRIZZLE,
+      useFactory: (db: DbService) => db.db,
+      inject: [DbService],
+    },
     AccountService,
     BalanceService,
     PostingService,

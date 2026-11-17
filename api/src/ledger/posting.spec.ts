@@ -31,14 +31,27 @@ function transfer(amount: string, key = 'key-1'): PostingRequest {
     idempotencyKey: key,
     memo: 'deposit credit',
     lines: [
-      { accountId, accountType: 'AVAILABLE', direction: 'CREDIT', amount, assetSymbol: 'USDT' },
-      { accountType: 'EXTERNAL', direction: 'DEBIT', amount, assetSymbol: 'USDT' },
+      {
+        accountId,
+        accountType: 'AVAILABLE',
+        direction: 'CREDIT',
+        amount,
+        assetSymbol: 'USDT',
+      },
+      {
+        accountType: 'EXTERNAL',
+        direction: 'DEBIT',
+        amount,
+        assetSymbol: 'USDT',
+      },
     ],
   };
 }
 
 async function countTransactions(): Promise<number> {
-  const r = await t.pool.query(`SELECT count(*)::int AS n FROM ledger_transaction`);
+  const r = await t.pool.query(
+    `SELECT count(*)::int AS n FROM ledger_transaction`,
+  );
   return (r.rows[0] as { n: number }).n;
 }
 
@@ -80,7 +93,9 @@ describe('PostingService.post', () => {
   });
 
   it('rejects an amount with more precision than the column holds', async () => {
-    await expect(posting.post(transfer('0.1234567890123456789'))).rejects.toThrow(/precision/i);
+    await expect(
+      posting.post(transfer('0.1234567890123456789')),
+    ).rejects.toThrow(/precision/i);
   });
 
   it('replaying an idempotency key returns the first transaction', async () => {
@@ -100,7 +115,9 @@ describe('PostingService.post', () => {
 
   it('stores every amount at the column scale', async () => {
     await posting.post(transfer('10'));
-    const r = await t.pool.query(`SELECT amount::text AS a FROM ledger_entry LIMIT 1`);
+    const r = await t.pool.query(
+      `SELECT amount::text AS a FROM ledger_entry LIMIT 1`,
+    );
     expect((r.rows[0] as { a: string }).a).toBe('10.000000000000000000');
   });
 
@@ -109,9 +126,25 @@ describe('PostingService.post', () => {
       idempotencyKey: 'multi',
       memo: 'settlement',
       lines: [
-        { accountId, accountType: 'LOCKED', direction: 'DEBIT', amount: '100', assetSymbol: 'USDT' },
-        { accountType: 'EXTERNAL', direction: 'CREDIT', amount: '97', assetSymbol: 'USDT' },
-        { accountType: 'REVENUE', direction: 'CREDIT', amount: '3', assetSymbol: 'USDT' },
+        {
+          accountId,
+          accountType: 'LOCKED',
+          direction: 'DEBIT',
+          amount: '100',
+          assetSymbol: 'USDT',
+        },
+        {
+          accountType: 'EXTERNAL',
+          direction: 'CREDIT',
+          amount: '97',
+          assetSymbol: 'USDT',
+        },
+        {
+          accountType: 'REVENUE',
+          direction: 'CREDIT',
+          amount: '3',
+          assetSymbol: 'USDT',
+        },
       ],
     });
     expect(await sumOfEntries(id)).toBe('0.000000000000000000');
