@@ -17,12 +17,13 @@ export function DeskLayout({
   const location = useLocation()
   const isMerchant = location.pathname.startsWith('/merchant')
 
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+
   if (isMerchant) {
     return <MobileSimulatorLayout panelType="merchant" />
   }
 
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
       <PrototypeBanner />

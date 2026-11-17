@@ -8,13 +8,13 @@ interface DepositModalProps {
 }
 
 export function DepositModal({ isOpen, onClose, onDepositSuccess }: DepositModalProps) {
-  if (!isOpen) return null
-
   const [network, setNetwork] = useState<'TRC20' | 'BEP20' | 'ERC20' | 'UPI'>('TRC20')
   const [copied, setCopied] = useState(false)
   const [simulatedAmount, setSimulatedAmount] = useState('100')
   const [isDepositing, setIsDepositing] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
+
+  if (!isOpen) return null
 
   const addresses = {
     TRC20: 'TLvM8vPq9xK92Zc1Qj4w9tG7eX5m4P1y9z',

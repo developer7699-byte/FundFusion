@@ -182,8 +182,9 @@ export function BecomeMerchantModal({ isOpen, onClose }: { isOpen: boolean; onCl
    3. PAYOUT API MODAL (Replaces jumping out to /features)
    ========================================================================= */
 export function PayoutApiModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  if (!isOpen) return null
   const [copiedKey, setCopiedKey] = useState(false)
+
+  if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/65 backdrop-blur-sm animate-in fade-in duration-200">
@@ -347,8 +348,9 @@ export function BulkPayoutModal({ isOpen, onClose }: { isOpen: boolean; onClose:
    5. AFFILIATE MODAL (Replaces jumping out to /merchant)
    ========================================================================= */
 export function AffiliateModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  if (!isOpen) return null
   const [copiedLink, setCopiedLink] = useState(false)
+
+  if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/65 backdrop-blur-sm animate-in fade-in duration-200">
