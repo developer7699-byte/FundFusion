@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { platformConfig } from './config/platform.config';
+import { DbModule } from './db/db.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { HealthController } from './health.controller';
@@ -12,6 +13,7 @@ import { OpsModule } from './ops/ops.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [platformConfig] }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
+    DbModule,
     PrototypeModule,
     AuthModule,
     WalletModule,
