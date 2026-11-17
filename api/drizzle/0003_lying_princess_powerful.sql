@@ -1,0 +1,2 @@
+DROP INDEX "user_capability_user_id_capability_key";--> statement-breakpoint
+CREATE UNIQUE INDEX "user_capability_user_id_capability_effect_key" ON "user_capability" USING btree ("user_id","capability","effect");

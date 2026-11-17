@@ -1,7 +1,8 @@
 import { Client } from 'pg';
 
 const TEST_URL =
-  process.env.TEST_DATABASE_URL ?? 'postgresql://localhost:5432/fundfusion_test';
+  process.env.TEST_DATABASE_URL ??
+  'postgresql://localhost:5432/fundfusion_test';
 
 let client: Client;
 
@@ -49,7 +50,12 @@ async function hasUniqueOn(table: string, column: string): Promise<boolean> {
 describe('roles (PRD §9.2)', () => {
   it('role_name carries the v1 admin roles', async () => {
     expect(await enumValues('role_name')).toEqual(
-      expect.arrayContaining(['CUSTOMER', 'MERCHANT', 'SUPPORT', 'SUPER_ADMIN']),
+      expect.arrayContaining([
+        'CUSTOMER',
+        'MERCHANT',
+        'SUPPORT',
+        'SUPER_ADMIN',
+      ]),
     );
   });
 });
@@ -57,7 +63,13 @@ describe('roles (PRD §9.2)', () => {
 describe('capability registry (PRD §9.3)', () => {
   it('capability_key carries the v1 capabilities', async () => {
     expect(await enumValues('capability_key')).toEqual(
-      expect.arrayContaining(['DEPOSIT', 'WITHDRAW', 'SEND', 'P2P_BUY', 'P2P_SELL']),
+      expect.arrayContaining([
+        'DEPOSIT',
+        'WITHDRAW',
+        'SEND',
+        'P2P_BUY',
+        'P2P_SELL',
+      ]),
     );
   });
 
@@ -91,7 +103,11 @@ describe('capability registry (PRD §9.3)', () => {
 describe('phone gate and admin MFA (PRD §9.1, §9.4)', () => {
   it('user carries phone verification and MFA columns', async () => {
     expect(await columnNames('user')).toEqual(
-      expect.arrayContaining(['phone_verified_at', 'mfa_secret', 'mfa_enrolled_at']),
+      expect.arrayContaining([
+        'phone_verified_at',
+        'mfa_secret',
+        'mfa_enrolled_at',
+      ]),
     );
   });
 
