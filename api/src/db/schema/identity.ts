@@ -68,6 +68,13 @@ export const session = pgTable('session', {
     .notNull()
     .references(() => user.id, { onDelete: 'cascade' }),
   refreshTokenHash: text('refresh_token_hash').notNull(),
+  /**
+   * Rotation chain. Presenting an already-revoked token means it leaked, so
+   * every live session in the same family is revoked — not just that one row
+   * (PRD §13.5, refresh-token rotation with reuse detection).
+   */
+  familyId: uuid('family_id').notNull().defaultRandom(),
+  replacedById: uuid('replaced_by_id'),
   userAgent: text('user_agent'),
   ipAddress: text('ip_address'),
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
