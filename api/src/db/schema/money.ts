@@ -110,6 +110,12 @@ export const ledgerTransaction = pgTable('ledger_transaction', {
   reference: text('reference').notNull().unique(),
   memo: text('memo').notNull(),
   idempotency: text('idempotency').notNull().unique(),
+  /**
+   * Hash of the request body. The unique constraint is on the KEY alone, so a
+   * replay collides; this column is what distinguishes a true replay from the
+   * same key reused with different intent (PRD §5 rule 2).
+   */
+  fingerprint: text('fingerprint').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
