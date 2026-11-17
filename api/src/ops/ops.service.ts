@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { d, inrAmount, moneyString, usdtAmount } from '../money/decimal';
-import { LedgerService } from '../ledger/ledger.service';
+import { PrototypeLedgerService } from '../prototype/prototype-ledger.service';
 import { PrototypeStore } from '../prototype/prototype.store';
 import { MockRateProvider } from '../providers/mock-rate.provider';
 import { OrderStatus, ProtoOrder } from '../prototype/types';
@@ -15,7 +15,7 @@ import { OrderStatus, ProtoOrder } from '../prototype/types';
 export class OpsService {
   constructor(
     private readonly store: PrototypeStore,
-    private readonly ledger: LedgerService,
+    private readonly ledger: PrototypeLedgerService,
     private readonly rates: MockRateProvider,
   ) {}
 

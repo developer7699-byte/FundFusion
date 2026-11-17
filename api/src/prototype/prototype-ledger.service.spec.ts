@@ -1,11 +1,11 @@
-import { LedgerService } from './ledger.service';
-import { PrototypeStore } from '../prototype/prototype.store';
+import { PrototypeLedgerService } from './prototype-ledger.service';
+import { PrototypeStore } from './prototype.store';
 
-describe('LedgerService', () => {
+describe('PrototypeLedgerService', () => {
   it('posts a balanced mock deposit and credits available USDT', () => {
     const store = new PrototypeStore();
     store.ensureAccount('user-1', 'USDT', '10.000000', '0.000000');
-    const ledger = new LedgerService(store);
+    const ledger = new PrototypeLedgerService(store);
     ledger.post({
       memo: 'test',
       idempotency: 'dep-1',
@@ -31,7 +31,7 @@ describe('LedgerService', () => {
   it('rejects unbalanced books and is idempotent', () => {
     const store = new PrototypeStore();
     store.ensureAccount('user-1', 'USDT', '10.000000', '0.000000');
-    const ledger = new LedgerService(store);
+    const ledger = new PrototypeLedgerService(store);
     expect(() =>
       ledger.post({
         memo: 'bad',
@@ -91,7 +91,7 @@ describe('LedgerService', () => {
   it('will not spend locked funds', () => {
     const store = new PrototypeStore();
     store.ensureAccount('user-1', 'USDT', '5.000000', '75.000000');
-    const ledger = new LedgerService(store);
+    const ledger = new PrototypeLedgerService(store);
     expect(() =>
       ledger.post({
         memo: 'over',

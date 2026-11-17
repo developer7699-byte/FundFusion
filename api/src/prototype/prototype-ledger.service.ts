@@ -7,11 +7,11 @@ import {
   moneyString,
   usdtAmount,
 } from '../money/decimal';
-import { PrototypeStore } from '../prototype/prototype.store';
-import { ProtoLedgerEntry } from '../prototype/types';
+import { PrototypeStore } from './prototype.store';
+import { ProtoLedgerEntry } from './types';
 
 @Injectable()
-export class LedgerService {
+export class PrototypeLedgerService {
   constructor(private readonly store: PrototypeStore) {}
 
   post(input: {

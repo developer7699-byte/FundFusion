@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { d, inrAmount, moneyString, usdtAmount } from '../money/decimal';
-import { LedgerService } from '../ledger/ledger.service';
+import { PrototypeLedgerService } from '../prototype/prototype-ledger.service';
 import { PrototypeStore } from '../prototype/prototype.store';
 import { MockCryptoProvider } from '../providers/mock-crypto.provider';
 import { MockRateProvider } from '../providers/mock-rate.provider';
@@ -15,7 +15,7 @@ import { DepositBroadcastDto, DepositStartDto, QuoteDto, SendDto } from './dto';
 export class WalletService {
   constructor(
     private readonly store: PrototypeStore,
-    private readonly ledger: LedgerService,
+    private readonly ledger: PrototypeLedgerService,
     private readonly crypto: MockCryptoProvider,
     private readonly rates: MockRateProvider,
   ) {}

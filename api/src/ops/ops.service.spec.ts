@@ -1,4 +1,4 @@
-import { LedgerService } from '../ledger/ledger.service';
+import { PrototypeLedgerService } from '../prototype/prototype-ledger.service';
 import { PrototypeStore } from '../prototype/prototype.store';
 import { MockRateProvider } from '../providers/mock-rate.provider';
 import { OpsService } from './ops.service';
@@ -10,7 +10,7 @@ describe('OpsService escrow', () => {
     store.ensureAccount('user-merchant', 'USDT', '0', '0');
     const ops = new OpsService(
       store,
-      new LedgerService(store),
+      new PrototypeLedgerService(store),
       new MockRateProvider(),
     );
     const order = ops.createOrder('c1', { kind: 'SELL', usdtAmount: '10' });
