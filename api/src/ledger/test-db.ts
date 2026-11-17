@@ -33,6 +33,7 @@ export function makeTestDb(): TestDb {
     reset: async () => {
       await pool.query(`
         TRUNCATE TABLE
+          audit_log, user_capability, role_capability, session, otp_challenge,
           ledger_entry, ledger_transaction,
           wallet_address, wallet_account, wallet,
           blockchain_network, asset,
