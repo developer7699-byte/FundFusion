@@ -27,6 +27,7 @@ import {
   Plus,
   Trash2,
   Mail,
+  Star,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import { useTheme } from '@/lib/theme'
@@ -120,10 +121,6 @@ export function CustomerProfilePage() {
   const [feedbackText, setFeedbackText] = useState('')
 
   const username = user?.displayName
-    ? `@${user.displayName.toLowerCase().replace(/\s+/g, '')}`
-    : user?.email
-    ? `@${user.email.split('@')[0]}`
-    : '@developer7699'
     ? `@${user.displayName.toLowerCase().replace(/\s+/g, '')}`
     : user?.email
     ? `@${user.email.split('@')[0]}`

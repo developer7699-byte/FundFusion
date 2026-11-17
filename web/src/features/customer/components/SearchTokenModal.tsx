@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, X, Gift, Smartphone, Zap, ArrowRight, ShieldCheck, Flame } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Search, X, Wallet, History, Flame } from 'lucide-react'
 
 interface SearchTokenModalProps {
   isOpen: boolean
@@ -12,35 +11,30 @@ interface SearchTokenModalProps {
 interface SearchItem {
   id: string
   title: string
-  category: 'Gifts' | 'Bills' | 'Crypto'
+  category: 'Wallet' | 'Trade' | 'Activity'
   meta: string
   link?: string
   action?: string
 }
 
 const SEARCH_CATALOG: SearchItem[] = [
-  // Gift Cards
-  { id: 'amz', title: 'Amazon Pay Gift Voucher', category: 'Gifts', meta: '5% Cashback · Instant code', link: '/customer/gift-cards' },
-  { id: 'flp', title: 'Flipkart Shopping Voucher', category: 'Gifts', meta: '4% Cashback · E-Gift PIN', link: '/customer/gift-cards' },
-  { id: 'gpl', title: 'Google Play Gift Card', category: 'Gifts', meta: 'Apps, Games & In-app', link: '/customer/gift-cards' },
-  { id: 'swg', title: 'Swiggy Food & Instamart', category: 'Gifts', meta: 'Food delivery vouchers', link: '/customer/gift-cards' },
-  { id: 'apl', title: 'Apple App Store Code', category: 'Gifts', meta: 'Music & iCloud storage', link: '/customer/gift-cards' },
-  { id: 'zom', title: 'Zomato Dining & Delivery', category: 'Gifts', meta: 'Instant dinner savings', link: '/customer/gift-cards' },
-  { id: 'myn', title: 'Myntra Fashion Voucher', category: 'Gifts', meta: 'Clothing & footwear', link: '/customer/gift-cards' },
+  // Wallet
+  { id: 'wallet', title: 'Wallet', category: 'Wallet', meta: 'Available and locked USDT', link: '/customer/wallet' },
+  { id: 'deposit', title: 'Deposit USDT', category: 'Wallet', meta: 'BEP-20 deposit address', link: '/customer/wallet/deposit' },
+  { id: 'withdraw', title: 'Withdraw USDT', category: 'Wallet', meta: 'To an allowlisted address', link: '/customer/wallet/withdraw' },
+  { id: 'send', title: 'Send USDT', category: 'Wallet', meta: 'Transfer to another user', link: '/customer/wallet/send' },
+  { id: 'receive', title: 'Receive USDT', category: 'Wallet', meta: 'Show your deposit address', link: '/customer/wallet/receive' },
+  { id: 'addresses', title: 'Saved addresses', category: 'Wallet', meta: 'Withdrawal allowlist', link: '/customer/wallet/addresses' },
 
-  // Bills & Utilities
-  { id: 'jio', title: 'Jio Mobile Recharge', category: 'Bills', meta: 'Prepaid & Postpaid · 0% fee', link: '/customer/utilities' },
-  { id: 'art', title: 'Airtel Recharge & Fiber', category: 'Bills', meta: 'Data packs & Validity', link: '/customer/utilities' },
-  { id: 'ele', title: 'Electricity Bill Payment', category: 'Bills', meta: 'BESCOM, Adani, Tata Power', link: '/customer/utilities' },
-  { id: 'dth', title: 'DTH TV Recharge', category: 'Bills', meta: 'Tata Play, Airtel, Dish TV', link: '/customer/utilities' },
-  { id: 'fas', title: 'FASTag Highway Toll', category: 'Bills', meta: 'Instant RFID wallet reload', link: '/customer/utilities' },
-  { id: 'gas', title: 'Piped Cooking Gas', category: 'Bills', meta: 'Mahanagar Gas, IGL', link: '/customer/utilities' },
+  // Trade
+  { id: 'buy', title: 'Buy USDT', category: 'Trade', meta: 'Pay rupees to a merchant', link: '/customer/buy' },
+  { id: 'sell', title: 'Sell USDT', category: 'Trade', meta: 'Receive rupees from a merchant', link: '/customer/sell' },
+  { id: 'request', title: 'Request money', category: 'Trade', meta: 'Generate a payment request', link: '/customer/request' },
 
-  // Crypto P2P
-  { id: 'req', title: 'Request Money via UPI / USDT', category: 'Payments', meta: 'Generate custom QR & pay link', link: '/customer/request' },
-  { id: 'usdt', title: 'Buy / Sell USDT via UPI', category: 'Crypto', meta: '₹91.45 · Escrow verified', link: '/customer/buy' },
-  { id: 'btc', title: 'Bitcoin P2P Trading', category: 'Crypto', meta: 'Instant Bank & IMPS', link: '/customer/buy' },
-  { id: 'eth', title: 'Ethereum P2P Swaps', category: 'Crypto', meta: 'Sub-minute settlement', link: '/customer/buy' },
+  // Activity
+  { id: 'orders', title: 'Orders', category: 'Activity', meta: 'Open and settled orders', link: '/customer/orders' },
+  { id: 'transactions', title: 'Transactions', category: 'Activity', meta: 'Full ledger history', link: '/customer/transactions' },
+  { id: 'support', title: 'Support', category: 'Activity', meta: 'Tickets and disputes', link: '/customer/support' },
 ]
 
 export function SearchTokenModal({ isOpen, onClose }: SearchTokenModalProps) {
@@ -123,12 +117,12 @@ export function SearchTokenModal({ isOpen, onClose }: SearchTokenModalProps) {
               >
                 <div className="min-w-0 flex items-center gap-3">
                   <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
-                    {item.category === 'Gifts' ? (
-                      <Gift className="w-4 h-4 text-amber-500" />
-                    ) : item.category === 'Bills' ? (
-                      <Zap className="w-4 h-4 text-emerald-500" />
+                    {item.category === 'Wallet' ? (
+                      <Wallet className="w-4 h-4 text-blue-500" />
+                    ) : item.category === 'Activity' ? (
+                      <History className="w-4 h-4 text-slate-500" />
                     ) : (
-                      <span className="text-xs font-mono font-bold text-blue-500">₮</span>
+                      <span className="text-xs font-mono font-bold text-emerald-500">₮</span>
                     )}
                   </div>
                   <div className="min-w-0">

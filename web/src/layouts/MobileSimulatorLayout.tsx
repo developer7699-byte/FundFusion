@@ -636,7 +636,7 @@ export function MobileSimulatorLayout({
             {/* Action Bar */}
             <div className="flex items-center gap-2 pt-1">
               <Button
-                variant="outline"
+                variant="ghost"
                 onClick={handleCopyLink}
                 className="flex-1 py-2 text-xs font-bold rounded-xl border-slate-200 dark:border-slate-700 flex items-center justify-center gap-1.5"
               >

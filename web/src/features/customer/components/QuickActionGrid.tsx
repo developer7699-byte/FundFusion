@@ -2,77 +2,41 @@ import { Link } from 'react-router-dom'
 import {
   Wallet,
   ArrowDownToLine,
-  Gift,
-  Receipt,
-  Percent,
-  CreditCard,
-  Users,
+  ArrowUpFromLine,
+  Send,
+  QrCode,
+  ClipboardList,
+  History,
   MoreHorizontal,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useLanguage } from '@/lib/language'
 
 interface QuickActionGridProps {
   onOpenMore?: () => void
-  onAction?: (actionId: string) => void
 }
 
-export function QuickActionGrid({ onOpenMore, onAction }: QuickActionGridProps) {
+export function QuickActionGrid({ onOpenMore }: QuickActionGridProps) {
   const { t } = useLanguage()
 
-  const actions = [
-    {
-      id: 'wallet',
-      label: t('dash.wallet'),
-      icon: Wallet,
-      to: '/customer/wallet',
-    },
-    {
-      id: 'buy',
-      label: t('dash.buy'),
-      icon: ArrowDownToLine,
-      to: '/customer/buy',
-    },
-    {
-      id: 'gifts',
-      label: t('dash.gifts'),
-      icon: Gift,
-      actionId: 'gifts',
-    },
-    {
-      id: 'bills',
-      label: t('dash.bills'),
-      icon: Receipt,
-      badge: '$50K',
-      badgeColor: 'bg-emerald-500 text-white',
-      actionId: 'bills',
-    },
-    {
-      id: 'offers',
-      label: t('dash.offers'),
-      icon: Percent,
-      actionId: 'offers',
-    },
-    {
-      id: 'cards',
-      label: t('dash.cards'),
-      icon: CreditCard,
-      actionId: 'cards',
-    },
-    {
-      id: 'community',
-      label: t('dash.community'),
-      icon: Users,
-      badge: 'Top',
-      badgeColor: 'bg-emerald-500 text-white',
-      actionId: 'community',
-    },
-    {
-      id: 'more',
-      label: t('dash.more'),
-      icon: MoreHorizontal,
-      isMore: true,
-    },
+  const actions: Array<{
+    id: string
+    label: string
+    icon: LucideIcon
+    to?: string
+    isMore?: boolean
+    badge?: string
+    badgeColor?: string
+  }> = [
+    { id: 'wallet', label: t('dash.wallet'), icon: Wallet, to: '/customer/wallet' },
+    { id: 'buy', label: t('dash.buy'), icon: ArrowDownToLine, to: '/customer/buy' },
+    { id: 'sell', label: t('dash.sell'), icon: ArrowUpFromLine, to: '/customer/sell' },
+    { id: 'send', label: t('dash.send'), icon: Send, to: '/customer/wallet/send' },
+    { id: 'receive', label: t('dash.receive'), icon: QrCode, to: '/customer/wallet/receive' },
+    { id: 'orders', label: t('dash.orders'), icon: ClipboardList, to: '/customer/orders' },
+    { id: 'transactions', label: t('dash.transactions'), icon: History, to: '/customer/transactions' },
+    { id: 'more', label: t('dash.more'), icon: MoreHorizontal, isMore: true },
   ]
 
   return (
@@ -122,20 +86,6 @@ export function QuickActionGrid({ onOpenMore, onAction }: QuickActionGridProps) 
                 onClick={onOpenMore}
                 className="focus:outline-none"
                 aria-label="View all platform features"
-              >
-                {btnContent}
-              </button>
-            )
-          }
-
-          if (item.actionId && onAction) {
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => onAction(item.actionId!)}
-                className="focus:outline-none"
-                aria-label={item.label}
               >
                 {btnContent}
               </button>
