@@ -18,12 +18,15 @@ export class RolesGuard implements CanActivate {
       context.getClass(),
     ]);
     if (!required?.length) return true;
-    const user = context.switchToHttp().getRequest().user as AuthUser | undefined;
+    const { user } = context.switchToHttp().getRequest<{ user?: AuthUser }>();
     const ok = required.some((role) => user?.roles?.includes(role));
     if (!ok) {
       throw new ForbiddenException({
         success: false,
-        error: { code: 'FORBIDDEN', message: 'This area is limited to another role.' },
+        error: {
+          code: 'FORBIDDEN',
+          message: 'This area is limited to another role.',
+        },
       });
     }
     return true;

@@ -8,7 +8,13 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomUUID } from 'crypto';
 import { PrototypeStore } from '../prototype/prototype.store';
-import { LoginDto, RefreshDto, RegisterDto, RequestOtpDto, VerifyOtpDto } from './dto';
+import {
+  LoginDto,
+  RefreshDto,
+  RegisterDto,
+  RequestOtpDto,
+  VerifyOtpDto,
+} from './dto';
 
 @Injectable()
 export class AuthService {
@@ -22,7 +28,10 @@ export class AuthService {
     if (this.store.findUserByEmail(dto.email)) {
       throw new ConflictException({
         success: false,
-        error: { code: 'EMAIL_TAKEN', message: 'An account already uses this email.' },
+        error: {
+          code: 'EMAIL_TAKEN',
+          message: 'An account already uses this email.',
+        },
       });
     }
     const passwordHash = await bcrypt.hash(dto.password, 10);
@@ -42,7 +51,10 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException({
         success: false,
-        error: { code: 'INVALID_CREDENTIALS', message: 'Email or password is incorrect.' },
+        error: {
+          code: 'INVALID_CREDENTIALS',
+          message: 'Email or password is incorrect.',
+        },
       });
     }
     const match = await bcrypt.compare(dto.password, user.passwordHash);
@@ -50,7 +62,10 @@ export class AuthService {
       user.failedLoginCount += 1;
       throw new UnauthorizedException({
         success: false,
-        error: { code: 'INVALID_CREDENTIALS', message: 'Email or password is incorrect.' },
+        error: {
+          code: 'INVALID_CREDENTIALS',
+          message: 'Email or password is incorrect.',
+        },
       });
     }
     if (user.status === 'SUSPENDED') {
@@ -85,10 +100,17 @@ export class AuthService {
     const challenge = this.store.otps.find(
       (row) => row.email === dto.email.toLowerCase() && !row.consumedAt,
     );
-    if (!challenge || challenge.expiresAt < new Date() || challenge.attempts >= 5) {
+    if (
+      !challenge ||
+      challenge.expiresAt < new Date() ||
+      challenge.attempts >= 5
+    ) {
       throw new UnauthorizedException({
         success: false,
-        error: { code: 'OTP_INVALID', message: 'That code is invalid or expired.' },
+        error: {
+          code: 'OTP_INVALID',
+          message: 'That code is invalid or expired.',
+        },
       });
     }
     const okHash = await bcrypt.compare(dto.code, challenge.codeHash);
@@ -96,7 +118,10 @@ export class AuthService {
     if (!okHash) {
       throw new UnauthorizedException({
         success: false,
-        error: { code: 'OTP_INVALID', message: 'That code is invalid or expired.' },
+        error: {
+          code: 'OTP_INVALID',
+          message: 'That code is invalid or expired.',
+        },
       });
     }
     challenge.consumedAt = new Date();
@@ -109,7 +134,13 @@ export class AuthService {
   }
 
   async refresh(dto: RefreshDto) {
-    let payload: { sub: string; email: string; roles: string[]; family: string; typ: string };
+    let payload: {
+      sub: string;
+      email: string;
+      roles: string[];
+      family: string;
+      typ: string;
+    };
     try {
       payload = this.jwt.verify(dto.refreshToken, {
         secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
@@ -117,26 +148,45 @@ export class AuthService {
     } catch {
       throw new UnauthorizedException({
         success: false,
-        error: { code: 'REFRESH_INVALID', message: 'Refresh token is invalid.' },
+        error: {
+          code: 'REFRESH_INVALID',
+          message: 'Refresh token is invalid.',
+        },
       });
     }
     const hash = this.hashToken(dto.refreshToken);
     const session = this.store.sessions.find(
-      (row) => row.userId === payload.sub && row.refreshTokenHash === hash && !row.revokedAt,
+      (row) =>
+        row.userId === payload.sub &&
+        row.refreshTokenHash === hash &&
+        !row.revokedAt,
     );
-    if (!session || session.expiresAt < new Date() || payload.typ !== 'refresh') {
+    if (
+      !session ||
+      session.expiresAt < new Date() ||
+      payload.typ !== 'refresh'
+    ) {
       throw new UnauthorizedException({
         success: false,
-        error: { code: 'REFRESH_REUSE', message: 'Refresh token is no longer valid.' },
+        error: {
+          code: 'REFRESH_REUSE',
+          message: 'Refresh token is no longer valid.',
+        },
       });
     }
     session.revokedAt = new Date();
-    return this.issueTokens(payload.sub, payload.email, payload.roles, payload.family);
+    return this.issueTokens(
+      payload.sub,
+      payload.email,
+      payload.roles,
+      payload.family,
+    );
   }
 
-  async logout(userId: string) {
+  logout(userId: string) {
     for (const session of this.store.sessions) {
-      if (session.userId === userId && !session.revokedAt) session.revokedAt = new Date();
+      if (session.userId === userId && !session.revokedAt)
+        session.revokedAt = new Date();
     }
     return { loggedOut: true };
   }
@@ -159,15 +209,26 @@ export class AuthService {
     };
   }
 
-  private async issueTokens(userId: string, email: string, roles: string[], familyId?: string) {
+  private async issueTokens(
+    userId: string,
+    email: string,
+    roles: string[],
+    familyId?: string,
+  ) {
     const family = familyId ?? randomUUID();
     const accessToken = await this.jwt.signAsync(
       { sub: userId, email, roles, typ: 'access' },
-      { secret: this.config.getOrThrow<string>('JWT_ACCESS_SECRET'), expiresIn: '365d' },
+      {
+        secret: this.config.getOrThrow<string>('JWT_ACCESS_SECRET'),
+        expiresIn: '365d',
+      },
     );
     const refreshToken = await this.jwt.signAsync(
       { sub: userId, email, roles, family, typ: 'refresh' },
-      { secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'), expiresIn: '365d' },
+      {
+        secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
+        expiresIn: '365d',
+      },
     );
     this.store.sessions.push({
       id: randomUUID(),

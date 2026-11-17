@@ -29,7 +29,9 @@ describe('Removed out-of-scope routes (e2e)', () => {
   });
 
   it.each(GONE)('%s %s is 404', async (method, path) => {
-    const res = await request(app.getHttpServer())[method as 'get' | 'post'](path);
+    const res = await request(app.getHttpServer())[method as 'get' | 'post'](
+      path,
+    );
     expect(res.status).toBe(404);
   });
 

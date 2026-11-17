@@ -6,7 +6,8 @@ import { Client } from 'pg';
  * against a real server and reads information_schema back.
  */
 const TEST_URL =
-  process.env.TEST_DATABASE_URL ?? 'postgresql://localhost:5432/fundfusion_test';
+  process.env.TEST_DATABASE_URL ??
+  'postgresql://localhost:5432/fundfusion_test';
 
 let client: Client;
 
@@ -75,17 +76,24 @@ describe('money precision (PRD §5.1)', () => {
           !(c.numeric_precision === 38 && c.numeric_scale === 18) &&
           !(c.numeric_precision === 20 && c.numeric_scale === 2),
       )
-      .map((c) => `${c.table_name}.${c.column_name}(${c.numeric_precision},${c.numeric_scale})`);
+      .map(
+        (c) =>
+          `${c.table_name}.${c.column_name}(${c.numeric_precision},${c.numeric_scale})`,
+      );
     expect(wrong).toEqual([]);
   });
 
   it('usdt amounts are NUMERIC(38,18)', async () => {
-    const entry = (await columns('ledger_entry')).find((c) => c.column_name === 'amount');
+    const entry = (await columns('ledger_entry')).find(
+      (c) => c.column_name === 'amount',
+    );
     expect([entry?.numeric_precision, entry?.numeric_scale]).toEqual([38, 18]);
   });
 
   it('inr amounts are NUMERIC(20,2)', async () => {
-    const order = (await columns('p2p_order')).find((c) => c.column_name === 'inr_amount');
+    const order = (await columns('p2p_order')).find(
+      (c) => c.column_name === 'inr_amount',
+    );
     expect([order?.numeric_precision, order?.numeric_scale]).toEqual([20, 2]);
   });
 });

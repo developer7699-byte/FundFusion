@@ -1,4 +1,11 @@
-import { index, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import {
+  index,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { disputeStatus, ticketStatus } from './enums';
 import { user } from './identity';
 import { p2pOrder } from './p2p';
@@ -14,9 +21,13 @@ export const notification = pgTable(
     title: text('title').notNull(),
     body: text('body').notNull(),
     readAt: timestamp('read_at', { withTimezone: true }),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
-  (t) => [index('notification_user_id_created_at_idx').on(t.userId, t.createdAt)],
+  (t) => [
+    index('notification_user_id_created_at_idx').on(t.userId, t.createdAt),
+  ],
 );
 
 export const supportTicket = pgTable('support_ticket', {
@@ -28,8 +39,12 @@ export const supportTicket = pgTable('support_ticket', {
   category: text('category').notNull(),
   subject: text('subject').notNull(),
   status: ticketStatus('status').notNull().default('OPEN'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const supportMessage = pgTable('support_message', {
@@ -39,7 +54,9 @@ export const supportMessage = pgTable('support_message', {
     .references(() => supportTicket.id, { onDelete: 'cascade' }),
   authorId: uuid('author_id').notNull(),
   body: text('body').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const dispute = pgTable('dispute', {
@@ -54,8 +71,12 @@ export const dispute = pgTable('dispute', {
     .references(() => supportTicket.id),
   status: disputeStatus('status').notNull().default('OPEN'),
   reason: text('reason').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 /**
@@ -74,7 +95,9 @@ export const auditLog = pgTable(
     newValue: jsonb('new_value'),
     ipAddress: text('ip_address'),
     reason: text('reason'),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (t) => [index('audit_log_entity_entity_id_idx').on(t.entity, t.entityId)],
 );
@@ -85,12 +108,16 @@ export const securityEvent = pgTable('security_event', {
   type: text('type').notNull(),
   severity: text('severity').notNull(),
   metadata: jsonb('metadata'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const systemSetting = pgTable('system_setting', {
   id: uuid('id').primaryKey().defaultRandom(),
   key: text('key').notNull().unique(),
   value: jsonb('value').notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });

@@ -13,7 +13,9 @@ import { merchantStatus, otpPurpose, roleName, userStatus } from './enums';
 export const role = pgTable('role', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: roleName('name').notNull().unique(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const user = pgTable('user', {
@@ -27,8 +29,12 @@ export const user = pgTable('user', {
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
   failedLoginCount: integer('failed_login_count').notNull().default(0),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const userRole = pgTable(
@@ -41,7 +47,9 @@ export const userRole = pgTable(
     roleId: uuid('role_id')
       .notNull()
       .references(() => role.id),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (t) => [uniqueIndex('user_role_user_id_role_id_key').on(t.userId, t.roleId)],
 );
@@ -56,7 +64,9 @@ export const session = pgTable('session', {
   ipAddress: text('ip_address'),
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const otpChallenge = pgTable('otp_challenge', {
@@ -68,7 +78,9 @@ export const otpChallenge = pgTable('otp_challenge', {
   attempts: integer('attempts').notNull().default(0),
   consumedAt: timestamp('consumed_at', { withTimezone: true }),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const customerProfile = pgTable('customer_profile', {
@@ -79,8 +91,12 @@ export const customerProfile = pgTable('customer_profile', {
     .references(() => user.id, { onDelete: 'cascade' }),
   fullName: text('full_name'),
   country: text('country'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const merchantProfile = pgTable('merchant_profile', {
@@ -93,8 +109,12 @@ export const merchantProfile = pgTable('merchant_profile', {
   status: merchantStatus('status').notNull().default('APPLIED'),
   buyEnabled: boolean('buy_enabled').notNull().default(false),
   sellEnabled: boolean('sell_enabled').notNull().default(false),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const userRelations = relations(user, ({ many, one }) => ({

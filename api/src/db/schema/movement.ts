@@ -15,8 +15,12 @@ export const deposit = pgTable('deposit', {
   status: text('status').notNull(),
   txHash: text('tx_hash'),
   confirmations: integer('confirmations').notNull().default(0),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const withdrawal = pgTable('withdrawal', {
@@ -28,8 +32,12 @@ export const withdrawal = pgTable('withdrawal', {
   fee: usdt('fee').notNull(),
   address: text('address').notNull(),
   status: text('status').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const transfer = pgTable('transfer', {
@@ -43,7 +51,9 @@ export const transfer = pgTable('transfer', {
   amount: usdt('amount').notNull(),
   fee: usdt('fee').notNull(),
   status: text('status').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const conversionQuote = pgTable('conversion_quote', {
@@ -59,5 +69,7 @@ export const conversionQuote = pgTable('conversion_quote', {
   feeAmount: usdt('fee_amount').notNull(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   consumedAt: timestamp('consumed_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });

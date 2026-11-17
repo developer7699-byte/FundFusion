@@ -38,7 +38,8 @@ export type ProtoAccount = {
 };
 
 export type LedgerDirection = 'DEBIT' | 'CREDIT';
-export type LedgerAccountType = 'AVAILABLE' | 'LOCKED' | 'PLATFORM_FEE' | 'EXTERNAL';
+export type LedgerAccountType =
+  'AVAILABLE' | 'LOCKED' | 'PLATFORM_FEE' | 'EXTERNAL';
 
 export type ProtoLedgerEntry = {
   accountType: LedgerAccountType;
@@ -164,7 +165,12 @@ export type ProtoDispute = {
   id: string;
   orderId: string;
   ticketId: string;
-  status: 'OPEN' | 'UNDER_REVIEW' | 'RESOLVED_CUSTOMER' | 'RESOLVED_MERCHANT' | 'CLOSED';
+  status:
+    | 'OPEN'
+    | 'UNDER_REVIEW'
+    | 'RESOLVED_CUSTOMER'
+    | 'RESOLVED_MERCHANT'
+    | 'CLOSED';
   reason: string;
   createdAt: Date;
 };

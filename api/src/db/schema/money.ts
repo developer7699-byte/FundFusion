@@ -32,7 +32,9 @@ export const blockchainNetwork = pgTable(
     name: text('name').notNull(),
     active: boolean('active').notNull().default(true),
   },
-  (t) => [uniqueIndex('blockchain_network_asset_id_code_key').on(t.assetId, t.code)],
+  (t) => [
+    uniqueIndex('blockchain_network_asset_id_code_key').on(t.assetId, t.code),
+  ],
 );
 
 export const wallet = pgTable(
@@ -43,7 +45,9 @@ export const wallet = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
     label: text('label').notNull().default('PRIMARY'),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (t) => [uniqueIndex('wallet_user_id_label_key').on(t.userId, t.label)],
 );
@@ -65,9 +69,16 @@ export const walletAccount = pgTable(
     assetId: uuid('asset_id')
       .notNull()
       .references(() => asset.id),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
-  (t) => [uniqueIndex('wallet_account_wallet_id_asset_id_key').on(t.walletId, t.assetId)],
+  (t) => [
+    uniqueIndex('wallet_account_wallet_id_asset_id_key').on(
+      t.walletId,
+      t.assetId,
+    ),
+  ],
 );
 
 export const walletAddress = pgTable(
@@ -82,9 +93,16 @@ export const walletAddress = pgTable(
       .references(() => blockchainNetwork.id),
     address: text('address').notNull(),
     isDefault: boolean('is_default').notNull().default(false),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
-  (t) => [uniqueIndex('wallet_address_network_id_address_key').on(t.networkId, t.address)],
+  (t) => [
+    uniqueIndex('wallet_address_network_id_address_key').on(
+      t.networkId,
+      t.address,
+    ),
+  ],
 );
 
 export const ledgerTransaction = pgTable('ledger_transaction', {
@@ -92,7 +110,9 @@ export const ledgerTransaction = pgTable('ledger_transaction', {
   reference: text('reference').notNull().unique(),
   memo: text('memo').notNull(),
   idempotency: text('idempotency').notNull().unique(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const ledgerEntry = pgTable(
@@ -107,7 +127,9 @@ export const ledgerEntry = pgTable(
     direction: ledgerDirection('direction').notNull(),
     amount: usdt('amount').notNull(),
     assetSymbol: text('asset_symbol').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (t) => [index('ledger_entry_account_id_idx').on(t.accountId)],
 );

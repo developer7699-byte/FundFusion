@@ -9,7 +9,12 @@ import { WalletService } from './wallet.service';
 @Module({
   imports: [AuthModule],
   controllers: [WalletController],
-  providers: [WalletService, LedgerService, MockCryptoProvider, MockRateProvider],
+  providers: [
+    WalletService,
+    LedgerService,
+    MockCryptoProvider,
+    MockRateProvider,
+  ],
   exports: [WalletService, LedgerService, MockRateProvider],
 })
 export class WalletModule {}

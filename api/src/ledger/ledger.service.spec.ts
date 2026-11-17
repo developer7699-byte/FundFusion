@@ -10,8 +10,19 @@ describe('LedgerService', () => {
       memo: 'test',
       idempotency: 'dep-1',
       entries: [
-        { accountType: 'EXTERNAL', direction: 'DEBIT', amount: '2.500000', asset: 'USDT' },
-        { accountType: 'AVAILABLE', direction: 'CREDIT', amount: '2.500000', asset: 'USDT', userId: 'user-1' },
+        {
+          accountType: 'EXTERNAL',
+          direction: 'DEBIT',
+          amount: '2.500000',
+          asset: 'USDT',
+        },
+        {
+          accountType: 'AVAILABLE',
+          direction: 'CREDIT',
+          amount: '2.500000',
+          asset: 'USDT',
+          userId: 'user-1',
+        },
       ],
     });
     expect(store.account('user-1', 'USDT').available).toBe('12.500000');
@@ -26,7 +37,13 @@ describe('LedgerService', () => {
         memo: 'bad',
         idempotency: 'bad-1',
         entries: [
-          { accountType: 'AVAILABLE', direction: 'DEBIT', amount: '1.000000', asset: 'USDT', userId: 'user-1' },
+          {
+            accountType: 'AVAILABLE',
+            direction: 'DEBIT',
+            amount: '1.000000',
+            asset: 'USDT',
+            userId: 'user-1',
+          },
         ],
       }),
     ).toThrow();
@@ -34,16 +51,38 @@ describe('LedgerService', () => {
       memo: 'send',
       idempotency: 'send-1',
       entries: [
-        { accountType: 'AVAILABLE', direction: 'DEBIT', amount: '1.000000', asset: 'USDT', userId: 'user-1' },
-        { accountType: 'EXTERNAL', direction: 'CREDIT', amount: '1.000000', asset: 'USDT' },
+        {
+          accountType: 'AVAILABLE',
+          direction: 'DEBIT',
+          amount: '1.000000',
+          asset: 'USDT',
+          userId: 'user-1',
+        },
+        {
+          accountType: 'EXTERNAL',
+          direction: 'CREDIT',
+          amount: '1.000000',
+          asset: 'USDT',
+        },
       ],
     });
     ledger.post({
       memo: 'send',
       idempotency: 'send-1',
       entries: [
-        { accountType: 'AVAILABLE', direction: 'DEBIT', amount: '1.000000', asset: 'USDT', userId: 'user-1' },
-        { accountType: 'EXTERNAL', direction: 'CREDIT', amount: '1.000000', asset: 'USDT' },
+        {
+          accountType: 'AVAILABLE',
+          direction: 'DEBIT',
+          amount: '1.000000',
+          asset: 'USDT',
+          userId: 'user-1',
+        },
+        {
+          accountType: 'EXTERNAL',
+          direction: 'CREDIT',
+          amount: '1.000000',
+          asset: 'USDT',
+        },
       ],
     });
     expect(store.account('user-1', 'USDT').available).toBe('9.000000');
@@ -58,8 +97,19 @@ describe('LedgerService', () => {
         memo: 'over',
         idempotency: 'over-1',
         entries: [
-          { accountType: 'AVAILABLE', direction: 'DEBIT', amount: '6.000000', asset: 'USDT', userId: 'user-1' },
-          { accountType: 'EXTERNAL', direction: 'CREDIT', amount: '6.000000', asset: 'USDT' },
+          {
+            accountType: 'AVAILABLE',
+            direction: 'DEBIT',
+            amount: '6.000000',
+            asset: 'USDT',
+            userId: 'user-1',
+          },
+          {
+            accountType: 'EXTERNAL',
+            direction: 'CREDIT',
+            amount: '6.000000',
+            asset: 'USDT',
+          },
         ],
       }),
     ).toThrow();

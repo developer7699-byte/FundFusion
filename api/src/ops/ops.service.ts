@@ -21,13 +21,20 @@ export class OpsService {
 
   createOrder(
     userId: string,
-    input: { kind: 'SELL' | 'UPI_PAY'; usdtAmount?: string; inrAmount?: string; upiId?: string; beneficiary?: string },
+    input: {
+      kind: 'SELL' | 'UPI_PAY';
+      usdtAmount?: string;
+      inrAmount?: string;
+      upiId?: string;
+      beneficiary?: string;
+    },
   ) {
     const rate = d(this.rates.usdtInr());
     let usdt = usdtAmount(input.usdtAmount ?? '0');
     let inr = inrAmount(input.inrAmount ?? '0');
     if (input.kind === 'UPI_PAY') {
-      if (!inr.gt(0)) throw this.fail('INVALID_AMOUNT', 'Enter a mock INR amount.');
+      if (!inr.gt(0))
+        throw this.fail('INVALID_AMOUNT', 'Enter a mock INR amount.');
       usdt = usdtAmount(inr.div(rate));
     } else if (!usdt.gt(0)) {
       throw this.fail('INVALID_AMOUNT', 'Enter a mock USDT amount.');
@@ -39,8 +46,20 @@ export class OpsService {
       memo: `Lock ${input.kind}`,
       idempotency: `lock:${userId}:${randomUUID()}`,
       entries: [
-        { accountType: 'AVAILABLE', direction: 'DEBIT', amount: moneyString(usdt, 6), asset: 'USDT', userId },
-        { accountType: 'LOCKED', direction: 'CREDIT', amount: moneyString(usdt, 6), asset: 'USDT', userId },
+        {
+          accountType: 'AVAILABLE',
+          direction: 'DEBIT',
+          amount: moneyString(usdt, 6),
+          asset: 'USDT',
+          userId,
+        },
+        {
+          accountType: 'LOCKED',
+          direction: 'CREDIT',
+          amount: moneyString(usdt, 6),
+          asset: 'USDT',
+          userId,
+        },
       ],
       activity: {
         userId,
@@ -62,14 +81,32 @@ export class OpsService {
       beneficiary: input.beneficiary,
       timeline: [
         { at: new Date(), status: 'CREATED', note: 'Mock order created' },
-        { at: new Date(), status: 'FUNDS_LOCKED', note: 'Available USDT moved to locked' },
-        { at: new Date(), status: 'MATCHING', note: 'Waiting for a mock merchant' },
+        {
+          at: new Date(),
+          status: 'FUNDS_LOCKED',
+          note: 'Available USDT moved to locked',
+        },
+        {
+          at: new Date(),
+          status: 'MATCHING',
+          note: 'Waiting for a mock merchant',
+        },
       ],
       createdAt: new Date(),
     };
     this.store.orders.unshift(order);
-    this.store.notify(userId, 'ORDER', 'Order created', `Mock ${input.kind} ${order.usdtAmount} USDT locked.`);
-    this.store.notify('user-merchant', 'ORDER', 'New available order', `Mock ${order.kind} ${order.usdtAmount} USDT`);
+    this.store.notify(
+      userId,
+      'ORDER',
+      'Order created',
+      `Mock ${input.kind} ${order.usdtAmount} USDT locked.`,
+    );
+    this.store.notify(
+      'user-merchant',
+      'ORDER',
+      'New available order',
+      `Mock ${order.kind} ${order.usdtAmount} USDT`,
+    );
     return { ...order, simulated: true };
   }
 
@@ -87,14 +124,19 @@ export class OpsService {
     const order = this.order(id);
     if (order.customerId !== userId) throw this.forbid();
     if (!['CREATED', 'FUNDS_LOCKED', 'MATCHING'].includes(order.status)) {
-      throw this.fail('ORDER_STATE', 'This mock order can no longer be cancelled.');
+      throw this.fail(
+        'ORDER_STATE',
+        'This mock order can no longer be cancelled.',
+      );
     }
     this.releaseToCustomer(order, 'CANCELLED', 'Customer cancelled');
     return order;
   }
 
   merchantAvailable() {
-    return this.store.orders.filter((o) => ['FUNDS_LOCKED', 'MATCHING'].includes(o.status) && !o.merchantId);
+    return this.store.orders.filter(
+      (o) => ['FUNDS_LOCKED', 'MATCHING'].includes(o.status) && !o.merchantId,
+    );
   }
 
   merchantOrders(merchantId: string) {
@@ -103,13 +145,21 @@ export class OpsService {
 
   accept(merchantId: string, id: string) {
     const order = this.order(id);
-    if (!['FUNDS_LOCKED', 'MATCHING'].includes(order.status) || order.merchantId) {
+    if (
+      !['FUNDS_LOCKED', 'MATCHING'].includes(order.status) ||
+      order.merchantId
+    ) {
       throw this.fail('ORDER_STATE', 'Order is not available to accept.');
     }
     order.merchantId = merchantId;
     this.push(order, 'SELLER_ASSIGNED', 'Orbit desk accepted (simulated)');
     this.push(order, 'PAYMENT_PENDING', 'Awaiting mock INR rail / UTR');
-    this.store.notify(order.customerId, 'ORDER', 'Merchant assigned', 'A mock merchant accepted your order.');
+    this.store.notify(
+      order.customerId,
+      'ORDER',
+      'Merchant assigned',
+      'A mock merchant accepted your order.',
+    );
     return order;
   }
 
@@ -123,7 +173,12 @@ export class OpsService {
     order.proofNote = note;
     this.push(order, 'PAYMENT_SUBMITTED', `Mock UTR ${utr}`);
     this.push(order, 'VERIFICATION', 'Awaiting verification (simulated)');
-    this.store.notify(order.customerId, 'ORDER', 'Payment submitted', 'Mock UTR recorded. Not a bank credit.');
+    this.store.notify(
+      order.customerId,
+      'ORDER',
+      'Payment submitted',
+      'Mock UTR recorded. Not a bank credit.',
+    );
     return order;
   }
 
@@ -161,10 +216,30 @@ export class OpsService {
         amount: order.usdtAmount,
       },
     });
-    this.push(order, 'COMPLETED', 'Escrow released on mock ledger. No INR moved.');
-    this.store.notify(order.customerId, 'ORDER', 'Order completed', 'Simulated settlement recorded.');
-    this.store.notify(merchantId, 'ORDER', 'Order completed', 'Mock USDT credited to merchant available.');
-    this.store.audit(actorId, 'ESCROW_RELEASE', 'P2POrder', order.id, 'Authorized mock completion');
+    this.push(
+      order,
+      'COMPLETED',
+      'Escrow released on mock ledger. No INR moved.',
+    );
+    this.store.notify(
+      order.customerId,
+      'ORDER',
+      'Order completed',
+      'Simulated settlement recorded.',
+    );
+    this.store.notify(
+      merchantId,
+      'ORDER',
+      'Order completed',
+      'Mock USDT credited to merchant available.',
+    );
+    this.store.audit(
+      actorId,
+      'ESCROW_RELEASE',
+      'P2POrder',
+      order.id,
+      'Authorized mock completion',
+    );
     return order;
   }
 
@@ -174,16 +249,29 @@ export class OpsService {
       throw this.fail('ORDER_STATE', 'Already finished.');
     }
     this.releaseToCustomer(order, 'REFUNDED', 'Admin refunded locked funds');
-    this.store.audit(adminId, 'ESCROW_REFUND', 'P2POrder', order.id, 'Authorized mock refund');
+    this.store.audit(
+      adminId,
+      'ESCROW_REFUND',
+      'P2POrder',
+      order.id,
+      'Authorized mock refund',
+    );
     return order;
   }
 
   dispute(userId: string, id: string, reason: string) {
     const order = this.order(id);
-    if (order.customerId !== userId && order.merchantId !== userId) throw this.forbid();
-    if (order.status === 'COMPLETED') throw this.fail('ORDER_STATE', 'Completed orders cannot dispute.');
+    if (order.customerId !== userId && order.merchantId !== userId)
+      throw this.forbid();
+    if (order.status === 'COMPLETED')
+      throw this.fail('ORDER_STATE', 'Completed orders cannot dispute.');
     this.push(order, 'DISPUTED', reason);
-    const ticket = this.openTicket(userId, 'DISPUTE', `Dispute ${order.id}`, reason);
+    const ticket = this.openTicket(
+      userId,
+      'DISPUTE',
+      `Dispute ${order.id}`,
+      reason,
+    );
     const dispute = {
       id: randomUUID(),
       orderId: order.id,
@@ -200,32 +288,39 @@ export class OpsService {
     const usdt = this.store.account(merchantId, 'USDT');
     const mine = this.merchantOrders(merchantId);
     const completed = mine.filter((o) => o.status === 'COMPLETED');
-    const volume = completed.reduce((sum, o) => sum.add(d(o.usdtAmount)), d('0'));
+    const volume = completed.reduce(
+      (sum, o) => sum.add(d(o.usdtAmount)),
+      d('0'),
+    );
     return {
       simulated: true,
       wallet: usdt,
       todayEarnings: moneyString(
         completed
-          .filter((o) => o.createdAt.toDateString() === new Date().toDateString())
+          .filter(
+            (o) => o.createdAt.toDateString() === new Date().toDateString(),
+          )
           .reduce((sum, o) => sum.add(inrAmount(o.feeAmount)), d('0')),
         2,
       ),
       totalEarningsNote: 'Fee figures are simulated, not guaranteed profit.',
-      active: mine.filter((o) => !['COMPLETED', 'CANCELLED', 'REFUNDED', 'FAILED'].includes(o.status)).length,
+      active: mine.filter(
+        (o) =>
+          !['COMPLETED', 'CANCELLED', 'REFUNDED', 'FAILED'].includes(o.status),
+      ).length,
       completed: completed.length,
       available: this.merchantAvailable().length,
-      completionRate: mine.length ? Math.round((completed.length / mine.length) * 100) : 0,
+      completionRate: mine.length
+        ? Math.round((completed.length / mine.length) * 100)
+        : 0,
       grossVolumeUsdt: moneyString(volume, 6),
     };
   }
 
-
-
-
-
-
   ticketsFor(userId: string, admin: boolean) {
-    return admin ? this.store.tickets : this.store.tickets.filter((t) => t.ownerId === userId);
+    return admin
+      ? this.store.tickets
+      : this.store.tickets.filter((t) => t.ownerId === userId);
   }
 
   ticket(id: string) {
@@ -253,7 +348,6 @@ export class OpsService {
   settings() {
     return Object.fromEntries(this.store.settings);
   }
-
 
   notices(userId: string) {
     return this.store.notices.filter((n) => n.userId === userId);
@@ -283,8 +377,14 @@ export class OpsService {
   replyTicket(actorId: string, id: string, body: string) {
     const ticket = this.store.tickets.find((t) => t.id === id);
     if (!ticket) throw this.missing('Ticket');
-    ticket.messages.push({ id: randomUUID(), authorId: actorId, body, at: new Date() });
-    ticket.status = actorId === ticket.ownerId ? 'WAITING_FOR_USER' : 'IN_PROGRESS';
+    ticket.messages.push({
+      id: randomUUID(),
+      authorId: actorId,
+      body,
+      at: new Date(),
+    });
+    ticket.status =
+      actorId === ticket.ownerId ? 'WAITING_FOR_USER' : 'IN_PROGRESS';
     return ticket;
   }
 
@@ -298,7 +398,10 @@ export class OpsService {
       merchants: users.filter((u) => u.roles.includes('MERCHANT')).length,
       orders: orders.length,
       completed: orders.filter((o) => o.status === 'COMPLETED').length,
-      pending: orders.filter((o) => !['COMPLETED', 'CANCELLED', 'REFUNDED', 'FAILED'].includes(o.status)).length,
+      pending: orders.filter(
+        (o) =>
+          !['COMPLETED', 'CANCELLED', 'REFUNDED', 'FAILED'].includes(o.status),
+      ).length,
       failed: orders.filter((o) => o.status === 'FAILED').length,
       lockedUsdt: moneyString(
         [...this.store.accounts.values()]
@@ -321,7 +424,11 @@ export class OpsService {
     }));
   }
 
-  setUserStatus(adminId: string, userId: string, status: 'ACTIVE' | 'SUSPENDED') {
+  setUserStatus(
+    adminId: string,
+    userId: string,
+    status: 'ACTIVE' | 'SUSPENDED',
+  ) {
     const user = this.store.users.get(userId);
     if (!user) throw this.missing('User');
     user.status = status;
@@ -339,7 +446,11 @@ export class OpsService {
     };
   }
 
-  private releaseToCustomer(order: ProtoOrder, status: OrderStatus, note: string) {
+  private releaseToCustomer(
+    order: ProtoOrder,
+    status: OrderStatus,
+    note: string,
+  ) {
     this.ledger.post({
       memo: `Unlock ${order.id}`,
       idempotency: `unlock:${order.id}`,
@@ -375,16 +486,22 @@ export class OpsService {
     order.timeline.push({ at: new Date(), status, note });
   }
 
-  private fail(code: string, message: string): never {
-    throw new BadRequestException({ success: false, error: { code, message } });
+  private fail(code: string, message: string): BadRequestException {
+    return new BadRequestException({
+      success: false,
+      error: { code, message },
+    });
   }
 
-  private missing(name: string): never {
-    throw new NotFoundException({ success: false, error: { code: 'NOT_FOUND', message: `${name} not found.` } });
+  private missing(name: string): NotFoundException {
+    return new NotFoundException({
+      success: false,
+      error: { code: 'NOT_FOUND', message: `${name} not found.` },
+    });
   }
 
-  private forbid(): never {
-    throw new ForbiddenException({
+  private forbid(): ForbiddenException {
+    return new ForbiddenException({
       success: false,
       error: { code: 'FORBIDDEN', message: 'Not allowed for this mock role.' },
     });

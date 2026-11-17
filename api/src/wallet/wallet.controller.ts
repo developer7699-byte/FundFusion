@@ -5,7 +5,13 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { ok } from '../common/http';
-import { DepositBroadcastDto, DepositStartDto, QuoteDto, SendDto, WithdrawDto } from './dto';
+import {
+  DepositBroadcastDto,
+  DepositStartDto,
+  QuoteDto,
+  SendDto,
+  WithdrawDto,
+} from './dto';
 import { WalletService } from './wallet.service';
 
 @ApiTags('wallet')

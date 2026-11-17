@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { NodePgDatabase, drizzle } from 'drizzle-orm/node-postgres';
 import { Pool, types } from 'pg';
 import * as schema from './schema';
@@ -22,7 +27,8 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   constructor() {
     this.pool = new Pool({
       connectionString:
-        process.env.DATABASE_URL ?? 'postgresql://localhost:5432/fundfusion_dev',
+        process.env.DATABASE_URL ??
+        'postgresql://localhost:5432/fundfusion_dev',
     });
     this.db = drizzle(this.pool, { schema, casing: 'snake_case' });
   }

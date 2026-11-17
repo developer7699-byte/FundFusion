@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import type { AuthUser } from './current-user';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -15,7 +16,10 @@ export class JwtAuthGuard implements CanActivate {
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const req = context.switchToHttp().getRequest();
+    const req = context.switchToHttp().getRequest<{
+      headers: Record<string, string | undefined>;
+      user?: AuthUser;
+    }>();
     const header = String(req.headers.authorization ?? '');
     const token = header.startsWith('Bearer ') ? header.slice(7) : null;
     if (!token) {
@@ -25,14 +29,17 @@ export class JwtAuthGuard implements CanActivate {
       });
     }
     try {
-      req.user = this.jwt.verify(token, {
+      req.user = this.jwt.verify<AuthUser>(token, {
         secret: this.config.getOrThrow<string>('JWT_ACCESS_SECRET'),
       });
       return true;
     } catch {
       throw new UnauthorizedException({
         success: false,
-        error: { code: 'TOKEN_INVALID', message: 'Session expired. Sign in again.' },
+        error: {
+          code: 'TOKEN_INVALID',
+          message: 'Session expired. Sign in again.',
+        },
       });
     }
   }

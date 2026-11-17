@@ -4,7 +4,9 @@ import { join } from 'node:path';
 const repoRoot = join(__dirname, '..', '..', '..');
 
 function pkg(workspace: string): { scripts?: Record<string, string> } {
-  return JSON.parse(readFileSync(join(repoRoot, workspace, 'package.json'), 'utf8'));
+  return JSON.parse(
+    readFileSync(join(repoRoot, workspace, 'package.json'), 'utf8'),
+  ) as { scripts?: Record<string, string> };
 }
 
 const apiPkg = pkg('api');

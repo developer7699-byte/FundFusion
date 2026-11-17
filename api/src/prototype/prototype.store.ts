@@ -133,8 +133,16 @@ export class PrototypeStore implements OnModuleInit {
       inrAmount: '6318.75',
       feeAmount: '25.28',
       timeline: [
-        { at: new Date(Date.now() - 3600000), status: 'CREATED', note: 'Seed mock sell' },
-        { at: new Date(Date.now() - 3590000), status: 'FUNDS_LOCKED', note: '75 USDT locked (simulated)' },
+        {
+          at: new Date(Date.now() - 3600000),
+          status: 'CREATED',
+          note: 'Seed mock sell',
+        },
+        {
+          at: new Date(Date.now() - 3590000),
+          status: 'FUNDS_LOCKED',
+          note: '75 USDT locked (simulated)',
+        },
       ],
       createdAt: new Date(Date.now() - 3600000),
     });
@@ -148,7 +156,9 @@ export class PrototypeStore implements OnModuleInit {
       createdAt: new Date(Date.now() - 86400000),
     });
     this.ready = true;
-    this.log.log('Mock prototype store seeded. Demo password Example!Demo1. No live rails.');
+    this.log.log(
+      'Mock prototype store seeded. Demo password Example!Demo1. No live rails.',
+    );
   }
 
   seedUser(user: ProtoUser) {
@@ -156,7 +166,12 @@ export class PrototypeStore implements OnModuleInit {
     this.usersByEmail.set(user.email, user.id);
   }
 
-  ensureAccount(userId: string, asset: 'USDT' | 'INR', available = '0', locked = '0') {
+  ensureAccount(
+    userId: string,
+    asset: 'USDT' | 'INR',
+    available = '0',
+    locked = '0',
+  ) {
     const key = `${userId}:${asset}`;
     if (!this.accounts.has(key)) {
       this.accounts.set(key, { userId, asset, available, locked });
@@ -173,7 +188,11 @@ export class PrototypeStore implements OnModuleInit {
     return id ? this.users.get(id) : undefined;
   }
 
-  createUser(input: Omit<ProtoUser, 'id' | 'failedLoginCount' | 'lastLoginAt'> & { id?: string }) {
+  createUser(
+    input: Omit<ProtoUser, 'id' | 'failedLoginCount' | 'lastLoginAt'> & {
+      id?: string;
+    },
+  ) {
     const user: ProtoUser = {
       ...input,
       id: input.id ?? randomUUID(),
@@ -187,7 +206,11 @@ export class PrototypeStore implements OnModuleInit {
     return user;
   }
 
-  addActivity(row: Omit<ProtoActivity, 'id' | 'createdAt' | 'simulated'> & { id?: string }) {
+  addActivity(
+    row: Omit<ProtoActivity, 'id' | 'createdAt' | 'simulated'> & {
+      id?: string;
+    },
+  ) {
     const item: ProtoActivity = {
       ...row,
       id: row.id ?? randomUUID(),
@@ -212,7 +235,13 @@ export class PrototypeStore implements OnModuleInit {
     return row;
   }
 
-  audit(actorId: string, action: string, entity: string, entityId: string, reason: string) {
+  audit(
+    actorId: string,
+    action: string,
+    entity: string,
+    entityId: string,
+    reason: string,
+  ) {
     this.audits.unshift({
       id: randomUUID(),
       actorId,

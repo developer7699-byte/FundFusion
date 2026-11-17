@@ -31,17 +31,25 @@ describe('platformConfig', () => {
 
 function sourceFiles(dir: string, acc: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
-    if (entry === 'node_modules' || entry === 'dist' || entry.startsWith('.')) continue;
+    if (entry === 'node_modules' || entry === 'dist' || entry.startsWith('.'))
+      continue;
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) sourceFiles(full, acc);
-    else if (/\.(ts|tsx|html|css)$/.test(full) && !full.endsWith('platform.config.spec.ts')) acc.push(full);
+    else if (
+      /\.(ts|tsx|html|css)$/.test(full) &&
+      !full.endsWith('platform.config.spec.ts')
+    )
+      acc.push(full);
   }
   return acc;
 }
 
 describe('brand is not hardcoded', () => {
   it('no source file contains the old brand name', () => {
-    const offenders = [join(repoRoot, 'api', 'src'), join(repoRoot, 'web', 'src')]
+    const offenders = [
+      join(repoRoot, 'api', 'src'),
+      join(repoRoot, 'web', 'src'),
+    ]
       .flatMap((d) => sourceFiles(d))
       .filter((f) => /nexora/i.test(readFileSync(f, 'utf8')))
       .map((f) => f.replace(repoRoot + '/', ''));

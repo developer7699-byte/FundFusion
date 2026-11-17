@@ -1,4 +1,11 @@
-import { index, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import {
+  index,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { orderStatus } from './enums';
 import { inr, usdt } from './money-columns';
 import { merchantProfile, user } from './identity';
@@ -15,8 +22,12 @@ export const p2pOrder = pgTable('p2p_order', {
   inrAmount: inr('inr_amount').notNull(),
   feeAmount: inr('fee_amount').notNull(),
   idempotency: text('idempotency').notNull().unique(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const escrow = pgTable('escrow', {
@@ -27,7 +38,9 @@ export const escrow = pgTable('escrow', {
     .references(() => p2pOrder.id),
   lockedAmt: usdt('locked_amt').notNull(),
   releasedAt: timestamp('released_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const merchantAssignment = pgTable('merchant_assignment', {
@@ -43,7 +56,9 @@ export const merchantAssignment = pgTable('merchant_assignment', {
     .notNull()
     .references(() => user.id),
   acceptedAt: timestamp('accepted_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const paymentProof = pgTable('payment_proof', {
@@ -54,7 +69,9 @@ export const paymentProof = pgTable('payment_proof', {
   utr: text('utr'),
   note: text('note'),
   url: text('url'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const settlement = pgTable('settlement', {
@@ -66,7 +83,9 @@ export const settlement = pgTable('settlement', {
   feeInr: inr('fee_inr').notNull(),
   netInr: inr('net_inr').notNull(),
   status: text('status').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const transaction = pgTable(
@@ -82,7 +101,11 @@ export const transaction = pgTable(
     amount: usdt('amount').notNull(),
     inrDisplay: inr('inr_display'),
     metadata: jsonb('metadata'),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
-  (t) => [index('transaction_user_id_created_at_idx').on(t.userId, t.createdAt)],
+  (t) => [
+    index('transaction_user_id_created_at_idx').on(t.userId, t.createdAt),
+  ],
 );

@@ -20,7 +20,8 @@ describe('Health (e2e)', () => {
   it('/api/health (GET) uses the mock store', async () => {
     const res = await request(app.getHttpServer()).get('/api/health');
     expect(res.status).toBe(200);
-    expect(res.body.data.mode).toBe('mock-prototype');
+    const body = res.body as { data: { mode: string } };
+    expect(body.data.mode).toBe('mock-prototype');
   });
 
   afterEach(async () => {

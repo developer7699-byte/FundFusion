@@ -58,7 +58,11 @@ export class OpsController {
 
   @Roles('CUSTOMER')
   @Post('orders/:id/dispute')
-  dispute(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: { reason: string }) {
+  dispute(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { reason: string },
+  ) {
     return ok(this.ops.dispute(user.sub, id, body.reason ?? 'Mock dispute'));
   }
 
@@ -82,8 +86,13 @@ export class OpsController {
 
   @Roles('CUSTOMER')
   @Post('support')
-  ticket(@CurrentUser() user: AuthUser, @Body() body: { category: string; subject: string; body: string }) {
-    return ok(this.ops.openTicket(user.sub, body.category, body.subject, body.body));
+  ticket(
+    @CurrentUser() user: AuthUser,
+    @Body() body: { category: string; subject: string; body: string },
+  ) {
+    return ok(
+      this.ops.openTicket(user.sub, body.category, body.subject, body.body),
+    );
   }
 
   @Roles('CUSTOMER', 'ADMIN')
@@ -100,14 +109,22 @@ export class OpsController {
 
   @Roles('CUSTOMER', 'ADMIN')
   @Post('support/:id/reply')
-  reply(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: { body: string }) {
+  reply(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { body: string },
+  ) {
     return ok(this.ops.replyTicket(user.sub, id, body.body));
   }
 
   @Roles('MERCHANT', 'ADMIN')
   @Get('merchant/dashboard')
   merchDash(@CurrentUser() user: AuthUser) {
-    return ok(this.ops.merchantDesk(user.roles.includes('ADMIN') ? 'user-merchant' : user.sub));
+    return ok(
+      this.ops.merchantDesk(
+        user.roles.includes('ADMIN') ? 'user-merchant' : user.sub,
+      ),
+    );
   }
 
   @Roles('MERCHANT', 'ADMIN')
@@ -119,7 +136,11 @@ export class OpsController {
   @Roles('MERCHANT', 'ADMIN')
   @Get('merchant/orders')
   merchOrders(@CurrentUser() user: AuthUser) {
-    return ok(this.ops.merchantOrders(user.roles.includes('ADMIN') ? 'user-merchant' : user.sub));
+    return ok(
+      this.ops.merchantOrders(
+        user.roles.includes('ADMIN') ? 'user-merchant' : user.sub,
+      ),
+    );
   }
 
   @Roles('MERCHANT')
@@ -130,7 +151,11 @@ export class OpsController {
 
   @Roles('MERCHANT')
   @Post('merchant/orders/:id/utr')
-  utr(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: { utr: string; note?: string }) {
+  utr(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { utr: string; note?: string },
+  ) {
     return ok(this.ops.submitUtr(user.sub, id, body.utr, body.note));
   }
 
@@ -154,7 +179,11 @@ export class OpsController {
 
   @Roles('ADMIN')
   @Post('admin/users/:id/status')
-  status(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: { status: 'ACTIVE' | 'SUSPENDED' }) {
+  status(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { status: 'ACTIVE' | 'SUSPENDED' },
+  ) {
     return ok(this.ops.setUserStatus(user.sub, id, body.status));
   }
 

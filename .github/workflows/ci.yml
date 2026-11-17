@@ -11,6 +11,28 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+
+    # PRD §13.4: ledger and schema tests run against a real PostgreSQL,
+    # never a mock. The behaviour under test is the database's own.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fundfusion
+          POSTGRES_PASSWORD: fundfusion_dev_only
+          POSTGRES_DB: fundfusion_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fundfusion -d fundfusion_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://fundfusion:fundfusion_dev_only@localhost:5432/fundfusion_test
+      TEST_DATABASE_URL: postgresql://fundfusion:fundfusion_dev_only@localhost:5432/fundfusion_test
+
     steps:
       - uses: actions/checkout@v4
 
@@ -22,6 +44,9 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Apply migrations
+        run: npm run db:migrate
+
       - name: Lint
         run: npm run lint
 
@@ -30,6 +55,9 @@ jobs:
 
       - name: Test
         run: npm run test
+
+      - name: End-to-end
+        run: npm run test:e2e --workspace api
 
       - name: Build
         run: npm run build

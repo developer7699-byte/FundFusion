@@ -1,4 +1,10 @@
-import { IsIn, IsOptional, IsString, Matches, MinLength } from 'class-validator';
+import {
+  IsIn,
+  IsOptional,
+  IsString,
+  Matches,
+  MinLength,
+} from 'class-validator';
 
 export class DepositStartDto {
   @IsIn(['USDT'])

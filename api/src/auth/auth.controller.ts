@@ -3,7 +3,13 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ok } from '../common/http';
 import { AuthService } from './auth.service';
 import { CurrentUser, type AuthUser } from './current-user';
-import { LoginDto, RefreshDto, RegisterDto, RequestOtpDto, VerifyOtpDto } from './dto';
+import {
+  LoginDto,
+  RefreshDto,
+  RegisterDto,
+  RequestOtpDto,
+  VerifyOtpDto,
+} from './dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 @ApiTags('auth')
@@ -39,14 +45,14 @@ export class AuthController {
   @Post('logout')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  async logout(@CurrentUser() user: AuthUser) {
-    return ok(await this.auth.logout(user.sub));
+  logout(@CurrentUser() user: AuthUser) {
+    return ok(this.auth.logout(user.sub));
   }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  async me(@CurrentUser() user: AuthUser) {
-    return ok(await this.auth.me(user.sub));
+  me(@CurrentUser() user: AuthUser) {
+    return ok(this.auth.me(user.sub));
   }
 }

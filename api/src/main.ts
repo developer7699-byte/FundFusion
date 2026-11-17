@@ -27,9 +27,13 @@ async function bootstrap() {
     .setVersion('0.1.0')
     .addBearerAuth()
     .build();
-  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swagger));
+  SwaggerModule.setup(
+    'api/docs',
+    app,
+    SwaggerModule.createDocument(app, swagger),
+  );
 
   await app.listen(Number(process.env.PORT ?? 3001));
 }
 
-bootstrap();
+void bootstrap();

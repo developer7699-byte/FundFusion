@@ -28,7 +28,8 @@ export class WalletService {
     const locked = usdtAmount(usdt.locked);
     return {
       simulated: true,
-      label: 'All balances are mock prototype figures. No chain or bank settlement.',
+      label:
+        'All balances are mock prototype figures. No chain or bank settlement.',
       rateLabel: 'Simulated USDT/INR display rate',
       usdtInrRate: rate.toFixed(4),
       assets: [
@@ -53,8 +54,13 @@ export class WalletService {
         inrEstimate: moneyString(inrAmount(available.mul(rate)), 2),
       },
       addresses: this.store.addresses.filter((a) => a.userId === userId),
-      activity: this.store.activity.filter((a) => a.userId === userId).slice(0, 25),
-      totals: { transactions: this.store.activity.filter((a) => a.userId === userId).length },
+      activity: this.store.activity
+        .filter((a) => a.userId === userId)
+        .slice(0, 25),
+      totals: {
+        transactions: this.store.activity.filter((a) => a.userId === userId)
+          .length,
+      },
     };
   }
 
@@ -90,14 +96,20 @@ export class WalletService {
     if (deposit.status !== 'ADDRESS_READY') {
       throw new BadRequestException({
         success: false,
-        error: { code: 'DEPOSIT_STATE', message: 'Mock deposit is not waiting for a broadcast.' },
+        error: {
+          code: 'DEPOSIT_STATE',
+          message: 'Mock deposit is not waiting for a broadcast.',
+        },
       });
     }
     const amount = usdtAmount(dto.amount);
     if (!amount.gt(0)) {
       throw new BadRequestException({
         success: false,
-        error: { code: 'INVALID_AMOUNT', message: 'Enter a positive mock amount.' },
+        error: {
+          code: 'INVALID_AMOUNT',
+          message: 'Enter a positive mock amount.',
+        },
       });
     }
     deposit.amount = moneyString(amount, 6);
@@ -112,7 +124,10 @@ export class WalletService {
     if (deposit.status === 'ADDRESS_READY') {
       throw new BadRequestException({
         success: false,
-        error: { code: 'DEPOSIT_STATE', message: 'Simulate a mock broadcast first.' },
+        error: {
+          code: 'DEPOSIT_STATE',
+          message: 'Simulate a mock broadcast first.',
+        },
       });
     }
     if (deposit.status === 'COMPLETED') return deposit;
@@ -123,7 +138,12 @@ export class WalletService {
         memo: `Mock deposit ${deposit.mockTxHash}`,
         idempotency: `deposit:${deposit.id}`,
         entries: [
-          { accountType: 'EXTERNAL', direction: 'DEBIT', amount: deposit.amount, asset: 'USDT' },
+          {
+            accountType: 'EXTERNAL',
+            direction: 'DEBIT',
+            amount: deposit.amount,
+            asset: 'USDT',
+          },
           {
             accountType: 'AVAILABLE',
             direction: 'CREDIT',
@@ -159,15 +179,38 @@ export class WalletService {
         },
       });
     }
-    const idempotency = dto.idempotencyKey ?? `${kind}:${userId}:${randomUUID()}`;
+    const idempotency =
+      dto.idempotencyKey ?? `${kind}:${userId}:${randomUUID()}`;
     const tx = this.ledger.post({
       memo: `${kind} mock ${dto.network} to ${dto.toAddress}`,
       idempotency,
       entries: [
-        { accountType: 'AVAILABLE', direction: 'DEBIT', amount: moneyString(amount, 6), asset: 'USDT', userId },
-        { accountType: 'AVAILABLE', direction: 'DEBIT', amount: moneyString(fee, 6), asset: 'USDT', userId },
-        { accountType: 'EXTERNAL', direction: 'CREDIT', amount: moneyString(amount, 6), asset: 'USDT' },
-        { accountType: 'PLATFORM_FEE', direction: 'CREDIT', amount: moneyString(fee, 6), asset: 'USDT' },
+        {
+          accountType: 'AVAILABLE',
+          direction: 'DEBIT',
+          amount: moneyString(amount, 6),
+          asset: 'USDT',
+          userId,
+        },
+        {
+          accountType: 'AVAILABLE',
+          direction: 'DEBIT',
+          amount: moneyString(fee, 6),
+          asset: 'USDT',
+          userId,
+        },
+        {
+          accountType: 'EXTERNAL',
+          direction: 'CREDIT',
+          amount: moneyString(amount, 6),
+          asset: 'USDT',
+        },
+        {
+          accountType: 'PLATFORM_FEE',
+          direction: 'CREDIT',
+          amount: moneyString(fee, 6),
+          asset: 'USDT',
+        },
       ],
       activity: {
         userId,
@@ -225,10 +268,17 @@ export class WalletService {
       side: dto.side,
       fromAsset,
       toAsset,
-      fromAmount: fromAsset === 'INR' ? moneyString(fromAmount, 2) : moneyString(fromAmount, 6),
-      toAmount: toAsset === 'INR' ? moneyString(toAmount, 2) : moneyString(toAmount, 6),
+      fromAmount:
+        fromAsset === 'INR'
+          ? moneyString(fromAmount, 2)
+          : moneyString(fromAmount, 6),
+      toAmount:
+        toAsset === 'INR' ? moneyString(toAmount, 2) : moneyString(toAmount, 6),
       rate: rate.toFixed(4),
-      feeAmount: dto.side === 'SELL' ? moneyString(feeAmount, 2) : moneyString(feeAmount, 6),
+      feeAmount:
+        dto.side === 'SELL'
+          ? moneyString(feeAmount, 2)
+          : moneyString(feeAmount, 6),
       expiresAt: new Date(Date.now() + 30_000),
       consumedAt: null,
       merchantLabel: 'Sample desk · Orbit (simulated)',
@@ -238,7 +288,9 @@ export class WalletService {
   }
 
   acceptQuote(userId: string, quoteId: string) {
-    const quote = this.store.quotes.find((q) => q.id === quoteId && q.userId === userId);
+    const quote = this.store.quotes.find(
+      (q) => q.id === quoteId && q.userId === userId,
+    );
     if (!quote) {
       throw new NotFoundException({
         success: false,
@@ -254,7 +306,10 @@ export class WalletService {
     if (quote.expiresAt < new Date()) {
       throw new BadRequestException({
         success: false,
-        error: { code: 'QUOTE_EXPIRED', message: 'Quote expired. Request a new mock quote.' },
+        error: {
+          code: 'QUOTE_EXPIRED',
+          message: 'Quote expired. Request a new mock quote.',
+        },
       });
     }
     if (quote.side === 'BUY') {
@@ -262,32 +317,95 @@ export class WalletService {
         memo: `Mock buy ${quote.id}`,
         idempotency: `quote:${quote.id}`,
         entries: [
-          { accountType: 'EXTERNAL', direction: 'DEBIT', amount: quote.toAmount, asset: 'USDT' },
-          { accountType: 'AVAILABLE', direction: 'CREDIT', amount: quote.toAmount, asset: 'USDT', userId },
+          {
+            accountType: 'EXTERNAL',
+            direction: 'DEBIT',
+            amount: quote.toAmount,
+            asset: 'USDT',
+          },
+          {
+            accountType: 'AVAILABLE',
+            direction: 'CREDIT',
+            amount: quote.toAmount,
+            asset: 'USDT',
+            userId,
+          },
         ],
-        activity: { userId, type: 'BUY', status: 'COMPLETED', asset: 'USDT', amount: quote.toAmount },
+        activity: {
+          userId,
+          type: 'BUY',
+          status: 'COMPLETED',
+          asset: 'USDT',
+          amount: quote.toAmount,
+        },
       });
     } else if (quote.side === 'SELL') {
       this.ledger.post({
         memo: `Mock sell lock ${quote.id}`,
         idempotency: `quote:${quote.id}`,
         entries: [
-          { accountType: 'AVAILABLE', direction: 'DEBIT', amount: quote.fromAmount, asset: 'USDT', userId },
-          { accountType: 'LOCKED', direction: 'CREDIT', amount: quote.fromAmount, asset: 'USDT', userId },
+          {
+            accountType: 'AVAILABLE',
+            direction: 'DEBIT',
+            amount: quote.fromAmount,
+            asset: 'USDT',
+            userId,
+          },
+          {
+            accountType: 'LOCKED',
+            direction: 'CREDIT',
+            amount: quote.fromAmount,
+            asset: 'USDT',
+            userId,
+          },
         ],
-        activity: { userId, type: 'SELL', status: 'FUNDS_LOCKED', asset: 'USDT', amount: quote.fromAmount },
+        activity: {
+          userId,
+          type: 'SELL',
+          status: 'FUNDS_LOCKED',
+          asset: 'USDT',
+          amount: quote.fromAmount,
+        },
       });
     } else {
       this.ledger.post({
         memo: `Mock convert ${quote.id}`,
         idempotency: `quote:${quote.id}`,
         entries: [
-          { accountType: 'AVAILABLE', direction: 'DEBIT', amount: quote.fromAmount, asset: 'USDT', userId },
-          { accountType: 'EXTERNAL', direction: 'CREDIT', amount: quote.fromAmount, asset: 'USDT' },
-          { accountType: 'EXTERNAL', direction: 'DEBIT', amount: quote.toAmount, asset: 'INR' },
-          { accountType: 'AVAILABLE', direction: 'CREDIT', amount: quote.toAmount, asset: 'INR', userId },
+          {
+            accountType: 'AVAILABLE',
+            direction: 'DEBIT',
+            amount: quote.fromAmount,
+            asset: 'USDT',
+            userId,
+          },
+          {
+            accountType: 'EXTERNAL',
+            direction: 'CREDIT',
+            amount: quote.fromAmount,
+            asset: 'USDT',
+          },
+          {
+            accountType: 'EXTERNAL',
+            direction: 'DEBIT',
+            amount: quote.toAmount,
+            asset: 'INR',
+          },
+          {
+            accountType: 'AVAILABLE',
+            direction: 'CREDIT',
+            amount: quote.toAmount,
+            asset: 'INR',
+            userId,
+          },
         ],
-        activity: { userId, type: 'CONVERT', status: 'COMPLETED', asset: 'USDT', amount: quote.fromAmount },
+        activity: {
+          userId,
+          type: 'CONVERT',
+          status: 'COMPLETED',
+          asset: 'USDT',
+          amount: quote.fromAmount,
+        },
       });
     }
     quote.consumedAt = new Date();
@@ -295,7 +413,9 @@ export class WalletService {
   }
 
   activity(userId: string, id: string) {
-    const row = this.store.activity.find((a) => a.id === id && a.userId === userId);
+    const row = this.store.activity.find(
+      (a) => a.id === id && a.userId === userId,
+    );
     if (!row) {
       throw new NotFoundException({
         success: false,
@@ -306,7 +426,9 @@ export class WalletService {
   }
 
   private requireDeposit(userId: string, id: string) {
-    const deposit = this.store.deposits.find((drow) => drow.id === id && drow.userId === userId);
+    const deposit = this.store.deposits.find(
+      (drow) => drow.id === id && drow.userId === userId,
+    );
     if (!deposit) {
       throw new NotFoundException({
         success: false,
