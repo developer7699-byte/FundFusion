@@ -76,6 +76,41 @@ export class PostingService {
   }
 
   /**
+   * Post a journal together with its rounding residue.
+   *
+   * PRD §5.1: every residue posts to a dedicated ROUNDING account. A residue
+   * that is silently dropped produces an unbalanced journal, which makes the
+   * reconciliation alert fire permanently, which teaches everyone to ignore it
+   * — and an ignored reconciliation alert is where real losses hide.
+   *
+   * A positive residue is value the customer did not receive, so it is
+   * CREDITED to ROUNDING. A negative residue (a payable rounded up) is
+   * DEBITED.
+   */
+  async postWithRounding(
+    req: PostingRequest,
+    residue: { amount: string; assetSymbol: string },
+  ): Promise<PostingResult> {
+    const value = usdt(residue.amount);
+    if (value.isZero()) {
+      return this.post(req);
+    }
+
+    return this.post({
+      ...req,
+      lines: [
+        ...req.lines,
+        {
+          accountType: 'ROUNDING',
+          direction: value.gt(0) ? 'CREDIT' : 'DEBIT',
+          amount: usdtString(value.abs()),
+          assetSymbol: residue.assetSymbol,
+        },
+      ],
+    });
+  }
+
+  /**
    * Post a debit that must not overdraw its bucket.
    *
    * The row lock is the whole point: two concurrent callers must not each read
