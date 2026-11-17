@@ -160,35 +160,6 @@ export type ProtoTicket = {
   createdAt: Date;
 };
 
-export type ProtoGiftBrand = {
-  id: string;
-  slug: string;
-  name: string;
-  category: string;
-  products: { id: string; denominationInr: string; usdtPrice: string }[];
-};
-
-export type ProtoGiftOrder = {
-  id: string;
-  userId: string;
-  brandId: string;
-  productId: string;
-  status: string;
-  mockCode: string | null;
-  createdAt: Date;
-};
-
-export type ProtoUtilOrder = {
-  id: string;
-  userId: string;
-  service: string;
-  consumerId: string;
-  amountInr: string;
-  usdtDebit: string;
-  status: string;
-  createdAt: Date;
-};
-
 export type ProtoDispute = {
   id: string;
   orderId: string;

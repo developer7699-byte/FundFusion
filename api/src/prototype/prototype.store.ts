@@ -8,8 +8,6 @@ import {
   ProtoAudit,
   ProtoDeposit,
   ProtoDispute,
-  ProtoGiftBrand,
-  ProtoGiftOrder,
   ProtoLedgerTx,
   ProtoNotice,
   ProtoOrder,
@@ -18,7 +16,6 @@ import {
   ProtoSession,
   ProtoTicket,
   ProtoUser,
-  ProtoUtilOrder,
 } from './types';
 
 const DEMO_PASSWORD = 'Nexora!Demo1';
@@ -40,9 +37,6 @@ export class PrototypeStore implements OnModuleInit {
   readonly orders: ProtoOrder[] = [];
   readonly notices: ProtoNotice[] = [];
   readonly tickets: ProtoTicket[] = [];
-  readonly giftBrands: ProtoGiftBrand[] = [];
-  readonly giftOrders: ProtoGiftOrder[] = [];
-  readonly utilOrders: ProtoUtilOrder[] = [];
   readonly disputes: ProtoDispute[] = [];
   readonly audits: ProtoAudit[] = [];
   readonly settings = new Map<string, string>([
@@ -144,25 +138,6 @@ export class PrototypeStore implements OnModuleInit {
       ],
       createdAt: new Date(Date.now() - 3600000),
     });
-    this.giftBrands.push(
-      {
-        id: 'brand-northline',
-        slug: 'northline-audio',
-        name: 'Northline Audio',
-        category: 'Entertainment',
-        products: [
-          { id: 'p-nl-500', denominationInr: '500.00', usdtPrice: '6.000000' },
-          { id: 'p-nl-1000', denominationInr: '1000.00', usdtPrice: '11.900000' },
-        ],
-      },
-      {
-        id: 'brand-paper',
-        slug: 'paper-trail',
-        name: 'Paper Trail Books',
-        category: 'Retail',
-        products: [{ id: 'p-pt-250', denominationInr: '250.00', usdtPrice: '3.050000' }],
-      },
-    );
     this.notices.push({
       id: 'n-1',
       userId: 'user-customer',

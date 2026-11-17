@@ -219,83 +219,10 @@ export class OpsService {
     };
   }
 
-  giftCatalog() {
-    return this.store.giftBrands;
-  }
 
-  buyGift(userId: string, productId: string) {
-    const brand = this.store.giftBrands.find((b) => b.products.some((p) => p.id === productId));
-    const product = brand?.products.find((p) => p.id === productId);
-    if (!brand || !product) throw this.missing('Gift card product');
-    this.ledger.post({
-      memo: `Gift ${productId}`,
-      idempotency: `gift:${userId}:${randomUUID()}`,
-      entries: [
-        { accountType: 'AVAILABLE', direction: 'DEBIT', amount: product.usdtPrice, asset: 'USDT', userId },
-        { accountType: 'EXTERNAL', direction: 'CREDIT', amount: product.usdtPrice, asset: 'USDT' },
-      ],
-      activity: {
-        userId,
-        type: 'GIFT_CARD',
-        status: 'COMPLETED',
-        asset: 'USDT',
-        amount: product.usdtPrice,
-      },
-    });
-    const order = {
-      id: randomUUID(),
-      userId,
-      brandId: brand.id,
-      productId,
-      status: 'DELIVERED_MOCK',
-      mockCode: `NX-GIFT-${randomUUID().slice(0, 8).toUpperCase()}`,
-      createdAt: new Date(),
-    };
-    this.store.giftOrders.unshift(order);
-    this.store.notify(userId, 'GIFT', 'Mock gift card delivered', `${brand.name} code is simulated inventory.`);
-    return { ...order, brand: brand.name, denominationInr: product.denominationInr };
-  }
 
-  payUtility(userId: string, service: string, consumerId: string, amountInr: string) {
-    const inr = inrAmount(amountInr);
-    const usdt = usdtAmount(inr.div(d(this.rates.usdtInr())));
-    this.ledger.post({
-      memo: `Utility ${service}`,
-      idempotency: `util:${userId}:${randomUUID()}`,
-      entries: [
-        { accountType: 'AVAILABLE', direction: 'DEBIT', amount: moneyString(usdt, 6), asset: 'USDT', userId },
-        { accountType: 'EXTERNAL', direction: 'CREDIT', amount: moneyString(usdt, 6), asset: 'USDT' },
-      ],
-      activity: {
-        userId,
-        type: 'UTILITY',
-        status: 'COMPLETED',
-        asset: 'USDT',
-        amount: moneyString(usdt, 6),
-      },
-    });
-    const order = {
-      id: randomUUID(),
-      userId,
-      service,
-      consumerId,
-      amountInr: moneyString(inr, 2),
-      usdtDebit: moneyString(usdt, 6),
-      status: 'SUCCESS_MOCK',
-      createdAt: new Date(),
-    };
-    this.store.utilOrders.unshift(order);
-    this.store.notify(userId, 'UTILITY', `${service} mock success`, 'No operator was contacted.');
-    return { ...order, mockDetails: { name: 'Sample consumer', due: amountInr } };
-  }
 
-  giftOrders(userId: string) {
-    return this.store.giftOrders.filter((g) => g.userId === userId);
-  }
 
-  utilOrders(userId: string) {
-    return this.store.utilOrders.filter((g) => g.userId === userId);
-  }
 
   ticketsFor(userId: string, admin: boolean) {
     return admin ? this.store.tickets : this.store.tickets.filter((t) => t.ownerId === userId);
@@ -327,11 +254,6 @@ export class OpsService {
     return Object.fromEntries(this.store.settings);
   }
 
-  giftBrand(id: string) {
-    const row = this.store.giftBrands.find((b) => b.id === id || b.slug === id);
-    if (!row) throw this.missing('Brand');
-    return row;
-  }
 
   notices(userId: string) {
     return this.store.notices.filter((n) => n.userId === userId);

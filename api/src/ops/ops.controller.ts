@@ -68,42 +68,6 @@ export class OpsController {
     return ok(this.ops.parseUpi(body.payload ?? ''));
   }
 
-  @Roles('CUSTOMER')
-  @Get('gift-cards')
-  gifts() {
-    return ok(this.ops.giftCatalog());
-  }
-
-  @Roles('CUSTOMER')
-  @Get('gift-cards/brands/:id')
-  brand(@Param('id') id: string) {
-    return ok(this.ops.giftBrand(id));
-  }
-
-  @Roles('CUSTOMER')
-  @Get('gift-cards/history')
-  giftHistory(@CurrentUser() user: AuthUser) {
-    return ok(this.ops.giftOrders(user.sub));
-  }
-
-  @Roles('CUSTOMER')
-  @Post('gift-cards/orders')
-  buyGift(@CurrentUser() user: AuthUser, @Body() body: { productId: string }) {
-    return ok(this.ops.buyGift(user.sub, body.productId));
-  }
-
-  @Roles('CUSTOMER')
-  @Post('utilities/orders')
-  util(@CurrentUser() user: AuthUser, @Body() body: { service: string; consumerId: string; amountInr: string }) {
-    return ok(this.ops.payUtility(user.sub, body.service, body.consumerId, body.amountInr));
-  }
-
-  @Roles('CUSTOMER')
-  @Get('utilities/history')
-  utilHistory(@CurrentUser() user: AuthUser) {
-    return ok(this.ops.utilOrders(user.sub));
-  }
-
   @Roles('CUSTOMER', 'MERCHANT', 'ADMIN')
   @Get('notifications')
   notices(@CurrentUser() user: AuthUser) {
