@@ -54,8 +54,8 @@ export function OrdersList() {
       status: 'ESCROW_LOCKED',
       usdtAmount: '50.00',
       inrAmount: '4575.00',
-      beneficiary: 'NexoraEscrow_Fast',
-      upiId: 'merchant.nexora@okaxis',
+      beneficiary: 'EscrowDesk_Fast',
+      upiId: 'merchant.desk@okaxis',
       timeline: [
         { at: '14:20', status: 'CREATED', note: 'Order matched with verified merchant' },
         { at: '14:21', status: 'ESCROW_LOCKED', note: '50.00 USDT held safely in smart escrow' },
@@ -249,7 +249,7 @@ export function OrderDetail() {
     status: 'ESCROW_LOCKED',
     usdtAmount: '50.00',
     inrAmount: '4575.00',
-    beneficiary: 'NexoraEscrow_Fast',
+    beneficiary: 'EscrowDesk_Fast',
     upiId: 'merchant.fast@okicici',
     utr: 'UTR99482019482',
     timeline: [

@@ -332,7 +332,7 @@ export class OpsService {
   parseUpi(payload: string) {
     return {
       mock: true,
-      upiId: 'demo.shop@nexora',
+      upiId: 'demo.shop@example',
       beneficiary: 'Sample Kirana (simulated)',
       raw: payload,
       note: 'Mock parser. No PSP was called.',

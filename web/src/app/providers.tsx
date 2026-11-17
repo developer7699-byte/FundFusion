@@ -16,7 +16,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
       if (!localStorage.getItem('nx.access')) {
         const tokens = await api<{ accessToken: string; refreshToken: string }>('/auth/login', {
           method: 'POST',
-          body: JSON.stringify({ email: 'customer@nexora.io', password: 'Password123!' }),
+          body: JSON.stringify({ email: 'customer@example.test', password: 'Password123!' }),
         }).catch(() => null)
         if (tokens) {
           localStorage.setItem('nx.access', tokens.accessToken)
@@ -63,7 +63,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
           const isAdmin = email.toLowerCase().includes('admin')
           const mockUser: SessionUser = {
             id: 'usr-101',
-            email: email || 'customer@nexorapay.dev',
+            email: email || 'customer@example.test',
             displayName: email ? email.split('@')[0] : 'Demo User',
             roles: isAdmin ? ['ADMIN', 'CUSTOMER'] : isMerchant ? ['MERCHANT', 'CUSTOMER'] : ['CUSTOMER'],
             status: 'ACTIVE',
@@ -88,7 +88,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
         } catch {
           const mockUser: SessionUser = {
             id: 'usr-101',
-            email: payload.email || 'customer@nexorapay.dev',
+            email: payload.email || 'customer@example.test',
             displayName: payload.displayName || 'Demo User',
             roles: ['CUSTOMER'],
             status: 'ACTIVE',

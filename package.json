@@ -1,8 +1,8 @@
 {
-  "name": "nexora-pay",
+  "name": "fundfusion",
   "private": true,
   "version": "0.1.0",
-  "description": "NEXORA PAY modular monolith",
+  "description": "FundFusion modular monolith",
   "workspaces": [
     "web",
     "api"

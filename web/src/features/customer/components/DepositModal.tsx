@@ -20,7 +20,7 @@ export function DepositModal({ isOpen, onClose, onDepositSuccess }: DepositModal
     TRC20: 'TLvM8vPq9xK92Zc1Qj4w9tG7eX5m4P1y9z',
     BEP20: '0x71C9484920492850294829482948294829482948',
     ERC20: '0x89205A3A3b2A5532642352bCfe327E749aCfe123',
-    UPI: 'nexora.deposit@icici',
+    UPI: 'platform.deposit@icici',
   }
 
   const handleCopy = () => {

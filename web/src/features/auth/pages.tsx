@@ -242,7 +242,7 @@ export function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      const me = await login('customer@nexorapay.dev', 'Nexora!Demo1')
+      const me = await login('customer@example.test', 'Example!Demo1')
       if (me.roles.includes('ADMIN')) navigate('/admin/dashboard')
       else if (me.roles.includes('MERCHANT')) navigate('/merchant/dashboard')
       else navigate('/customer/dashboard')
@@ -340,14 +340,14 @@ export function LoginPage() {
             <span>Demo:</span>
             <button
               type="button"
-              onClick={() => fillDemo('customer@nexorapay.dev', 'Nexora!Demo1')}
+              onClick={() => fillDemo('customer@example.test', 'Example!Demo1')}
               className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-500 font-medium transition cursor-pointer"
             >
               User
             </button>
             <button
               type="button"
-              onClick={() => fillDemo('merchant@nexorapay.dev', 'Nexora!Demo1')}
+              onClick={() => fillDemo('merchant@example.test', 'Example!Demo1')}
               className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-500 font-medium transition cursor-pointer"
             >
               Merchant
@@ -405,7 +405,7 @@ export function RegisterPage() {
         onClick={() => {
           form.setValue('displayName', 'Demo User')
           form.setValue('email', `user_${Math.floor(Math.random() * 1000)}@fundfusion.io`)
-          form.setValue('password', 'Nexora!Demo1')
+          form.setValue('password', 'Example!Demo1')
         }}
         className="w-full h-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-[0_4px_18px_rgba(37,99,235,0.35)] hover:shadow-[0_6px_22px_rgba(37,99,235,0.5)] hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
       >

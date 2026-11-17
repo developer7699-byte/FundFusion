@@ -9,7 +9,7 @@ export function P2PRatesSection() {
   const buyDealers = [
     {
       id: 'd1',
-      name: 'NexoraEscrow_Fast',
+      name: 'EscrowDesk_Fast',
       orders: '1,420 orders',
       completion: '99.8%',
       price: '₹91.45',

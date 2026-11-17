@@ -18,7 +18,7 @@ import {
   ProtoUser,
 } from './types';
 
-const DEMO_PASSWORD = 'Nexora!Demo1';
+const DEMO_PASSWORD = 'Example!Demo1';
 
 @Injectable()
 export class PrototypeStore implements OnModuleInit {
@@ -49,7 +49,7 @@ export class PrototypeStore implements OnModuleInit {
     const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
     this.seedUser({
       id: 'user-customer',
-      email: 'customer@nexorapay.dev',
+      email: 'customer@example.test',
       displayName: 'Aanya Shah',
       passwordHash,
       status: 'ACTIVE',
@@ -60,7 +60,7 @@ export class PrototypeStore implements OnModuleInit {
     });
     this.seedUser({
       id: 'user-merchant',
-      email: 'merchant@nexorapay.dev',
+      email: 'merchant@example.test',
       displayName: 'Orbit Desk Merchant',
       passwordHash,
       status: 'ACTIVE',
@@ -71,8 +71,8 @@ export class PrototypeStore implements OnModuleInit {
     });
     this.seedUser({
       id: 'user-admin',
-      email: 'admin@nexorapay.dev',
-      displayName: 'Nexora Operator',
+      email: 'admin@example.test',
+      displayName: 'Platform Operator',
       passwordHash,
       status: 'ACTIVE',
       roles: ['ADMIN'],
@@ -148,7 +148,7 @@ export class PrototypeStore implements OnModuleInit {
       createdAt: new Date(Date.now() - 86400000),
     });
     this.ready = true;
-    this.log.log('Mock prototype store seeded. Demo password Nexora!Demo1. No live rails.');
+    this.log.log('Mock prototype store seeded. Demo password Example!Demo1. No live rails.');
   }
 
   seedUser(user: ProtoUser) {
