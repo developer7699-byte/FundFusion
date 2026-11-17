@@ -13,3 +13,4 @@ api/dist
 api/generated
 shell-test.txt
 *.pdf
+.superpowers
