@@ -15,6 +15,13 @@
       "when": 1794949506504,
       "tag": "0001_rapid_hemingway",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794950713566,
+      "tag": "0002_clammy_lyja",
+      "breakpoints": true
     }
   ]
 }

@@ -26,6 +26,14 @@ export const user = pgTable('user', {
   displayName: text('display_name').notNull(),
   status: userStatus('status').notNull().default('PENDING_VERIFICATION'),
   emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
+  /**
+   * PRD §9.1: phone OTP is the financial gate. Until this is set the account
+   * has no deposit address, no balance, and cannot place orders.
+   */
+  phoneVerifiedAt: timestamp('phone_verified_at', { withTimezone: true }),
+  /** PRD §9.4: MFA is mandatory on every admin account. */
+  mfaSecret: text('mfa_secret'),
+  mfaEnrolledAt: timestamp('mfa_enrolled_at', { withTimezone: true }),
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
   failedLoginCount: integer('failed_login_count').notNull().default(0),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),

@@ -1,6 +1,32 @@
 import { pgEnum } from 'drizzle-orm/pg-core';
 
-export const roleName = pgEnum('role_name', ['CUSTOMER', 'MERCHANT', 'ADMIN']);
+/**
+ * PRD §9.2. Two admin roles in v1: SUPPORT reads everything and moves no money,
+ * SUPER_ADMIN does everything. The essential separation is between people who
+ * look at things and people who move money — a support account able to release
+ * escrow is the most common insider-fraud path in platforms like this.
+ */
+export const roleName = pgEnum('role_name', [
+  'CUSTOMER',
+  'MERCHANT',
+  'SUPPORT',
+  'SUPER_ADMIN',
+]);
+
+/**
+ * PRD §9.3. Features declare named capabilities. The deferred GIFT_CARD and
+ * UTILITY keys are deliberately absent: §18 says they re-enter by registering
+ * a capability, and pre-declaring them here would defeat that.
+ */
+export const capabilityKey = pgEnum('capability_key', [
+  'DEPOSIT',
+  'WITHDRAW',
+  'SEND',
+  'P2P_BUY',
+  'P2P_SELL',
+]);
+
+export const grantEffect = pgEnum('grant_effect', ['ALLOW', 'DENY']);
 
 export const userStatus = pgEnum('user_status', [
   'PENDING_VERIFICATION',
