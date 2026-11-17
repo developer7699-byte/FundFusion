@@ -3,6 +3,8 @@ import { ConfigModule } from '@nestjs/config';
 import { platformConfig } from './config/platform.config';
 import { DbModule } from './db/db.module';
 import { LedgerModule } from './ledger/ledger.module';
+import { CapabilityModule } from './capability/capability.module';
+import { AuditModule } from './audit/audit.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { HealthController } from './health.controller';
@@ -16,6 +18,8 @@ import { OpsModule } from './ops/ops.module';
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     DbModule,
     LedgerModule,
+    CapabilityModule,
+    AuditModule,
     PrototypeModule,
     AuthModule,
     WalletModule,

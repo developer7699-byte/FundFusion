@@ -37,7 +37,10 @@ function action(over: Partial<{ reason: string }> = {}) {
 describe('AuditService (PRD §9.4)', () => {
   it('records a privileged action with its reason', async () => {
     const id = await audit.record(action());
-    const r = await t.pool.query(`SELECT reason, action FROM audit_log WHERE id = $1`, [id]);
+    const r = await t.pool.query(
+      `SELECT reason, action FROM audit_log WHERE id = $1`,
+      [id],
+    );
     expect((r.rows[0] as { reason: string }).reason).toBe(
       'customer never received the rupees',
     );
@@ -46,11 +49,15 @@ describe('AuditService (PRD §9.4)', () => {
   // An audit row that explains nothing is worse than none: it looks like
   // oversight while providing none.
   it('refuses to record without a reason', async () => {
-    await expect(audit.record(action({ reason: '' }))).rejects.toThrow(/reason/i);
+    await expect(audit.record(action({ reason: '' }))).rejects.toThrow(
+      /reason/i,
+    );
   });
 
   it('refuses a whitespace-only reason', async () => {
-    await expect(audit.record(action({ reason: '   ' }))).rejects.toThrow(/reason/i);
+    await expect(audit.record(action({ reason: '   ' }))).rejects.toThrow(
+      /reason/i,
+    );
   });
 
   it('writes nothing when the reason is refused', async () => {
@@ -66,7 +73,9 @@ describe('append-only (PRD §9.4)', () => {
   it('an audit row cannot be updated', async () => {
     const id = await audit.record(action());
     await expect(
-      t.pool.query(`UPDATE audit_log SET reason = 'rewritten' WHERE id = $1`, [id]),
+      t.pool.query(`UPDATE audit_log SET reason = 'rewritten' WHERE id = $1`, [
+        id,
+      ]),
     ).rejects.toThrow(/append-only/i);
   });
 
@@ -94,6 +103,8 @@ describe('the boundary of append-only', () => {
       entityId: 'z',
       reason: 'boundary check',
     });
-    await expect(t.pool.query(`TRUNCATE audit_log CASCADE`)).resolves.toBeDefined();
+    await expect(
+      t.pool.query(`TRUNCATE audit_log CASCADE`),
+    ).resolves.toBeDefined();
   });
 });

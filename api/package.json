@@ -94,6 +94,7 @@
     "testEnvironment": "node",
     "transformIgnorePatterns": [
       "/node_modules/(?!(@nestjs|dotenv|dotenv-expand)/)"
-    ]
+    ],
+    "maxWorkers": 1
   }
 }

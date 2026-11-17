@@ -5,7 +5,11 @@ import { AuditService } from './audit.service';
 
 @Module({
   providers: [
-    { provide: DRIZZLE, useFactory: (db: DbService) => db.db, inject: [DbService] },
+    {
+      provide: DRIZZLE,
+      useFactory: (db: DbService) => db.db,
+      inject: [DbService],
+    },
     AuditService,
   ],
   exports: [AuditService],
