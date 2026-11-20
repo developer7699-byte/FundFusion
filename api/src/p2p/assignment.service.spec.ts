@@ -11,6 +11,7 @@ import {
   seedUser,
   type TestDb,
 } from '../ledger/test-db';
+import { AbandonmentService } from './abandonment.service';
 import { AssignmentService } from './assignment.service';
 import { EligibilityService } from './eligibility.service';
 import { OrderService } from './order.service';
@@ -45,7 +46,13 @@ beforeEach(async () => {
     ttlSeconds: 90,
     buyFeeBps: 100,
   });
-  orders = new OrderService(t.db, quotes, posting, accounts);
+  orders = new OrderService(
+    t.db,
+    quotes,
+    posting,
+    accounts,
+    new AbandonmentService(t.db),
+  );
   eligibility = new EligibilityService(
     t.db,
     quotes,

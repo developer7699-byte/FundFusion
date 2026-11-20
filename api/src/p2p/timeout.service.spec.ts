@@ -11,6 +11,7 @@ import {
   seedUser,
   type TestDb,
 } from '../ledger/test-db';
+import { AbandonmentService } from './abandonment.service';
 import { AssignmentService } from './assignment.service';
 import { EligibilityService } from './eligibility.service';
 import { OrderService } from './order.service';
@@ -50,7 +51,13 @@ beforeEach(async () => {
   const provider = new MockRateProvider();
   provider.next('100.00');
   quotes = new QuoteService(t.db, new RateService(provider));
-  orders = new OrderService(t.db, quotes, posting, accounts);
+  orders = new OrderService(
+    t.db,
+    quotes,
+    posting,
+    accounts,
+    new AbandonmentService(t.db),
+  );
   const eligibility = new EligibilityService(
     t.db,
     quotes,

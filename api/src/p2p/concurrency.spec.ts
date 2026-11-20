@@ -11,6 +11,7 @@ import {
   seedUser,
   type TestDb,
 } from '../ledger/test-db';
+import { AbandonmentService } from './abandonment.service';
 import { AssignmentService } from './assignment.service';
 import { EligibilityService } from './eligibility.service';
 import { OrderService } from './order.service';
@@ -90,10 +91,13 @@ beforeEach(async () => {
     side: 'SELL',
     usdtAmount: '100',
   });
-  const order = await new OrderService(t.db, quotes, posting, accounts).confirm(
-    quote.id,
-    'order-key',
-  );
+  const order = await new OrderService(
+    t.db,
+    quotes,
+    posting,
+    accounts,
+    new AbandonmentService(t.db),
+  ).confirm(quote.id, 'order-key');
   orderId = order.id;
   broadcastAt = order.broadcastAt;
 

@@ -9,6 +9,7 @@ import { PostingService } from '../ledger/posting.service';
 import { BalanceService } from '../ledger/balance.service';
 import { CapabilityModule } from '../capability/capability.module';
 import { CapabilityService } from '../capability/capability.service';
+import { AbandonmentService } from './abandonment.service';
 import { AssignmentService } from './assignment.service';
 import { EligibilityService } from './eligibility.service';
 import { OrderService } from './order.service';
@@ -35,14 +36,26 @@ import { TimeoutService } from './timeout.service';
       inject: [DbService, RateService],
     },
     {
+      provide: AbandonmentService,
+      useFactory: (db: DbService) => new AbandonmentService(db.db),
+      inject: [DbService],
+    },
+    {
       provide: OrderService,
       useFactory: (
         db: DbService,
         quotes: QuoteService,
         posting: PostingService,
         accounts: AccountService,
-      ) => new OrderService(db.db, quotes, posting, accounts),
-      inject: [DbService, QuoteService, PostingService, AccountService],
+        abandonment: AbandonmentService,
+      ) => new OrderService(db.db, quotes, posting, accounts, abandonment),
+      inject: [
+        DbService,
+        QuoteService,
+        PostingService,
+        AccountService,
+        AbandonmentService,
+      ],
     },
     {
       provide: EligibilityService,
@@ -107,6 +120,7 @@ import { TimeoutService } from './timeout.service';
     },
   ],
   exports: [
+    AbandonmentService,
     TimeoutService,
     QuoteService,
     OrderService,

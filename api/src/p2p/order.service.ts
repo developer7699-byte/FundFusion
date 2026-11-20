@@ -10,6 +10,7 @@ import * as schema from '../db/schema';
 import { AccountService, DRIZZLE } from '../ledger/account.service';
 import { PostingService } from '../ledger/posting.service';
 import { canTransition, type OrderState } from './order.state';
+import { AbandonmentService } from './abandonment.service';
 import { QuoteService, type QuoteSnapshot } from './quote.service';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -23,6 +24,7 @@ export class OrderService {
     private readonly quotes: QuoteService,
     private readonly posting: PostingService,
     private readonly accounts: AccountService,
+    private readonly abandonment: AbandonmentService,
   ) {}
 
   /**
@@ -38,6 +40,16 @@ export class OrderService {
    */
   async confirm(quoteId: string, idempotencyKey: string): Promise<Order> {
     const quote = await this.quotes.get(quoteId);
+
+    // PRD §6.11. Checked before the row exists, because the row itself would
+    // occupy one of the slots being counted — and skipped on a retry, which
+    // opens nothing new.
+    if (quote.side === 'BUY') {
+      await this.abandonment.assertMayOpenBuy(quote.userId, {
+        excludeIdempotencyKey: idempotencyKey,
+      });
+    }
+
     const order = await this.claim(quote, idempotencyKey);
 
     // Already confirmed. The money moved on the first call.

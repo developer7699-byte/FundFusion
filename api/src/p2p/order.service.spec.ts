@@ -10,6 +10,7 @@ import {
   type TestDb,
 } from '../ledger/test-db';
 import { canTransition, ORDER_STATES } from './order.state';
+import { AbandonmentService } from './abandonment.service';
 import { OrderService } from './order.service';
 import { QuoteService } from './quote.service';
 
@@ -35,7 +36,13 @@ beforeEach(async () => {
   customerId = await seedUser(t.pool, 'customer@example.test');
   accountId = await accounts.ensureAccount(customerId, 'USDT');
   quotes = new QuoteService(t.db, new RateService(new MockRateProvider()));
-  orders = new OrderService(t.db, quotes, posting, accounts);
+  orders = new OrderService(
+    t.db,
+    quotes,
+    posting,
+    accounts,
+    new AbandonmentService(t.db),
+  );
 });
 
 afterAll(async () => {
