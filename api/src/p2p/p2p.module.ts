@@ -14,6 +14,7 @@ import { EligibilityService } from './eligibility.service';
 import { OrderService } from './order.service';
 import { QuoteService } from './quote.service';
 import { SettlementService } from './settlement.service';
+import { TimeoutService } from './timeout.service';
 
 /**
  * The P2P engine (PRD §6). Quotes first: everything downstream settles
@@ -95,8 +96,18 @@ import { SettlementService } from './settlement.service';
         AccountService,
       ],
     },
+    {
+      provide: TimeoutService,
+      useFactory: (
+        db: DbService,
+        posting: PostingService,
+        accounts: AccountService,
+      ) => new TimeoutService(db.db, posting, accounts),
+      inject: [DbService, PostingService, AccountService],
+    },
   ],
   exports: [
+    TimeoutService,
     QuoteService,
     OrderService,
     EligibilityService,
