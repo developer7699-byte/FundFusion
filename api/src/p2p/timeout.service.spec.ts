@@ -127,7 +127,7 @@ async function broadcastSell() {
     side: 'SELL',
     usdtAmount: '100',
   });
-  return orders.confirm(quote.id, 'order-key');
+  return orders.confirm(quote.id, customerId, 'order-key');
 }
 
 async function statusOf(orderId: string): Promise<string> {
@@ -196,7 +196,7 @@ describe('expiry returns funds (PRD §6.9)', () => {
     const order = await broadcastSell();
     await timeouts.sweep(later(5));
 
-    const again = await orders.confirm(order.quoteId, 'order-key');
+    const again = await orders.confirm(order.quoteId, customerId, 'order-key');
 
     expect(again.status).toBe('EXPIRED');
     expect(await balances.balance(customerAccount, 'LOCKED')).toBe(

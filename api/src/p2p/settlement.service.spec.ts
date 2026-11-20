@@ -131,7 +131,7 @@ async function sellToSettlement(qty = '100', merchantFunds = '200') {
     side: 'SELL',
     usdtAmount: qty,
   });
-  const order = await orders.confirm(quote.id, 'order-key');
+  const order = await orders.confirm(quote.id, customerId, 'order-key');
   await assignments.accept(order.id, merchantId, 'accept-key');
   return { order, quote };
 }
@@ -144,7 +144,7 @@ async function buyToSettlement(qty = '97') {
     side: 'BUY',
     usdtAmount: qty,
   });
-  const order = await orders.confirm(quote.id, 'order-key');
+  const order = await orders.confirm(quote.id, customerId, 'order-key');
   await assignments.accept(order.id, merchantId, 'accept-key');
   return { order, quote };
 }
@@ -306,6 +306,16 @@ describe('who may confirm (PRD §6.8)', () => {
     ).rejects.toThrow(/not .*payer/i);
   });
 
+  /** A UTR is the evidence in a dispute. An empty one is worse than none. */
+  it('refuses an empty payment reference', async () => {
+    const { order } = await sellToSettlement();
+
+    await expect(
+      settlement.submitUtr(order.id, merchantId, '   '),
+    ).rejects.toThrow(/reference/i);
+    expect(await statusOf(order.id)).toBe('ACCEPTED');
+  });
+
   it('receipt cannot be confirmed before a payment is submitted', async () => {
     const { order } = await sellToSettlement();
 
@@ -377,7 +387,7 @@ describe('a fee the business has not set yet', () => {
       side: 'BUY',
       usdtAmount: '97',
     });
-    const order = await e.orders.confirm(quote.id, 'order-key');
+    const order = await e.orders.confirm(quote.id, customerId, 'order-key');
     await e.assignments.accept(order.id, merchantId, 'accept-key');
     await e.settlement.submitUtr(order.id, customerId, 'UTR-1');
 
@@ -398,7 +408,7 @@ describe('a fee the business has not set yet', () => {
       side: 'SELL',
       usdtAmount: '100',
     });
-    const order = await e.orders.confirm(quote.id, 'order-key');
+    const order = await e.orders.confirm(quote.id, customerId, 'order-key');
     await e.assignments.accept(order.id, merchantId, 'accept-key');
     await e.settlement.submitUtr(order.id, merchantId, 'UTR-1');
 
@@ -409,6 +419,82 @@ describe('a fee the business has not set yet', () => {
     expect(await balances.balance(customerAccount, 'LOCKED')).toBe(
       '0.000000000000000000',
     );
+  });
+});
+
+/**
+ * §6.7 takes the order row lock before deciding anything. Settlement moves
+ * more money than acceptance does and had no such lock: two confirmations
+ * arriving together both read PAYMENT_SUBMITTED, and the only thing left
+ * standing between them is a balance floor on the whole LOCKED bucket —
+ * which a customer with a second open order can satisfy twice over.
+ */
+describe('concurrent settlement', () => {
+  it('pays the merchant once when two confirmations arrive together', async () => {
+    const { order } = await sellToSettlement();
+    await settlement.submitUtr(order.id, merchantId, 'UTR-9700');
+    // A second open order, so the customer's LOCKED bucket could cover a
+    // duplicate journal if nothing serialised the two confirmations.
+    await fund(customerAccount, '100', 'customer-funds-2');
+    const second = await quotes.create({
+      userId: customerId,
+      side: 'SELL',
+      usdtAmount: '100',
+    });
+    await orders.confirm(second.id, customerId, 'order-key-2');
+
+    const results = await Promise.allSettled([
+      settlement.confirmReceipt(order.id, customerId, 'settle-a'),
+      settlement.confirmReceipt(order.id, customerId, 'settle-b'),
+    ]);
+
+    expect(results.filter((r) => r.status === 'fulfilled').length).toBeLessThan(
+      3,
+    );
+    expect(await balances.balance(merchantAccount, 'AVAILABLE')).toBe(
+      '297.000000000000000000',
+    );
+    const r = await t.pool.query(
+      `SELECT count(*)::int AS n FROM ledger_transaction WHERE memo LIKE $1`,
+      [`%settlement for order ${order.id}%`],
+    );
+    expect((r.rows[0] as { n: number }).n).toBe(1);
+  });
+
+  /**
+   * A UTR arriving as the payer window closes must not undo the escalation.
+   * The state is what decides who may move money next, so overwriting
+   * DISPUTED with PAYMENT_SUBMITTED hands the order back to a flow the
+   * dispute was raised to stop.
+   */
+  it('a UTR submitted as the order is escalated does not resurrect it', async () => {
+    const { order } = await sellToSettlement();
+
+    // Hold the row the way the timeout sweep does, escalate, and only then
+    // let the UTR land.
+    const holder = await t.pool.connect();
+    try {
+      await holder.query('BEGIN');
+      await holder.query(`SELECT id FROM p2p_order WHERE id = $1 FOR UPDATE`, [
+        order.id,
+      ]);
+      const submitting = settlement
+        .submitUtr(order.id, merchantId, 'UTR-LATE')
+        .catch((err: Error) => err);
+      // Long enough that an unguarded implementation has already read the
+      // order and decided it is ACCEPTED.
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      await holder.query(
+        `UPDATE p2p_order SET status = 'DISPUTED' WHERE id = $1`,
+        [order.id],
+      );
+      await holder.query('COMMIT');
+      await submitting;
+    } finally {
+      holder.release();
+    }
+
+    expect(await statusOf(order.id)).toBe('DISPUTED');
   });
 });
 

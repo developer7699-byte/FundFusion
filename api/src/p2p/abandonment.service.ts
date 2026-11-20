@@ -68,6 +68,16 @@ export class AbandonmentService {
       .select({
         status: schema.p2pOrder.status,
         updatedAt: schema.p2pOrder.updatedAt,
+        /**
+         * Whether the customer ever sent the rupees. On a buy order they are
+         * the payer, so a dispute with a payment reference against it is the
+         * merchant failing to confirm money that was sent — not the customer
+         * walking away (PRD §6.8, §6.10).
+         */
+        paid: sql<boolean>`EXISTS (
+          SELECT 1 FROM payment_proof
+           WHERE payment_proof.order_id = ${schema.p2pOrder.id}
+        )`,
       })
       .from(schema.p2pOrder)
       .innerJoin(
@@ -86,8 +96,9 @@ export class AbandonmentService {
       )
       .orderBy(desc(schema.p2pOrder.updatedAt));
 
-    const walked = rows.filter((r) =>
-      (ABANDONED_STATES as readonly string[]).includes(r.status),
+    const walked = rows.filter(
+      (r) =>
+        (ABANDONED_STATES as readonly string[]).includes(r.status) && !r.paid,
     );
     const matched = rows.length;
     const abandoned = walked.length;

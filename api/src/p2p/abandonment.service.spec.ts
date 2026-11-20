@@ -17,6 +17,7 @@ import { AssignmentService } from './assignment.service';
 import { EligibilityService } from './eligibility.service';
 import { OrderService } from './order.service';
 import { QuoteService } from './quote.service';
+import { SettlementService } from './settlement.service';
 import { TimeoutService } from './timeout.service';
 
 let t: TestDb;
@@ -27,6 +28,7 @@ let quotes: QuoteService;
 let orders: OrderService;
 let assignments: AssignmentService;
 let timeouts: TimeoutService;
+let settlement: SettlementService;
 let abandonment: AbandonmentService;
 let customerId: string;
 let merchantId: string;
@@ -51,7 +53,7 @@ beforeEach(async () => {
   quotes = new QuoteService(t.db, new RateService(provider));
   abandonment = new AbandonmentService(t.db);
   orders = new OrderService(t.db, quotes, posting, accounts, abandonment);
-  const eligibility = new EligibilityService(
+  const eligibility: EligibilityService = new EligibilityService(
     t.db,
     quotes,
     balances,
@@ -66,6 +68,13 @@ beforeEach(async () => {
     accounts,
   );
   timeouts = new TimeoutService(t.db, posting, accounts);
+  settlement = new SettlementService(
+    t.db,
+    quotes,
+    eligibility,
+    posting,
+    accounts,
+  );
 
   customerId = await seedUser(t.pool, 'customer@example.test');
   await accounts.ensureAccount(customerId, 'USDT');
@@ -107,7 +116,7 @@ async function openBuyOrder(key: string) {
     side: 'BUY',
     usdtAmount: '10',
   });
-  return orders.confirm(quote.id, key);
+  return orders.confirm(quote.id, customerId, key);
 }
 
 /** A merchant commits funds, then the customer never pays (PRD §6.11). */
@@ -170,7 +179,7 @@ describe('concurrent open buy orders (PRD §6.11)', () => {
         usdtAmount: '100',
       });
       await expect(
-        orders.confirm(quote.id, `sell-${n}`),
+        orders.confirm(quote.id, customerId, `sell-${n}`),
       ).resolves.toBeDefined();
     }
   });
@@ -217,6 +226,30 @@ describe('abandonment rate and cooldown (PRD §6.11)', () => {
     expect(afterTwo.cooldownSeconds).toBe(300);
     expect(afterThree.cooldownSeconds).toBe(600);
     await expect(openBuyOrder('buy-4')).rejects.toThrow(/cooldown|wait/i);
+  });
+
+  /**
+   * The mirror of §6.10, and the case where it matters most. On a buy order
+   * the customer pays the rupees and the merchant confirms them. If the
+   * merchant goes quiet after the customer has already sent real money, the
+   * escalation is the merchant's doing — charging it to the customer's
+   * record would hand them a cooldown for someone else's silence.
+   */
+  it("a merchant who goes quiet is not the customer's abandonment", async () => {
+    const order = await openBuyOrder('buy-1');
+    await assignments.accept(order.id, merchantId, 'accept-1');
+    await settlement.submitUtr(order.id, customerId, 'UTR-PAID');
+
+    await timeouts.sweep(new Date(Date.now() + 16 * MINUTE));
+
+    const r = await t.pool.query(`SELECT status FROM p2p_order WHERE id = $1`, [
+      order.id,
+    ]);
+    expect((r.rows[0] as { status: string }).status).toBe('DISPUTED');
+
+    const stats = await abandonment.stats(customerId);
+    expect(stats.abandoned).toBe(0);
+    expect(stats.cooldownUntil).toBeNull();
   });
 
   /** PRD §6.10: a merchant is never penalised for a customer's abandonment. */

@@ -114,7 +114,7 @@ beforeEach(async () => {
     posting,
     accounts,
     new AbandonmentService(t.db),
-  ).confirm(quote.id, 'order-key');
+  ).confirm(quote.id, customerId, 'order-key');
   orderId = order.id;
 
   merchants = [];

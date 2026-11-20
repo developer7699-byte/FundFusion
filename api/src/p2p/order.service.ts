@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
 } from '@nestjs/common';
@@ -38,8 +39,18 @@ export class OrderService {
    * journal are idempotent, retrying the same key finishes the job instead of
    * doing it twice.
    */
-  async confirm(quoteId: string, idempotencyKey: string): Promise<Order> {
+  async confirm(
+    quoteId: string,
+    actorId: string,
+    idempotencyKey: string,
+  ): Promise<Order> {
     const quote = await this.quotes.get(quoteId);
+
+    // A quote id is not a capability (PRD §13.5). Checked before anything is
+    // written, so a stranger's attempt leaves no trace to clean up.
+    if (actorId !== quote.userId) {
+      throw new ForbiddenException('That quote is not yours to confirm.');
+    }
 
     // PRD §6.11. Checked before the row exists, because the row itself would
     // occupy one of the slots being counted — and skipped on a retry, which

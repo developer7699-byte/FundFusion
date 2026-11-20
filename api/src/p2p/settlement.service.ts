@@ -1,11 +1,12 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema';
 import { AccountService, DRIZZLE } from '../ledger/account.service';
@@ -46,34 +47,58 @@ export class SettlementService {
     private readonly accounts: AccountService,
   ) {}
 
-  /** Evidence, not authority. No money moves here. */
+  /**
+   * Evidence, not authority. No money moves here — but the state does, and
+   * the state decides who may move money next. A UTR landing as the payer
+   * window closes must not overwrite the escalation the sweep just made, so
+   * this takes the same row lock acceptance does and writes against the
+   * status it actually read.
+   */
   async submitUtr(
     orderId: string,
     actorId: string,
     utr: string,
   ): Promise<Order> {
-    const parties = await this.parties(orderId);
-
-    if (actorId !== parties.payerId) {
-      throw new ForbiddenException(
-        'You are not the payer on this order, so you cannot submit a payment reference.',
-      );
-    }
-    if (!canTransition(parties.order.status, 'PAYMENT_SUBMITTED')) {
-      throw new ConflictException(
-        `An order in ${parties.order.status} is not waiting for a payment.`,
+    if (!utr?.trim()) {
+      throw new BadRequestException(
+        'A payment reference is the evidence in a dispute. An empty one is worse than none.',
       );
     }
 
-    await this.db.insert(schema.paymentProof).values({ orderId, utr });
+    return this.db.transaction(async (tx) => {
+      const parties = await this.parties(orderId, tx);
 
-    const [row] = await this.db
-      .update(schema.p2pOrder)
-      .set({ status: 'PAYMENT_SUBMITTED', updatedAt: new Date() })
-      .where(eq(schema.p2pOrder.id, orderId))
-      .returning();
+      if (actorId !== parties.payerId) {
+        throw new ForbiddenException(
+          'You are not the payer on this order, so you cannot submit a payment reference.',
+        );
+      }
+      if (!canTransition(parties.order.status, 'PAYMENT_SUBMITTED')) {
+        throw new ConflictException(
+          `An order in ${parties.order.status} is not waiting for a payment.`,
+        );
+      }
 
-    return row;
+      await tx.insert(schema.paymentProof).values({ orderId, utr: utr.trim() });
+
+      const [row] = await tx
+        .update(schema.p2pOrder)
+        .set({ status: 'PAYMENT_SUBMITTED', updatedAt: new Date() })
+        .where(
+          and(
+            eq(schema.p2pOrder.id, orderId),
+            eq(schema.p2pOrder.status, parties.order.status),
+          ),
+        )
+        .returning();
+
+      if (!row) {
+        throw new ConflictException(
+          'That order changed while the payment reference was being submitted.',
+        );
+      }
+      return row;
+    });
   }
 
   /**
@@ -199,11 +224,15 @@ export class SettlementService {
   private async parties(orderId: string, tx?: Db): Promise<Parties> {
     const db = tx ?? this.db;
 
-    const [order] = await db
+    // §6.7's discipline, applied to the side that moves more money than
+    // acceptance does: decide nothing from a row another transaction can
+    // still change underneath you.
+    const base = db
       .select()
       .from(schema.p2pOrder)
       .where(eq(schema.p2pOrder.id, orderId))
       .limit(1);
+    const [order] = await (tx ? base.for('update') : base);
     if (!order) throw new NotFoundException('That order does not exist.');
 
     const [assignment] = await db

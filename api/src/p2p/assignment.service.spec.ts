@@ -118,7 +118,7 @@ async function sellOrder(key = 'order-1') {
     side: 'SELL',
     usdtAmount: '100',
   });
-  return orders.confirm(quote.id, key);
+  return orders.confirm(quote.id, customerId, key);
 }
 
 async function buyOrder(key = 'buy-1') {
@@ -127,7 +127,7 @@ async function buyOrder(key = 'buy-1') {
     side: 'BUY',
     usdtAmount: '97',
   });
-  return orders.confirm(quote.id, key);
+  return orders.confirm(quote.id, customerId, key);
 }
 
 /**

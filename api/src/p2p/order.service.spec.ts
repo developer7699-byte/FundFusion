@@ -80,7 +80,7 @@ describe('confirming an order (PRD §6.3, §6.4)', () => {
     await fund('100');
     const quote = await sellQuote();
 
-    await orders.confirm(quote.id, 'confirm-1');
+    await orders.confirm(quote.id, customerId, 'confirm-1');
 
     expect(await balances.balance(accountId, 'AVAILABLE')).toBe(
       '0.000000000000000000',
@@ -97,7 +97,7 @@ describe('confirming an order (PRD §6.3, §6.4)', () => {
       usdtAmount: '97',
     });
 
-    await orders.confirm(quote.id, 'confirm-buy');
+    await orders.confirm(quote.id, customerId, 'confirm-buy');
 
     expect(await balances.balance(accountId, 'AVAILABLE')).toBe(
       '0.000000000000000000',
@@ -111,7 +111,7 @@ describe('confirming an order (PRD §6.3, §6.4)', () => {
     await fund('100');
     const quote = await sellQuote();
 
-    const order = await orders.confirm(quote.id, 'confirm-2');
+    const order = await orders.confirm(quote.id, customerId, 'confirm-2');
 
     expect(order.status).toBe('AWAITING_MERCHANT');
     expect(order.quoteId).toBe(quote.id);
@@ -134,9 +134,9 @@ describe('confirming an order (PRD §6.3, §6.4)', () => {
       usdtAmount: '100',
     });
 
-    await expect(orders.confirm(quote.id, 'confirm-3')).rejects.toThrow(
-      /expired/i,
-    );
+    await expect(
+      orders.confirm(quote.id, customerId, 'confirm-3'),
+    ).rejects.toThrow(/expired/i);
     expect(await balances.balance(accountId, 'LOCKED')).toBe(
       '0.000000000000000000',
     );
@@ -146,8 +146,8 @@ describe('confirming an order (PRD §6.3, §6.4)', () => {
     await fund('100');
     const quote = await sellQuote();
 
-    const first = await orders.confirm(quote.id, 'confirm-4');
-    const second = await orders.confirm(quote.id, 'confirm-4');
+    const first = await orders.confirm(quote.id, customerId, 'confirm-4');
+    const second = await orders.confirm(quote.id, customerId, 'confirm-4');
 
     expect(second.id).toBe(first.id);
     expect(await balances.balance(accountId, 'LOCKED')).toBe(
@@ -161,9 +161,9 @@ describe('confirming an order (PRD §6.3, §6.4)', () => {
     await fund('99');
     const quote = await sellQuote();
 
-    await expect(orders.confirm(quote.id, 'confirm-5')).rejects.toThrow(
-      /insufficient/i,
-    );
+    await expect(
+      orders.confirm(quote.id, customerId, 'confirm-5'),
+    ).rejects.toThrow(/insufficient/i);
     expect(await balances.balance(accountId, 'AVAILABLE')).toBe(
       '99.000000000000000000',
     );
@@ -176,7 +176,9 @@ describe('confirming an order (PRD §6.3, §6.4)', () => {
     await fund('99');
     const quote = await sellQuote();
 
-    await expect(orders.confirm(quote.id, 'confirm-6')).rejects.toThrow();
+    await expect(
+      orders.confirm(quote.id, customerId, 'confirm-6'),
+    ).rejects.toThrow();
 
     const r = await t.pool.query(`SELECT status FROM p2p_order`);
     const rows = r.rows as { status: string }[];
@@ -234,13 +236,33 @@ describe('the state machine', () => {
  * key reused for something else; both must be refused rather than silently
  * answered with the wrong order.
  */
+/**
+ * PRD §13.5 requires object-level checks, not just route-level ones. A quote
+ * id is not a capability: whoever holds one must not be able to lock someone
+ * else's USDT into escrow.
+ */
+describe('whose quote it is', () => {
+  it('refuses a confirmation from anyone but the customer who asked', async () => {
+    await fund('100');
+    const quote = await sellQuote();
+    const stranger = await seedUser(t.pool, 'stranger@example.test');
+
+    await expect(
+      orders.confirm(quote.id, stranger, 'confirm-stranger'),
+    ).rejects.toThrow(/not yours|your quote/i);
+    expect(await balances.balance(accountId, 'LOCKED')).toBe(
+      '0.000000000000000000',
+    );
+  });
+});
+
 describe('collisions', () => {
   it('a quote can be confirmed only once', async () => {
     await fund('100');
     const quote = await sellQuote();
-    await orders.confirm(quote.id, 'key-a');
+    await orders.confirm(quote.id, customerId, 'key-a');
 
-    await expect(orders.confirm(quote.id, 'key-b')).rejects.toThrow(
+    await expect(orders.confirm(quote.id, customerId, 'key-b')).rejects.toThrow(
       /already been confirmed/i,
     );
   });
@@ -249,10 +271,10 @@ describe('collisions', () => {
     await fund('200');
     const first = await sellQuote();
     const second = await sellQuote();
-    await orders.confirm(first.id, 'shared-key');
+    await orders.confirm(first.id, customerId, 'shared-key');
 
-    await expect(orders.confirm(second.id, 'shared-key')).rejects.toThrow(
-      /different quote/i,
-    );
+    await expect(
+      orders.confirm(second.id, customerId, 'shared-key'),
+    ).rejects.toThrow(/different quote/i);
   });
 });
