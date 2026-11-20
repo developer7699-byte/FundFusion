@@ -13,9 +13,14 @@ import { inr, usdt } from './money-columns';
  */
 export const p2pQuote = pgTable('p2p_quote', {
   id: uuid('id').primaryKey().defaultRandom(),
+  /**
+   * No cascade. A quote is a financial record: it outlives the account that
+   * asked for it, and the immutability trigger would refuse the cascaded
+   * delete anyway — leaving a user row that could never be removed.
+   */
   userId: uuid('user_id')
     .notNull()
-    .references(() => user.id, { onDelete: 'cascade' }),
+    .references(() => user.id),
   side: quoteSide('side').notNull(),
   /** The mid-market rate the customer rate was derived from. */
   referenceRate: inr('reference_rate').notNull(),

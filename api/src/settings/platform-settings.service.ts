@@ -91,6 +91,7 @@ export class PlatformSettingsService implements SettingsReader {
     }
 
     const next = this.validate(key, definition, value);
+    await this.assertAgreesWithNeighbours(key, Number(next));
     const previous = (await this.stored()).get(key) ?? definition.default;
 
     await this.db
@@ -110,6 +111,36 @@ export class PlatformSettingsService implements SettingsReader {
       oldValue: { value: previous },
       newValue: { value: next },
     });
+  }
+
+  /**
+   * PRD §6.9 runs two clocks over one order: the quote's TTL bounds the
+   * customer's decision, and the search window bounds the merchant's. A TTL
+   * longer than the window would leave an order broadcast at a price that
+   * has already lapsed, which is a state nothing downstream can resolve.
+   */
+  private async assertAgreesWithNeighbours(
+    key: SettingKey,
+    next: number,
+  ): Promise<void> {
+    if (key !== 'quote.ttlSeconds' && key !== 'order.searchWindowSeconds') {
+      return;
+    }
+
+    const ttl =
+      key === 'quote.ttlSeconds'
+        ? next
+        : await this.integer('quote.ttlSeconds');
+    const window =
+      key === 'order.searchWindowSeconds'
+        ? next
+        : await this.integer('order.searchWindowSeconds');
+
+    if (window < ttl) {
+      throw new BadRequestException(
+        `The merchant search window (${window}s) cannot be shorter than the quote TTL (${ttl}s): an order would outlive the price it was broadcast at.`,
+      );
+    }
   }
 
   private validate(

@@ -124,7 +124,21 @@ export class SettlementService {
         );
       }
 
-      if (order.status === 'COMPLETED') return order;
+      if (order.status === 'COMPLETED') {
+        // A repeat under the key that settled it is a replay, and gets the
+        // same answer. A different key is a different request, and answering
+        // it with this one's result would silently discard it (PRD §5 rule 2).
+        const [settled] = await tx
+          .select({ id: schema.ledgerTransaction.id })
+          .from(schema.ledgerTransaction)
+          .where(eq(schema.ledgerTransaction.idempotency, idempotencyKey))
+          .limit(1);
+
+        if (settled) return order;
+        throw new ConflictException(
+          `An order in ${order.status} cannot settle.`,
+        );
+      }
       if (!canTransition(order.status, 'COMPLETED')) {
         throw new ConflictException(
           `An order in ${order.status} cannot settle.`,

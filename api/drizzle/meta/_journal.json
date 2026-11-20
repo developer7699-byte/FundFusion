@@ -71,6 +71,13 @@
       "when": 1795202084022,
       "tag": "0009_light_valkyrie",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795206425586,
+      "tag": "0010_faithful_enchantress",
+      "breakpoints": true
     }
   ]
 }

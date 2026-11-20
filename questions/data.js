@@ -552,3 +552,23 @@ answer("scope-r5", { q33: [0, ""], q34: [0, ""], q35: [0, ""], q36: [0, ""] });
 // which also avoids a known BSC failure mode where eth_getLogs returns
 // incomplete results at the head and ERC-20 deposits are silently missed.
 // Reorg-reversal journal path is still built in v1.
+
+round({
+  id: "engine-r1",
+  title: "M4 — two clocks the spec runs over one order",
+  settled: false,
+  qs: [
+    {
+      id: "q37",
+      t: "When a merchant accepts, which clock decides whether the order is still live — the quote's 90s TTL or the order's 120s search window?",
+      ctx: "PRD §6.9 gives a quote a 90s TTL and the merchant search 120s. §6.7 step 2 says accept must assert the order is AWAITING_MERCHANT 'and its quote has not expired'. Those two cannot both hold: between 90s and 120s every broadcast order has an expired quote, so a literal reading of §6.7 kills every order at 90s and makes the 120s window unreachable. M4 was built on the second reading — accept checks the search window, not the TTL — and a code review flagged that §6.7's sentence is therefore unimplemented. The settings registry now refuses a window shorter than the TTL, so the gap cannot be configured open, but the question of which clock binds is yours.",
+      o: [
+        "A — The search window binds at accept. The TTL bounds the customer's decision to confirm; once funds are escrowed the order's own clock takes over. This is what is built.",
+        "B — The TTL binds at accept too, and the default TTL must therefore be raised above the search window (e.g. TTL 180s, window 120s).",
+        "C — Collapse them: one clock from broadcast, and drop the separate quote TTL."
+      ],
+      r: 0,
+      why: "A, because the risk each clock guards is different. The TTL exists so a customer cannot sit on a favourable price and confirm only when the market moves their way — that risk ends the moment they confirm and their USDT is locked. The merchant's version of that risk is bounded by the search window. B works but makes the TTL do two jobs with one number, and every future change to one has to be checked against the other. C is tempting and wrong: before confirmation nothing is escrowed, so the two periods have genuinely different stakes."
+    }
+  ]
+});

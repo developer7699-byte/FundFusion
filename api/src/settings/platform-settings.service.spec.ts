@@ -109,6 +109,34 @@ describe('bounds', () => {
   });
 });
 
+/**
+ * PRD §6.9 gives a quote 90 s and the merchant search 120 s. The order of
+ * those two is load-bearing: if a quote could expire before its own search
+ * window closed, an order would sit broadcast at a price nobody is allowed to
+ * honour. Two independently editable numbers can be typed into that gap, so
+ * the relationship is enforced rather than documented.
+ */
+describe('numbers that must agree with each other', () => {
+  it('refuses a search window shorter than the quote TTL', async () => {
+    await expect(
+      settings.set('order.searchWindowSeconds', 30, change('faster matching')),
+    ).rejects.toThrow(/quote ttl|90/i);
+  });
+
+  it('refuses a quote TTL longer than the search window', async () => {
+    await expect(
+      settings.set('quote.ttlSeconds', 300, change('longer to decide')),
+    ).rejects.toThrow(/search window|120/i);
+  });
+
+  it('allows a consistent pair', async () => {
+    await settings.set('order.searchWindowSeconds', 300, change('slower desk'));
+    await settings.set('quote.ttlSeconds', 240, change('longer to decide'));
+
+    expect(await settings.integer('quote.ttlSeconds')).toBe(240);
+  });
+});
+
 /** PRD §9.4: every privileged action carries an actor and a reason. */
 describe('accountability', () => {
   it('records who changed what, and why', async () => {

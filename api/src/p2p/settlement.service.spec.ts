@@ -516,12 +516,33 @@ describe('the invariants', () => {
     expect(await sumOfEntries(txId)).toBe('0.000000000000000000');
   });
 
-  it('settlement is idempotent', async () => {
+  it('a repeated confirmation under the same key is a replay', async () => {
     const { order } = await sellToSettlement();
     await settlement.submitUtr(order.id, merchantId, 'UTR-9700');
 
     await settlement.confirmReceipt(order.id, customerId, 'settle-1');
+    const again = await settlement.confirmReceipt(
+      order.id,
+      customerId,
+      'settle-1',
+    );
+
+    expect(again.status).toBe('COMPLETED');
+    expect(await balances.balance(merchantAccount, 'AVAILABLE')).toBe(
+      '297.000000000000000000',
+    );
+  });
+
+  it('a settled order cannot be settled again under a fresh key', async () => {
+    const { order } = await sellToSettlement();
+    await settlement.submitUtr(order.id, merchantId, 'UTR-9700');
+
     await settlement.confirmReceipt(order.id, customerId, 'settle-1');
+    // A new key is a new request, not a replay: it must be refused by the
+    // state, not quietly answered by the idempotency layer.
+    await expect(
+      settlement.confirmReceipt(order.id, customerId, 'settle-2'),
+    ).rejects.toThrow(/cannot settle/i);
 
     expect(await balances.balance(merchantAccount, 'AVAILABLE')).toBe(
       '297.000000000000000000',
