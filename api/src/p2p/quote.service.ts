@@ -121,8 +121,8 @@ export class QuoteService {
     return row;
   }
 
-  async get(id: string): Promise<QuoteSnapshot> {
-    const [row] = await this.db
+  async get(id: string, tx?: Db): Promise<QuoteSnapshot> {
+    const [row] = await (tx ?? this.db)
       .select()
       .from(schema.p2pQuote)
       .where(eq(schema.p2pQuote.id, id))

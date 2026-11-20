@@ -20,8 +20,9 @@ export class CapabilityService {
    * rows can let a deny lose. Expired overrides — in either direction — are
    * filtered out before the sets are combined.
    */
-  async effective(userId: string): Promise<Set<CapabilityKey>> {
-    const roleGrants = await this.db
+  async effective(userId: string, tx?: Db): Promise<Set<CapabilityKey>> {
+    const db = tx ?? this.db;
+    const roleGrants = await db
       .select({ capability: schema.roleCapability.capability })
       .from(schema.roleCapability)
       .innerJoin(schema.userRole, eq(schema.userRole.userId, userId))
@@ -38,7 +39,7 @@ export class CapabilityService {
       gt(schema.userCapability.expiresAt, sql`now()`),
     );
 
-    const overrides = await this.db
+    const overrides = await db
       .select({
         capability: schema.userCapability.capability,
         effect: schema.userCapability.effect,
@@ -57,8 +58,8 @@ export class CapabilityService {
     return allowed;
   }
 
-  async can(userId: string, key: CapabilityKey): Promise<boolean> {
-    return (await this.effective(userId)).has(key);
+  async can(userId: string, key: CapabilityKey, tx?: Db): Promise<boolean> {
+    return (await this.effective(userId, tx)).has(key);
   }
 
   async grant(

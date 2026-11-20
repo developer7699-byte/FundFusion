@@ -84,6 +84,7 @@ export class AssignmentService {
       const accountId = await this.accounts.ensureAccount(
         merchantUserId,
         'USDT',
+        tx,
       );
       await this.accounts.lockForUpdate(tx, accountId);
       const owed = await this.eligibility.check(merchantUserId, order, tx);

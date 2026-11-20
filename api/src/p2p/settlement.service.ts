@@ -152,13 +152,16 @@ export class SettlementService {
     const merchantCredit = quantity.minus(fee);
     const bond = usdt(this.eligibility.obligation(p.quote).amountUsdt);
 
-    const lines: PostingLine[] = [
+    // A zero fee is a legal configuration — PRD §6.4 leaves the figure to the
+    // business — and a journal leg of zero is not. Omitting it keeps the
+    // journal balanced, because the merchant's credit is the complement.
+    const lines: PostingLine[] = nonZero([
       leg(p.customerAccountId, 'LOCKED', 'DEBIT', quantity),
       leg(p.merchantAccountId, 'AVAILABLE', 'CREDIT', merchantCredit),
       platformLeg('REVENUE', 'CREDIT', fee),
       leg(p.merchantAccountId, 'BONDED', 'DEBIT', bond),
       leg(p.merchantAccountId, 'AVAILABLE', 'CREDIT', bond),
-    ];
+    ]);
 
     return {
       escrowAccountId: p.customerAccountId,
@@ -179,11 +182,11 @@ export class SettlementService {
     const fee = usdt(p.quote.platformFeeUsdt);
     const locked = quantity.plus(fee);
 
-    const lines: PostingLine[] = [
+    const lines: PostingLine[] = nonZero([
       leg(p.merchantAccountId, 'LOCKED', 'DEBIT', locked),
       leg(p.customerAccountId, 'AVAILABLE', 'CREDIT', quantity),
       platformLeg('REVENUE', 'CREDIT', fee),
-    ];
+    ]);
 
     return {
       escrowAccountId: p.merchantAccountId,
@@ -212,7 +215,7 @@ export class SettlementService {
       throw new ConflictException('That order has no merchant yet.');
     }
 
-    const quote = await this.quotes.get(order.quoteId);
+    const quote = await this.quotes.get(order.quoteId, tx);
 
     return {
       order,
@@ -223,13 +226,24 @@ export class SettlementService {
       customerAccountId: await this.accounts.ensureAccount(
         order.customerId,
         'USDT',
+        tx,
       ),
       merchantAccountId: await this.accounts.ensureAccount(
         assignment.userId,
         'USDT',
+        tx,
       ),
     };
   }
+}
+
+/**
+ * Drop legs that carry nothing. The ledger refuses a zero leg, and rightly:
+ * it is a movement that did not happen. The journal still balances, because
+ * the amounts that remain are complements of each other.
+ */
+function nonZero(lines: PostingLine[]): PostingLine[] {
+  return lines.filter((line) => usdt(line.amount).gt(0));
 }
 
 function leg(

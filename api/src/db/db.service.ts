@@ -29,6 +29,18 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       connectionString:
         process.env.DATABASE_URL ??
         'postgresql://localhost:5432/fundfusion_dev',
+      max: Number(process.env.DATABASE_POOL_MAX ?? 10),
+      /**
+       * A transaction holds one connection. Anything inside it that reaches
+       * for a second — a lookup that uses the pool instead of the
+       * transaction — can drain the pool under load, and with the driver's
+       * default every caller then waits forever: no error, no timeout, no
+       * recovery, while FOR UPDATE locks are held. Bounding the wait turns
+       * that silence into a failure somebody can see.
+       */
+      connectionTimeoutMillis: Number(
+        process.env.DATABASE_CONNECTION_TIMEOUT_MS ?? 10_000,
+      ),
     });
     this.db = drizzle(this.pool, { schema, casing: 'snake_case' });
   }

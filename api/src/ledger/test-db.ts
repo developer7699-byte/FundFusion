@@ -21,8 +21,13 @@ export interface TestDb {
   close: () => Promise<void>;
 }
 
-export function makeTestDb(): TestDb {
-  const pool = new Pool({ connectionString: TEST_URL });
+export function makeTestDb(options: { max?: number } = {}): TestDb {
+  const pool = new Pool({
+    connectionString: TEST_URL,
+    max: options.max,
+    // A borrowed-connection bug must fail, not hang forever.
+    connectionTimeoutMillis: options.max ? 2_000 : undefined,
+  });
   const db = drizzle(pool, { schema, casing: 'snake_case' });
 
   return {

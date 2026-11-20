@@ -177,6 +177,7 @@ export class TimeoutService {
         const accountId = await this.accounts.ensureAccount(
           order.customerId,
           'USDT',
+          tx,
         );
         await this.accounts.lockForUpdate(tx, accountId);
         await this.posting.postDebit(

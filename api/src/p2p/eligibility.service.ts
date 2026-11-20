@@ -96,15 +96,19 @@ export class EligibilityService {
       throw new ForbiddenException('That merchant desk is not active.');
     }
 
-    const quote = await this.quotes.get(order.quoteId);
+    const quote = await this.quotes.get(order.quoteId, tx);
     const capability = quote.side === 'SELL' ? 'P2P_SELL' : 'P2P_BUY';
-    if (!(await this.capabilities.can(merchantUserId, capability))) {
+    if (!(await this.capabilities.can(merchantUserId, capability, tx))) {
       throw new ForbiddenException(
         `That merchant does not hold the ${capability} capability.`,
       );
     }
 
-    const accountId = await this.accounts.ensureAccount(merchantUserId, 'USDT');
+    const accountId = await this.accounts.ensureAccount(
+      merchantUserId,
+      'USDT',
+      tx,
+    );
     const owed = this.obligation(quote);
     const available = new Decimal(
       await this.balances.balance(accountId, 'AVAILABLE', db),

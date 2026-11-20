@@ -318,6 +318,100 @@ describe('who may confirm (PRD §6.8)', () => {
   });
 });
 
+/**
+ * PRD §6.4 leaves the buy-side fee to the business, and DEPENDENCIES §3.2
+ * records it as not yet set — so zero is the configuration that actually
+ * ships. A settlement path that only works once someone picks a number is a
+ * settlement path that does not work.
+ */
+describe('a fee the business has not set yet', () => {
+  async function withFee(buyFeeBps: number, markupBps: number) {
+    const provider = new MockRateProvider();
+    provider.next('100.00');
+    const rateService = new RateService(provider, {
+      markupBps,
+      maxDeviationBps: 2000,
+    });
+    const quoteService = new QuoteService(t.db, rateService, {
+      ttlSeconds: 90,
+      buyFeeBps,
+    });
+    const eligibility = new EligibilityService(
+      t.db,
+      quoteService,
+      balances,
+      capabilities,
+      accounts,
+    );
+    return {
+      quotes: quoteService,
+      orders: new OrderService(
+        t.db,
+        quoteService,
+        posting,
+        accounts,
+        new AbandonmentService(t.db),
+      ),
+      assignments: new AssignmentService(
+        t.db,
+        quoteService,
+        eligibility,
+        posting,
+        accounts,
+      ),
+      settlement: new SettlementService(
+        t.db,
+        quoteService,
+        eligibility,
+        posting,
+        accounts,
+      ),
+    };
+  }
+
+  it('settles a buy order when the platform fee is zero', async () => {
+    const e = await withFee(0, 300);
+    await fund(merchantAccount, '200', 'merchant-funds');
+    const quote = await e.quotes.create({
+      userId: customerId,
+      side: 'BUY',
+      usdtAmount: '97',
+    });
+    const order = await e.orders.confirm(quote.id, 'order-key');
+    await e.assignments.accept(order.id, merchantId, 'accept-key');
+    await e.settlement.submitUtr(order.id, customerId, 'UTR-1');
+
+    await e.settlement.confirmReceipt(order.id, merchantId, 'settle-1');
+
+    expect(await balances.balance(customerAccount, 'AVAILABLE')).toBe(
+      '97.000000000000000000',
+    );
+    expect(await statusOf(order.id)).toBe('COMPLETED');
+  });
+
+  it('settles a sell order when the markup is zero', async () => {
+    const e = await withFee(0, 0);
+    await fund(customerAccount, '100', 'customer-funds');
+    await fund(merchantAccount, '200', 'merchant-funds');
+    const quote = await e.quotes.create({
+      userId: customerId,
+      side: 'SELL',
+      usdtAmount: '100',
+    });
+    const order = await e.orders.confirm(quote.id, 'order-key');
+    await e.assignments.accept(order.id, merchantId, 'accept-key');
+    await e.settlement.submitUtr(order.id, merchantId, 'UTR-1');
+
+    await e.settlement.confirmReceipt(order.id, customerId, 'settle-1');
+
+    // The whole quantity reaches the merchant when the platform takes nothing.
+    expect(await statusOf(order.id)).toBe('COMPLETED');
+    expect(await balances.balance(customerAccount, 'LOCKED')).toBe(
+      '0.000000000000000000',
+    );
+  });
+});
+
 describe('the invariants', () => {
   /** Review Focus #5. */
   it('a settlement journal sums to zero at full precision', async () => {
