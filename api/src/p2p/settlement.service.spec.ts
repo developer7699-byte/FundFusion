@@ -283,6 +283,21 @@ describe('who may confirm (PRD §6.8)', () => {
     ).rejects.toThrow(/not .*receiver/i);
   });
 
+  /**
+   * PRD §13.5 wants object-level checks, not just route-level ones. A settled
+   * order must not answer a stranger just because there is nothing left to
+   * move: the reply itself tells them the order exists and is done.
+   */
+  it('a stranger cannot read a settled order through confirmReceipt', async () => {
+    const { order } = await sellToSettlement();
+    await settlement.submitUtr(order.id, merchantId, 'UTR-9700');
+    await settlement.confirmReceipt(order.id, customerId, 'settle-1');
+
+    await expect(
+      settlement.confirmReceipt(order.id, merchantId, 'settle-again'),
+    ).rejects.toThrow(/not .*receiver/i);
+  });
+
   it('only the payer can submit a UTR', async () => {
     const { order } = await sellToSettlement();
 

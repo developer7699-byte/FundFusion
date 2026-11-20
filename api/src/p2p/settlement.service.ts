@@ -91,13 +91,15 @@ export class SettlementService {
       const parties = await this.parties(orderId, tx);
       const { order, quote } = parties;
 
-      if (order.status === 'COMPLETED') return order;
-
+      // Authorisation first: a settled order must not answer a stranger just
+      // because there is nothing left to move (PRD §13.5).
       if (actorId !== parties.receiverId) {
         throw new ForbiddenException(
           'You are not the receiver of these rupees, so you cannot confirm they arrived.',
         );
       }
+
+      if (order.status === 'COMPLETED') return order;
       if (!canTransition(order.status, 'COMPLETED')) {
         throw new ConflictException(
           `An order in ${order.status} cannot settle.`,
