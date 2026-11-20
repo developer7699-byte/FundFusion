@@ -6,6 +6,11 @@ import { RateService } from '../rates/rate.service';
 import { AccountService } from '../ledger/account.service';
 import { LedgerModule } from '../ledger/ledger.module';
 import { PostingService } from '../ledger/posting.service';
+import { BalanceService } from '../ledger/balance.service';
+import { CapabilityModule } from '../capability/capability.module';
+import { CapabilityService } from '../capability/capability.service';
+import { AssignmentService } from './assignment.service';
+import { EligibilityService } from './eligibility.service';
 import { OrderService } from './order.service';
 import { QuoteService } from './quote.service';
 
@@ -14,7 +19,7 @@ import { QuoteService } from './quote.service';
  * against the snapshot a quote wrote, never against a current rate.
  */
 @Module({
-  imports: [RateModule, LedgerModule],
+  imports: [RateModule, LedgerModule, CapabilityModule],
   providers: [
     {
       provide: DRIZZLE,
@@ -37,7 +42,42 @@ import { QuoteService } from './quote.service';
       ) => new OrderService(db.db, quotes, posting, accounts),
       inject: [DbService, QuoteService, PostingService, AccountService],
     },
+    {
+      provide: EligibilityService,
+      useFactory: (
+        db: DbService,
+        quotes: QuoteService,
+        balances: BalanceService,
+        capabilities: CapabilityService,
+        accounts: AccountService,
+      ) =>
+        new EligibilityService(db.db, quotes, balances, capabilities, accounts),
+      inject: [
+        DbService,
+        QuoteService,
+        BalanceService,
+        CapabilityService,
+        AccountService,
+      ],
+    },
+    {
+      provide: AssignmentService,
+      useFactory: (
+        db: DbService,
+        quotes: QuoteService,
+        eligibility: EligibilityService,
+        posting: PostingService,
+        accounts: AccountService,
+      ) => new AssignmentService(db.db, quotes, eligibility, posting, accounts),
+      inject: [
+        DbService,
+        QuoteService,
+        EligibilityService,
+        PostingService,
+        AccountService,
+      ],
+    },
   ],
-  exports: [QuoteService, OrderService],
+  exports: [QuoteService, OrderService, EligibilityService, AssignmentService],
 })
 export class P2pModule {}

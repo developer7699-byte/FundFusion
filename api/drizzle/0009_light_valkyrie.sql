@@ -1,0 +1,1 @@
+ALTER TABLE "p2p_order" ADD COLUMN "broadcast_at" timestamp with time zone;

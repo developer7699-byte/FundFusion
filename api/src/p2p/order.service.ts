@@ -53,7 +53,10 @@ export class OrderService {
       await this.lock(quote, order.id);
     }
 
-    return this.advance(order, 'AWAITING_MERCHANT');
+    // One instant, recorded once, for every merchant who will see it.
+    return this.advance(order, 'AWAITING_MERCHANT', {
+      broadcastAt: new Date(),
+    });
   }
 
   /**
@@ -123,7 +126,11 @@ export class OrderService {
     });
   }
 
-  private async advance(order: Order, to: OrderState): Promise<Order> {
+  private async advance(
+    order: Order,
+    to: OrderState,
+    extra: Partial<Order> = {},
+  ): Promise<Order> {
     if (!canTransition(order.status, to)) {
       throw new ConflictException(
         `An order cannot move from ${order.status} to ${to}.`,
@@ -132,7 +139,7 @@ export class OrderService {
 
     const [row] = await this.db
       .update(schema.p2pOrder)
-      .set({ status: to, updatedAt: new Date() })
+      .set({ status: to, updatedAt: new Date(), ...extra })
       .where(eq(schema.p2pOrder.id, order.id))
       .returning();
 

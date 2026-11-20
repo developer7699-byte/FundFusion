@@ -150,3 +150,76 @@ describe('PostingService.post', () => {
     expect(await sumOfEntries(id)).toBe('0.000000000000000000');
   });
 });
+
+/**
+ * PRD §6.7 holds two row locks across an accept and posts the journal between
+ * them. A journal that insists on opening its own transaction would take a
+ * second connection, block on the rows the caller already holds, and deadlock.
+ * So a caller may supply its transaction — and when it does, atomicity is the
+ * caller's: the journal commits or rolls back with everything else.
+ */
+describe('posting inside a caller transaction', () => {
+  it('posts on the transaction it is given', async () => {
+    const id = await t.db.transaction(async (tx) => {
+      const res = await posting.post(transfer('10', 'tx-1'), tx);
+      return res.id;
+    });
+    expect(await sumOfEntries(id)).toBe('0.000000000000000000');
+  });
+
+  it("rolls back with the caller's transaction", async () => {
+    await expect(
+      t.db.transaction(async (tx) => {
+        await posting.post(transfer('10', 'tx-2'), tx);
+        throw new Error('caller changed its mind');
+      }),
+    ).rejects.toThrow('caller changed its mind');
+
+    expect(await countTransactions()).toBe(0);
+  });
+
+  it('still detects a replay inside a caller transaction', async () => {
+    await posting.post(transfer('10', 'tx-3'));
+
+    const replayed = await t.db.transaction(async (tx) =>
+      posting.post(transfer('10', 'tx-3'), tx),
+    );
+
+    expect(replayed.replayed).toBe(true);
+    expect(await countTransactions()).toBe(1);
+  });
+
+  it('sees uncommitted balance written earlier in the same transaction', async () => {
+    await t.db.transaction(async (tx) => {
+      await posting.post(transfer('50', 'tx-4'), tx);
+      // Without the transaction this debit would read a zero balance and fail.
+      await posting.postDebit(
+        accountId,
+        'AVAILABLE',
+        '50',
+        {
+          idempotencyKey: 'tx-5',
+          memo: 'spend what was just credited',
+          lines: [
+            {
+              accountId,
+              accountType: 'AVAILABLE',
+              direction: 'DEBIT',
+              amount: '50',
+              assetSymbol: 'USDT',
+            },
+            {
+              accountType: 'EXTERNAL',
+              direction: 'CREDIT',
+              amount: '50',
+              assetSymbol: 'USDT',
+            },
+          ],
+        },
+        tx,
+      );
+    });
+
+    expect(await countTransactions()).toBe(2);
+  });
+});

@@ -34,7 +34,8 @@ export function makeTestDb(): TestDb {
       await pool.query(`
         TRUNCATE TABLE
           audit_log, user_capability, role_capability, session, otp_challenge,
-          ledger_entry, ledger_transaction, p2p_order, p2p_quote,
+          ledger_entry, ledger_transaction, merchant_assignment,
+          p2p_order, p2p_quote, merchant_profile,
           wallet_address, wallet_account, wallet,
           blockchain_network, asset,
           user_role, "user", role
@@ -58,6 +59,20 @@ export async function seedUser(
     [email],
   );
   return (res.rows[0] as { id: string }).id;
+}
+
+/** A merchant is a user plus an ACTIVE profile (PRD §6.5). */
+export async function seedMerchant(
+  pool: Pool,
+  email: string,
+): Promise<{ userId: string; merchantId: string }> {
+  const userId = await seedUser(pool, email);
+  const res = await pool.query(
+    `INSERT INTO merchant_profile (user_id, desk_name, status, buy_enabled, sell_enabled)
+     VALUES ($1, $2, 'ACTIVE', true, true) RETURNING id`,
+    [userId, `desk-${email}`],
+  );
+  return { userId, merchantId: (res.rows[0] as { id: string }).id };
 }
 
 export async function seedAsset(pool: Pool, symbol = 'USDT'): Promise<string> {

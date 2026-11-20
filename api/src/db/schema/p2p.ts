@@ -26,6 +26,12 @@ export const p2pOrder = pgTable('p2p_order', {
     .notNull()
     .references(() => user.id),
   status: orderStatus('status').notNull().default('QUOTED'),
+  /**
+   * When the order went out to every eligible merchant, from one place at one
+   * instant (PRD §11). Paired with `merchant_assignment.accepted_at` it is the
+   * only answer to the first fairness complaint.
+   */
+  broadcastAt: timestamp('broadcast_at', { withTimezone: true }),
   idempotency: text('idempotency').notNull().unique(),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()

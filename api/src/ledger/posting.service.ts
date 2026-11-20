@@ -43,12 +43,16 @@ export class PostingService {
    * Write one balanced journal (PRD §5). Every money operation is atomic,
    * idempotent and auditable: the whole journal commits or none of it does.
    */
-  async post(req: PostingRequest): Promise<PostingResult> {
+  async post(req: PostingRequest, tx?: Db): Promise<PostingResult> {
     this.validate(req);
     const fingerprint = this.fingerprint(req);
+    const db = tx ?? this.db;
 
     try {
-      return await this.db.transaction(async (tx) => {
+      // On a caller's transaction this opens a SAVEPOINT rather than a second
+      // transaction, so a replay can still be caught and recovered from
+      // without dooming everything the caller has done so far.
+      return await db.transaction(async (tx) => {
         const [row] = await tx
           .insert(schema.ledgerTransaction)
           .values({
@@ -74,7 +78,7 @@ export class PostingService {
       });
     } catch (err) {
       if (isUniqueViolation(err)) {
-        return this.resolveReplay(req, fingerprint);
+        return this.resolveReplay(req, fingerprint, db);
       }
       throw err;
     }
@@ -127,13 +131,15 @@ export class PostingService {
     bucket: Bucket,
     amount: string,
     req: PostingRequest,
+    tx?: Db,
   ): Promise<PostingResult> {
     this.validate(req);
     const fingerprint = this.fingerprint(req);
     const wanted = usdt(amount);
+    const db = tx ?? this.db;
 
     try {
-      return await this.db.transaction(async (tx) => {
+      return await db.transaction(async (tx) => {
         await tx.execute(
           sql`SELECT id FROM wallet_account WHERE id = ${accountId} FOR UPDATE`,
         );
@@ -172,7 +178,7 @@ export class PostingService {
       });
     } catch (err) {
       if (isUniqueViolation(err)) {
-        return this.resolveReplay(req, fingerprint);
+        return this.resolveReplay(req, fingerprint, db);
       }
       throw err;
     }
@@ -181,8 +187,9 @@ export class PostingService {
   private async resolveReplay(
     req: PostingRequest,
     fingerprint: string,
+    db: Db,
   ): Promise<PostingResult> {
-    const [existing] = await this.db
+    const [existing] = await db
       .select({
         id: schema.ledgerTransaction.id,
         fingerprint: schema.ledgerTransaction.fingerprint,

@@ -64,6 +64,13 @@
       "when": 1795201713997,
       "tag": "0008_military_grandmaster",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795202084022,
+      "tag": "0009_light_valkyrie",
+      "breakpoints": true
     }
   ]
 }
