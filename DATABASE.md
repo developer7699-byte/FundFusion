@@ -2,6 +2,7 @@
 
 PostgreSQL via Prisma. Money columns use `Decimal(36, 18)` for crypto and `Decimal(18, 2)` for INR display fields. Never persist JS floats as money.
 
+
 ## Core groups
 
 **Identity:** User, Role, Session, OtpChallenge, CustomerProfile, MerchantProfile  
