@@ -13,6 +13,7 @@ import { AssignmentService } from './assignment.service';
 import { EligibilityService } from './eligibility.service';
 import { OrderService } from './order.service';
 import { QuoteService } from './quote.service';
+import { SettlementService } from './settlement.service';
 
 /**
  * The P2P engine (PRD §6). Quotes first: everything downstream settles
@@ -77,7 +78,30 @@ import { QuoteService } from './quote.service';
         AccountService,
       ],
     },
+    {
+      provide: SettlementService,
+      useFactory: (
+        db: DbService,
+        quotes: QuoteService,
+        eligibility: EligibilityService,
+        posting: PostingService,
+        accounts: AccountService,
+      ) => new SettlementService(db.db, quotes, eligibility, posting, accounts),
+      inject: [
+        DbService,
+        QuoteService,
+        EligibilityService,
+        PostingService,
+        AccountService,
+      ],
+    },
   ],
-  exports: [QuoteService, OrderService, EligibilityService, AssignmentService],
+  exports: [
+    QuoteService,
+    OrderService,
+    EligibilityService,
+    AssignmentService,
+    SettlementService,
+  ],
 })
 export class P2pModule {}
