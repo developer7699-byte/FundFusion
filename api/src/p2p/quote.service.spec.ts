@@ -2,6 +2,9 @@ import { BadRequestException } from '@nestjs/common';
 import { MockRateProvider } from '../rates/rate.provider';
 import { RateService } from '../rates/rate.service';
 import { makeTestDb, seedUser, type TestDb } from '../ledger/test-db';
+import { fixedSettings } from '../settings/platform-settings';
+import { AuditService } from '../audit/audit.service';
+import { PlatformSettingsService } from '../settings/platform-settings.service';
 import { QuoteService } from './quote.service';
 
 let t: TestDb;
@@ -88,13 +91,21 @@ describe('the snapshot (PRD §7)', () => {
    * must see it in the order preview before accepting.
    */
   it('snapshots the buy-side merchant fee', async () => {
-    quotes = new QuoteService(t.db, rates, { ttlSeconds: 90, buyFeeBps: 100 });
+    quotes = new QuoteService(
+      t.db,
+      rates,
+      fixedSettings({ 'quote.buyFeeBps': 100 }),
+    );
     const q = await quotes.create({ userId, side: 'BUY', usdtAmount: '97' });
     expect(q.platformFeeUsdt).toBe('0.970000000000000000');
   });
 
   it('expires after the configured TTL', async () => {
-    quotes = new QuoteService(t.db, rates, { ttlSeconds: 30, buyFeeBps: 0 });
+    quotes = new QuoteService(
+      t.db,
+      rates,
+      fixedSettings({ 'quote.ttlSeconds': 30 }),
+    );
     const q = await quotes.create({ userId, side: 'SELL', usdtAmount: '100' });
     expect(q.expiresAt.getTime() - q.createdAt.getTime()).toBe(30_000);
   });
@@ -123,6 +134,58 @@ describe('the snapshot (PRD §7)', () => {
     await expect(
       t.pool.query(`DELETE FROM p2p_quote WHERE id = $1`, [q.id]),
     ).rejects.toThrow(/immutable|append-only/i);
+  });
+});
+
+/**
+ * The point of holding the commercial numbers in the registry: a markup is a
+ * business decision, and a business decision should not need a deploy.
+ */
+describe('what the admin set is what the customer gets', () => {
+  it('a markup change moves the next quote', async () => {
+    const live = new PlatformSettingsService(t.db, new AuditService(t.db));
+    const priced = new QuoteService(
+      t.db,
+      new RateService(new MockRateProvider(), live),
+      live,
+    );
+
+    const before = await priced.create({
+      userId,
+      side: 'SELL',
+      usdtAmount: '100',
+    });
+    expect(before.customerRate).toBe('94.09');
+
+    await live.set('rate.markupBps', 100, {
+      actorId: null,
+      reason: 'margin review',
+    });
+
+    const after = await priced.create({
+      userId,
+      side: 'SELL',
+      usdtAmount: '100',
+    });
+    expect(after.customerRate).toBe('96.03');
+    expect(after.markupBps).toBe(100);
+  });
+
+  it('an order below the admin floor is refused', async () => {
+    const live = new PlatformSettingsService(t.db, new AuditService(t.db));
+    const priced = new QuoteService(
+      t.db,
+      new RateService(new MockRateProvider(), live),
+      live,
+    );
+    await live.set('order.minUsdt', '50', {
+      actorId: null,
+      reason: 'chain fees make small trades uneconomic',
+    });
+
+    await expect(
+      priced.create({ userId, side: 'SELL', usdtAmount: '10' }),
+    ).rejects.toThrow(/smallest order is 50/i);
   });
 });
 

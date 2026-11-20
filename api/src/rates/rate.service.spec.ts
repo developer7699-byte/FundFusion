@@ -1,4 +1,5 @@
 import { MockRateProvider } from './rate.provider';
+import { fixedSettings } from '../settings/platform-settings';
 import { RateService } from './rate.service';
 
 let provider: MockRateProvider;
@@ -27,10 +28,7 @@ describe('markup (PRD §7)', () => {
   });
 
   it('applies the configured markup exactly', async () => {
-    rates = new RateService(provider, {
-      markupBps: 300,
-      maxDeviationBps: 2000,
-    });
+    rates = new RateService(provider, fixedSettings({ 'rate.markupBps': 300 }));
     const q = await rates.quote('SELL');
     expect(q.customerRate).toBe('94.09'); // 97.00 * (1 - 0.03)
   });
@@ -65,12 +63,14 @@ describe('deviation bound (PRD §7)', () => {
 
   it('the same bound applies to an admin override', async () => {
     await rates.quote('SELL');
-    expect(() => rates.override('1000.00')).toThrow(/deviation|unavailable/i);
+    await expect(rates.override('1000.00')).rejects.toThrow(
+      /deviation|unavailable/i,
+    );
   });
 
   it('an admin override inside the bound is accepted', async () => {
     await rates.quote('SELL');
-    rates.override('98.50');
+    await rates.override('98.50');
     const q = await rates.quote('SELL');
     expect(q.referenceRate).toBe('98.50');
   });

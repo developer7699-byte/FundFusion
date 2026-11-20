@@ -10,6 +10,7 @@ import {
   SETTING_KEYS,
   type SettingDefinition,
   type SettingKey,
+  type SettingsReader,
 } from './platform-settings';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -40,7 +41,7 @@ export interface SettingView {
  * lookup against the cost of restarting a service to change a markup.
  */
 @Injectable()
-export class PlatformSettingsService {
+export class PlatformSettingsService implements SettingsReader {
   constructor(
     @Inject(DRIZZLE) private readonly db: Db,
     private readonly audit: AuditService,

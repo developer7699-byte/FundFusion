@@ -12,6 +12,7 @@ import {
 import { canTransition, ORDER_STATES } from './order.state';
 import { AbandonmentService } from './abandonment.service';
 import { OrderService } from './order.service';
+import { fixedSettings } from '../settings/platform-settings';
 import { QuoteService } from './quote.service';
 
 let t: TestDb;
@@ -126,7 +127,7 @@ describe('confirming an order (PRD §6.3, §6.4)', () => {
     const expiring = new QuoteService(
       t.db,
       new RateService(new MockRateProvider()),
-      { ttlSeconds: 0, buyFeeBps: 0 },
+      fixedSettings({ 'quote.ttlSeconds': 0 }),
     );
     const quote = await expiring.create({
       userId: customerId,

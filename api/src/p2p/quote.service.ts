@@ -18,6 +18,10 @@ import {
   usdtString,
 } from '../money/money';
 import { RateService } from '../rates/rate.service';
+import {
+  fixedSettings,
+  type SettingsReader,
+} from '../settings/platform-settings';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -31,20 +35,6 @@ export interface QuoteRequest {
   inrAmount?: string;
 }
 
-export interface QuoteConfig {
-  /** PRD §6.9: 90 s by default, configurable. */
-  ttlSeconds: number;
-  /**
-   * PRD §6.4: the buy-side fee the platform charges the merchant, in USDT.
-   * The client has not set this figure (docs/DEPENDENCIES.md §3.2), so the
-   * default is zero — an invented default would silently charge merchants a
-   * number nobody chose.
-   */
-  buyFeeBps: number;
-}
-
-const DEFAULTS: QuoteConfig = { ttlSeconds: 90, buyFeeBps: 0 };
-
 const USDT_SCALE = 18;
 const INR_SCALE = 2;
 
@@ -53,7 +43,7 @@ export class QuoteService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Db,
     private readonly rates: RateService,
-    private readonly config: QuoteConfig = DEFAULTS,
+    private readonly settings: SettingsReader = fixedSettings(),
   ) {}
 
   /**
@@ -99,6 +89,8 @@ export class QuoteService {
       );
     }
 
+    await this.assertWithinSizeLimits(usdtAmount);
+
     const [row] = await this.db
       .insert(schema.p2pQuote)
       .values({
@@ -111,10 +103,10 @@ export class QuoteService {
         inrAmount: inrString(inrAmount),
         authoritativeSide: typedCrypto ? 'CRYPTO' : 'FIAT',
         platformFeeUsdt: usdtString(
-          this.platformFee(req.side, usdtAmount, rate.markupBps),
+          await this.platformFee(req.side, usdtAmount, rate.markupBps),
         ),
         provider: rate.provider,
-        ...this.window(),
+        ...(await this.window()),
       })
       .returning();
 
@@ -141,12 +133,15 @@ export class QuoteService {
    * platform is never short — the merchant's credit is then an exact
    * subtraction and leaves no residue.
    */
-  private platformFee(
+  private async platformFee(
     side: 'BUY' | 'SELL',
     usdtAmount: Decimal,
     markupBps: number,
-  ): Decimal {
-    const bps = side === 'SELL' ? markupBps : this.config.buyFeeBps;
+  ): Promise<Decimal> {
+    const bps =
+      side === 'SELL'
+        ? markupBps
+        : await this.settings.integer('quote.buyFeeBps');
     const exact = usdtAmount.times(new Decimal(bps)).div(10_000);
     return payableUp(exact, USDT_SCALE).value;
   }
@@ -155,12 +150,34 @@ export class QuoteService {
    * Both timestamps come from one clock reading, so the TTL a quote carries is
    * exactly the configured one rather than that minus a round trip.
    */
-  private window(): { createdAt: Date; expiresAt: Date } {
+  private async window(): Promise<{ createdAt: Date; expiresAt: Date }> {
+    const ttlSeconds = await this.settings.integer('quote.ttlSeconds');
     const createdAt = new Date();
     return {
       createdAt,
-      expiresAt: new Date(createdAt.getTime() + this.config.ttlSeconds * 1000),
+      expiresAt: new Date(createdAt.getTime() + ttlSeconds * 1000),
     };
+  }
+
+  /**
+   * Order size is a commercial lever, not a technical one: the floor keeps
+   * the engine off trades whose chain fees exceed the trade, and the ceiling
+   * caps how much one order can put at risk.
+   */
+  private async assertWithinSizeLimits(amount: Decimal): Promise<void> {
+    const min = usdt(await this.settings.money('order.minUsdt'));
+    const max = usdt(await this.settings.money('order.maxUsdt'));
+
+    if (amount.lt(min)) {
+      throw new BadRequestException(
+        `The smallest order is ${min.toFixed()} USDT.`,
+      );
+    }
+    if (amount.gt(max)) {
+      throw new BadRequestException(
+        `The largest order is ${max.toFixed()} USDT.`,
+      );
+    }
   }
 
   private positive(value: Decimal, label: string): Decimal {

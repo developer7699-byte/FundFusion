@@ -15,6 +15,7 @@ import { AbandonmentService } from './abandonment.service';
 import { AssignmentService } from './assignment.service';
 import { EligibilityService } from './eligibility.service';
 import { OrderService } from './order.service';
+import { fixedSettings } from '../settings/platform-settings';
 import { QuoteService } from './quote.service';
 
 let t: TestDb;
@@ -42,10 +43,11 @@ beforeEach(async () => {
   await seedAsset(t.pool);
   customerId = await seedUser(t.pool, 'customer@example.test');
   customerAccount = await accounts.ensureAccount(customerId, 'USDT');
-  quotes = new QuoteService(t.db, new RateService(new MockRateProvider()), {
-    ttlSeconds: 90,
-    buyFeeBps: 100,
-  });
+  quotes = new QuoteService(
+    t.db,
+    new RateService(new MockRateProvider()),
+    fixedSettings({ 'quote.buyFeeBps': 100 }),
+  );
   orders = new OrderService(
     t.db,
     quotes,

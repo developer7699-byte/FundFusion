@@ -7,6 +7,10 @@ import { AccountService, DRIZZLE } from '../ledger/account.service';
 import { BalanceService } from '../ledger/balance.service';
 import { Decimal, payableUp, usdt, usdtString } from '../money/money';
 import type { Order } from './order.service';
+import {
+  fixedSettings,
+  type SettingsReader,
+} from '../settings/platform-settings';
 import { QuoteService, type QuoteSnapshot } from './quote.service';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -21,13 +25,6 @@ export interface Obligation {
   accountId: string;
 }
 
-export interface EligibilityConfig {
-  /** PRD §6.5: admin-configurable between 5% and 10%, default 10%. */
-  bufferBps: number;
-}
-
-const DEFAULTS: EligibilityConfig = { bufferBps: 1000 };
-
 const USDT_SCALE = 18;
 
 @Injectable()
@@ -38,7 +35,7 @@ export class EligibilityService {
     private readonly balances: BalanceService,
     private readonly capabilities: CapabilityService,
     private readonly accounts: AccountService,
-    private readonly config: EligibilityConfig = DEFAULTS,
+    private readonly settings: SettingsReader = fixedSettings(),
   ) {}
 
   /**
@@ -48,9 +45,10 @@ export class EligibilityService {
    * self-declared and unenforceable, because the platform never holds rupees —
    * so the USDT bond *is* the guarantee behind the rupee promise.
    */
-  obligation(
+  async obligation(
     quote: QuoteSnapshot,
-  ): Pick<Obligation, 'amountUsdt' | 'requiredUsdt' | 'bucket'> {
+  ): Promise<Pick<Obligation, 'amountUsdt' | 'requiredUsdt' | 'bucket'>> {
+    const bufferBps = await this.settings.integer('eligibility.bufferBps');
     const amount =
       quote.side === 'SELL'
         ? // The merchant owes INR; the bond is what those rupees are worth.
@@ -61,7 +59,7 @@ export class EligibilityService {
         : usdt(quote.usdtAmount).plus(usdt(quote.platformFeeUsdt));
 
     const buffered = amount.times(
-      new Decimal(1).plus(new Decimal(this.config.bufferBps).div(10_000)),
+      new Decimal(1).plus(new Decimal(bufferBps).div(10_000)),
     );
 
     return {
@@ -109,7 +107,7 @@ export class EligibilityService {
       'USDT',
       tx,
     );
-    const owed = this.obligation(quote);
+    const owed = await this.obligation(quote);
     const available = new Decimal(
       await this.balances.balance(accountId, 'AVAILABLE', db),
     );

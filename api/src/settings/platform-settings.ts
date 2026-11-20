@@ -133,3 +133,28 @@ export const PLATFORM_SETTINGS = {
 export type SettingKey = keyof typeof PLATFORM_SETTINGS;
 
 export const SETTING_KEYS = Object.keys(PLATFORM_SETTINGS) as SettingKey[];
+
+/**
+ * What the engine needs from the registry.
+ *
+ * Services depend on this rather than on the service that implements it, so a
+ * unit test can supply the two or three numbers it cares about without a
+ * database, while production reads every one of them from the same place an
+ * admin edits.
+ */
+export interface SettingsReader {
+  integer(key: SettingKey): Promise<number>;
+  money(key: SettingKey): Promise<string>;
+}
+
+/** The documented defaults, for tests that care about one number. */
+export function fixedSettings(
+  overrides: Partial<Record<SettingKey, string | number>> = {},
+): SettingsReader {
+  const value = (key: SettingKey) =>
+    overrides[key] ?? PLATFORM_SETTINGS[key].default;
+  return {
+    integer: (key) => Promise.resolve(Number(value(key))),
+    money: (key) => Promise.resolve(String(value(key))),
+  };
+}

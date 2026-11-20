@@ -4,22 +4,13 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema';
 import { AccountService, DRIZZLE } from '../ledger/account.service';
 import { PostingService } from '../ledger/posting.service';
+import {
+  fixedSettings,
+  type SettingsReader,
+} from '../settings/platform-settings';
 import { canTransition } from './order.state';
 
 type Db = NodePgDatabase<typeof schema>;
-
-export interface TimeoutConfig {
-  /** PRD §6.9, all configurable: 120 s to find a merchant, 15 min each side. */
-  searchWindowSeconds: number;
-  payerWindowSeconds: number;
-  receiverWindowSeconds: number;
-}
-
-const DEFAULTS: TimeoutConfig = {
-  searchWindowSeconds: 120,
-  payerWindowSeconds: 900,
-  receiverWindowSeconds: 900,
-};
 
 export interface SweepResult {
   expired: string[];
@@ -32,7 +23,7 @@ export class TimeoutService {
     @Inject(DRIZZLE) private readonly db: Db,
     private readonly posting: PostingService,
     private readonly accounts: AccountService,
-    private readonly config: TimeoutConfig = DEFAULTS,
+    private readonly settings: SettingsReader = fixedSettings(),
   ) {}
 
   /**
@@ -82,6 +73,7 @@ export class TimeoutService {
 
   /** Broadcast, but no merchant took it inside the search window. */
   private async unmatched(now: Date): Promise<string[]> {
+    const seconds = await this.settings.integer('order.searchWindowSeconds');
     const rows = await this.db
       .select({ id: schema.p2pOrder.id })
       .from(schema.p2pOrder)
@@ -89,7 +81,7 @@ export class TimeoutService {
         and(
           eq(schema.p2pOrder.status, 'AWAITING_MERCHANT'),
           lte(
-            sql`${schema.p2pOrder.broadcastAt} + make_interval(secs => ${this.config.searchWindowSeconds})`,
+            sql`${schema.p2pOrder.broadcastAt} + make_interval(secs => ${seconds})`,
             now,
           ),
         ),
@@ -99,6 +91,7 @@ export class TimeoutService {
 
   /** Accepted, but the payer never sent the rupees. */
   private async unpaid(now: Date): Promise<string[]> {
+    const seconds = await this.settings.integer('order.payerWindowSeconds');
     const rows = await this.db
       .select({ id: schema.p2pOrder.id })
       .from(schema.p2pOrder)
@@ -110,7 +103,7 @@ export class TimeoutService {
         and(
           eq(schema.p2pOrder.status, 'ACCEPTED'),
           lte(
-            sql`${schema.merchantAssignment.acceptedAt} + make_interval(secs => ${this.config.payerWindowSeconds})`,
+            sql`${schema.merchantAssignment.acceptedAt} + make_interval(secs => ${seconds})`,
             now,
           ),
         ),
@@ -123,6 +116,7 @@ export class TimeoutService {
    * rule exists for: the money stays exactly where it is and a human decides.
    */
   private async unconfirmedReceipt(now: Date): Promise<string[]> {
+    const seconds = await this.settings.integer('order.receiverWindowSeconds');
     const rows = await this.db
       .select({ id: schema.p2pOrder.id })
       .from(schema.p2pOrder)
@@ -134,7 +128,7 @@ export class TimeoutService {
         and(
           eq(schema.p2pOrder.status, 'PAYMENT_SUBMITTED'),
           lte(
-            sql`${schema.paymentProof.createdAt} + make_interval(secs => ${this.config.receiverWindowSeconds})`,
+            sql`${schema.paymentProof.createdAt} + make_interval(secs => ${seconds})`,
             now,
           ),
         ),

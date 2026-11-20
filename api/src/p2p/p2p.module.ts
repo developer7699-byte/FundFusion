@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { DbService } from '../db/db.service';
 import { DRIZZLE } from '../ledger/account.service';
 import { RateModule } from '../rates/rate.module';
+import { SettingsModule } from '../settings/settings.module';
+import { PlatformSettingsService } from '../settings/platform-settings.service';
 import { RateService } from '../rates/rate.service';
 import { AccountService } from '../ledger/account.service';
 import { LedgerModule } from '../ledger/ledger.module';
@@ -22,7 +24,7 @@ import { TimeoutService } from './timeout.service';
  * against the snapshot a quote wrote, never against a current rate.
  */
 @Module({
-  imports: [RateModule, LedgerModule, CapabilityModule],
+  imports: [RateModule, LedgerModule, CapabilityModule, SettingsModule],
   providers: [
     {
       provide: DRIZZLE,
@@ -31,14 +33,18 @@ import { TimeoutService } from './timeout.service';
     },
     {
       provide: QuoteService,
-      useFactory: (db: DbService, rates: RateService) =>
-        new QuoteService(db.db, rates),
-      inject: [DbService, RateService],
+      useFactory: (
+        db: DbService,
+        rates: RateService,
+        settings: PlatformSettingsService,
+      ) => new QuoteService(db.db, rates, settings),
+      inject: [DbService, RateService, PlatformSettingsService],
     },
     {
       provide: AbandonmentService,
-      useFactory: (db: DbService) => new AbandonmentService(db.db),
-      inject: [DbService],
+      useFactory: (db: DbService, settings: PlatformSettingsService) =>
+        new AbandonmentService(db.db, settings),
+      inject: [DbService, PlatformSettingsService],
     },
     {
       provide: OrderService,
@@ -115,8 +121,14 @@ import { TimeoutService } from './timeout.service';
         db: DbService,
         posting: PostingService,
         accounts: AccountService,
-      ) => new TimeoutService(db.db, posting, accounts),
-      inject: [DbService, PostingService, AccountService],
+        settings: PlatformSettingsService,
+      ) => new TimeoutService(db.db, posting, accounts, settings),
+      inject: [
+        DbService,
+        PostingService,
+        AccountService,
+        PlatformSettingsService,
+      ],
     },
   ],
   exports: [

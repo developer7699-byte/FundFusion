@@ -141,7 +141,9 @@ export class SettlementService {
       }
 
       const { escrowAccountId, escrowBucket, escrowAmount, lines } =
-        quote.side === 'SELL' ? this.sellLegs(parties) : this.buyLegs(parties);
+        quote.side === 'SELL'
+          ? await this.sellLegs(parties)
+          : await this.buyLegs(parties);
 
       await this.posting.postDebit(
         escrowAccountId,
@@ -171,11 +173,11 @@ export class SettlementService {
    * The platform's cut is taken from the asset it custodies — the merchant is
    * never credited the full quantity.
    */
-  private sellLegs(p: Parties) {
+  private async sellLegs(p: Parties) {
     const quantity = usdt(p.quote.usdtAmount);
     const fee = usdt(p.quote.platformFeeUsdt);
     const merchantCredit = quantity.minus(fee);
-    const bond = usdt(this.eligibility.obligation(p.quote).amountUsdt);
+    const bond = usdt((await this.eligibility.obligation(p.quote)).amountUsdt);
 
     // A zero fee is a legal configuration — PRD §6.4 leaves the figure to the
     // business — and a journal leg of zero is not. Omitting it keeps the
@@ -202,7 +204,7 @@ export class SettlementService {
    * instead — debited inside this same journal, out of what was locked at
    * accept. The customer receives exactly the quantity they asked for.
    */
-  private buyLegs(p: Parties) {
+  private async buyLegs(p: Parties) {
     const quantity = usdt(p.quote.usdtAmount);
     const fee = usdt(p.quote.platformFeeUsdt);
     const locked = quantity.plus(fee);

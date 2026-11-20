@@ -1,5 +1,9 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { Decimal, inr, inrString } from '../money/money';
+import {
+  fixedSettings,
+  type SettingsReader,
+} from '../settings/platform-settings';
 import type { RateProvider } from './rate.provider';
 
 export interface RateQuote {
@@ -12,14 +16,10 @@ export interface RateQuote {
   takenAt: Date;
 }
 
-export interface RateConfig {
-  /** Admin-configured markup per side, in basis points. */
-  markupBps: number;
-  /** Maximum move from the last known good rate before pricing fails closed. */
-  maxDeviationBps: number;
-}
-
-const DEFAULTS: RateConfig = { markupBps: 300, maxDeviationBps: 2000 };
+/**
+ * Both numbers come from the admin-editable registry, read per quote: a
+ * markup change is a commercial decision, not a deploy (PRD §7).
+ */
 
 @Injectable()
 export class RateService {
@@ -29,7 +29,7 @@ export class RateService {
 
   constructor(
     private readonly provider: RateProvider,
-    private readonly config: RateConfig = DEFAULTS,
+    private readonly settings: SettingsReader = fixedSettings(),
   ) {}
 
   /**
@@ -37,9 +37,9 @@ export class RateService {
    * maximum deviation that guards the feed — a typed input is no more
    * trustworthy than a bad tick.
    */
-  override(rate: string): void {
+  async override(rate: string): Promise<void> {
     const value = inr(rate);
-    this.assertWithinBound(value);
+    await this.assertWithinBound(value);
     this.manualOverride = value;
     this.lastGood = value;
   }
@@ -59,11 +59,12 @@ export class RateService {
     }
 
     if (!this.manualOverride) {
-      this.assertWithinBound(mid);
+      await this.assertWithinBound(mid);
       this.lastGood = mid;
     }
 
-    const factor = new Decimal(this.config.markupBps).div(10_000);
+    const markupBps = await this.settings.integer('rate.markupBps');
+    const factor = new Decimal(markupBps).div(10_000);
     const customer =
       side === 'SELL'
         ? mid.times(new Decimal(1).minus(factor))
@@ -75,7 +76,7 @@ export class RateService {
       customerRate: inrString(
         inr(customer.toDecimalPlaces(2, Decimal.ROUND_HALF_UP)),
       ),
-      markupBps: this.config.markupBps,
+      markupBps,
       provider: this.manualOverride ? 'admin-override' : this.provider.name,
       takenAt: new Date(),
     };
@@ -87,17 +88,19 @@ export class RateService {
    * pricing as unavailable rather than guessing at a safer number — a guess
    * here is still a price someone can trade against.
    */
-  private assertWithinBound(candidate: Decimal): void {
+  private async assertWithinBound(candidate: Decimal): Promise<void> {
     if (!this.lastGood) return; // nothing to deviate from yet
+
+    const maxDeviationBps = await this.settings.integer('rate.maxDeviationBps');
 
     const move = candidate
       .minus(this.lastGood)
       .abs()
       .div(this.lastGood)
       .times(10_000);
-    if (move.gt(this.config.maxDeviationBps)) {
+    if (move.gt(maxDeviationBps)) {
       throw new ServiceUnavailableException(
-        `Pricing is unavailable: ${inrString(candidate)} deviates ${move.toFixed(0)}bps from the last known good rate ${inrString(this.lastGood)}, beyond the ${this.config.maxDeviationBps}bps bound.`,
+        `Pricing is unavailable: ${inrString(candidate)} deviates ${move.toFixed(0)}bps from the last known good rate ${inrString(this.lastGood)}, beyond the ${maxDeviationBps}bps bound.`,
       );
     }
   }

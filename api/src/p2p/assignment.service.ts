@@ -12,18 +12,15 @@ import { PostingService } from '../ledger/posting.service';
 import { EligibilityService, type Obligation } from './eligibility.service';
 import type { Order } from './order.service';
 import { canTransition } from './order.state';
+import {
+  fixedSettings,
+  type SettingsReader,
+} from '../settings/platform-settings';
 import { QuoteService } from './quote.service';
 
 type Db = NodePgDatabase<typeof schema>;
 
 export type Assignment = typeof schema.merchantAssignment.$inferSelect;
-
-export interface AssignmentConfig {
-  /** PRD §6.9: how long an order stays open to merchants. 120 s by default. */
-  searchWindowSeconds: number;
-}
-
-const DEFAULTS: AssignmentConfig = { searchWindowSeconds: 120 };
 
 @Injectable()
 export class AssignmentService {
@@ -33,7 +30,7 @@ export class AssignmentService {
     private readonly eligibility: EligibilityService,
     private readonly posting: PostingService,
     private readonly accounts: AccountService,
-    private readonly config: AssignmentConfig = DEFAULTS,
+    private readonly settings: SettingsReader = fixedSettings(),
   ) {}
 
   /**
@@ -77,7 +74,7 @@ export class AssignmentService {
       if (!canTransition(order.status, 'ACCEPTED')) {
         throw new ConflictException('ORDER_ALREADY_ASSIGNED');
       }
-      this.assertWithinWindow(order);
+      await this.assertWithinWindow(order);
 
       // 3 and 4. Capability and desk status, then the wallet lock, then
       // eligibility re-read inside it.
@@ -151,11 +148,18 @@ export class AssignmentService {
     );
   }
 
-  private assertWithinWindow(order: Order): void {
+  /**
+   * One source for the window, shared with the sweep. Two copies that merely
+   * agree today would eventually let a merchant accept an order the sweep
+   * had already expired, or the reverse.
+   */
+  private async assertWithinWindow(order: Order): Promise<void> {
     if (!order.broadcastAt) return;
 
-    const deadline =
-      order.broadcastAt.getTime() + this.config.searchWindowSeconds * 1000;
+    const searchWindowSeconds = await this.settings.integer(
+      'order.searchWindowSeconds',
+    );
+    const deadline = order.broadcastAt.getTime() + searchWindowSeconds * 1000;
     if (Date.now() > deadline) {
       throw new ConflictException(
         'That order expired before it was accepted: its merchant search window has closed.',

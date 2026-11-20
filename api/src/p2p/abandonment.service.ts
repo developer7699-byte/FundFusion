@@ -4,26 +4,12 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema';
 import { DRIZZLE } from '../ledger/account.service';
 import { Decimal } from '../money/money';
+import {
+  fixedSettings,
+  type SettingsReader,
+} from '../settings/platform-settings';
 
 type Db = NodePgDatabase<typeof schema>;
-
-export interface AbandonmentConfig {
-  /** PRD §6.11: one to two concurrent open buy orders per customer. */
-  concurrentBuyOrderCap: number;
-  cooldownBaseSeconds: number;
-  /**
-   * How many abandonments pass without a cooldown. One: a first-time buyer
-   * whose bank app failed is not an attacker, and treating them as one costs
-   * a customer to prevent nothing.
-   */
-  forgiven: number;
-}
-
-const DEFAULTS: AbandonmentConfig = {
-  concurrentBuyOrderCap: 2,
-  cooldownBaseSeconds: 300,
-  forgiven: 1,
-};
 
 /** States in which an order is still holding someone's attention or money. */
 const OPEN_STATES = [
@@ -60,7 +46,7 @@ export interface AbandonmentStats {
 export class AbandonmentService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Db,
-    private readonly config: AbandonmentConfig = DEFAULTS,
+    private readonly settings: SettingsReader = fixedSettings(),
   ) {}
 
   async stats(customerId: string): Promise<AbandonmentStats> {
@@ -103,9 +89,10 @@ export class AbandonmentService {
     const matched = rows.length;
     const abandoned = walked.length;
 
-    const steps = abandoned - this.config.forgiven;
-    const cooldownSeconds =
-      steps > 0 ? this.config.cooldownBaseSeconds * 2 ** (steps - 1) : 0;
+    const forgiven = await this.settings.integer('abandonment.forgiven');
+    const base = await this.settings.integer('abandonment.cooldownBaseSeconds');
+    const steps = abandoned - forgiven;
+    const cooldownSeconds = steps > 0 ? base * 2 ** (steps - 1) : 0;
 
     return {
       matched,
@@ -133,7 +120,10 @@ export class AbandonmentService {
       customerId,
       opts.excludeIdempotencyKey,
     );
-    if (open >= this.config.concurrentBuyOrderCap) {
+    const cap = await this.settings.integer(
+      'abandonment.concurrentBuyOrderCap',
+    );
+    if (open >= cap) {
       throw new ConflictException(
         `You already have ${open} open order${open === 1 ? '' : 's'}. Finish or cancel one before starting another.`,
       );

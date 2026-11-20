@@ -4,6 +4,7 @@ import { PostingService } from '../ledger/posting.service';
 import { CapabilityService } from '../capability/capability.service';
 import { MockRateProvider } from '../rates/rate.provider';
 import { RateService } from '../rates/rate.service';
+import { fixedSettings } from '../settings/platform-settings';
 import {
   makeTestDb,
   seedAsset,
@@ -51,7 +52,11 @@ beforeEach(async () => {
   // less the 300bps markup.
   provider.next('100.00');
   rates = new RateService(provider);
-  quotes = new QuoteService(t.db, rates, { ttlSeconds: 90, buyFeeBps: 100 });
+  quotes = new QuoteService(
+    t.db,
+    rates,
+    fixedSettings({ 'quote.buyFeeBps': 100 }),
+  );
   orders = new OrderService(
     t.db,
     quotes,
@@ -338,14 +343,15 @@ describe('a fee the business has not set yet', () => {
   function withFee(buyFeeBps: number, markupBps: number) {
     const provider = new MockRateProvider();
     provider.next('100.00');
-    const rateService = new RateService(provider, {
-      markupBps,
-      maxDeviationBps: 2000,
-    });
-    const quoteService = new QuoteService(t.db, rateService, {
-      ttlSeconds: 90,
-      buyFeeBps,
-    });
+    const rateService = new RateService(
+      provider,
+      fixedSettings({ 'rate.markupBps': markupBps }),
+    );
+    const quoteService = new QuoteService(
+      t.db,
+      rateService,
+      fixedSettings({ 'quote.buyFeeBps': buyFeeBps }),
+    );
     const eligibility = new EligibilityService(
       t.db,
       quoteService,
@@ -502,7 +508,7 @@ describe('the invariants', () => {
   /** Review Focus #5. */
   it('a settlement journal sums to zero at full precision', async () => {
     // A quantity whose 3% cut does not fit in 18 decimal places.
-    const { order } = await sellToSettlement('0.333333333333333333', '1');
+    const { order } = await sellToSettlement('1.333333333333333333', '10');
     await settlement.submitUtr(order.id, merchantId, 'UTR-x');
     await settlement.confirmReceipt(order.id, customerId, 'settle-1');
 
