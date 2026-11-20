@@ -20,5 +20,8 @@
   "transformIgnorePatterns": [
     "/node_modules/(?!(@nestjs|dotenv|dotenv-expand|uid|file-type|strtok3|token-types|peek-readable)/)"
   ],
-  "maxWorkers": 1
+  "maxWorkers": 1,
+  "setupFiles": [
+    "<rootDir>/../jest.setup.ts"
+  ]
 }

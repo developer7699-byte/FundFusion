@@ -12,7 +12,7 @@ types.setTypeParser(types.builtins.INT8, (v: string) => v);
 
 const TEST_URL =
   process.env.TEST_DATABASE_URL ??
-  'postgresql://localhost:5432/fundfusion_test';
+  'postgresql://fundfusion:fundfusion_dev_only@localhost:5433/fundfusion_test';
 
 export interface TestDb {
   db: NodePgDatabase<typeof schema>;

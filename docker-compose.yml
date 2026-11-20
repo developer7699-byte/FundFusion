@@ -1,3 +1,10 @@
+# Local infrastructure (PRD §12). Everything this project needs runs here, so
+# a new machine needs Docker and nothing else installed.
+#
+# The published ports are deliberately NOT the defaults: this machine already
+# runs a PostgreSQL on 5432 and a Redis on 6379 for other projects. Binding
+# those would either fail or, worse, quietly shadow them. Inside the compose
+# network the containers still speak the standard ports.
 services:
   postgres:
     image: postgres:16-alpine
@@ -8,9 +15,10 @@ services:
       POSTGRES_PASSWORD: fundfusion_dev_only
       POSTGRES_DB: fundfusion_dev
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - fundfusion_pg:/var/lib/postgresql/data
+      - ./docker/init-test-db.sql:/docker-entrypoint-initdb.d/10-test-db.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U fundfusion -d fundfusion_dev"]
       interval: 5s
@@ -22,10 +30,15 @@ services:
     container_name: fundfusion-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "6380:6379"
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - fundfusion_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   fundfusion_pg:

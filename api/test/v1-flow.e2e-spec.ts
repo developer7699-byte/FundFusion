@@ -33,7 +33,7 @@ describe('v1 flow (e2e)', () => {
     process.env.OTP_STATIC_DEV = CODE;
     process.env.DATABASE_URL =
       process.env.TEST_DATABASE_URL ??
-      'postgresql://localhost:5432/fundfusion_test';
+      'postgresql://fundfusion:fundfusion_dev_only@localhost:5433/fundfusion_test';
 
     pool = new Pool({ connectionString: process.env.DATABASE_URL });
     await pool.query(`TRUNCATE TABLE audit_log, system_setting, user_capability,

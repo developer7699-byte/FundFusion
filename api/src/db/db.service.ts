@@ -28,7 +28,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     this.pool = new Pool({
       connectionString:
         process.env.DATABASE_URL ??
-        'postgresql://localhost:5432/fundfusion_dev',
+        'postgresql://fundfusion:fundfusion_dev_only@localhost:5433/fundfusion_dev',
       max: Number(process.env.DATABASE_POOL_MAX ?? 10),
       /**
        * A transaction holds one connection. Anything inside it that reaches
