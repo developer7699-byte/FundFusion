@@ -91,10 +91,10 @@ describe('money precision (PRD §5.1)', () => {
   });
 
   it('inr amounts are NUMERIC(20,2)', async () => {
-    const order = (await columns('p2p_order')).find(
+    const quoted = (await columns('p2p_quote')).find(
       (c) => c.column_name === 'inr_amount',
     );
-    expect([order?.numeric_precision, order?.numeric_scale]).toEqual([20, 2]);
+    expect([quoted?.numeric_precision, quoted?.numeric_scale]).toEqual([20, 2]);
   });
 });
 

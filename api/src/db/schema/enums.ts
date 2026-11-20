@@ -71,21 +71,21 @@ export const ledgerAccountType = pgEnum('ledger_account_type', [
   'REVENUE',
 ]);
 
+/**
+ * PRD §6.6. Exactly the states the spec's machine names — no more. The
+ * previous fourteen values were the prototype's and described a different
+ * flow; a state nothing can reach is a state someone will eventually write
+ * into the column by hand.
+ */
 export const orderStatus = pgEnum('order_status', [
-  'CREATED',
-  'FUNDS_LOCKED',
-  'MATCHING',
-  'SELLER_ASSIGNED',
-  'PAYMENT_PENDING',
+  'QUOTED',
+  'AWAITING_MERCHANT',
+  'ACCEPTED',
   'PAYMENT_SUBMITTED',
-  'VERIFICATION',
   'COMPLETED',
-  'CANCELLED',
-  'EXPIRED',
-  'REFUND_PENDING',
-  'REFUNDED',
   'DISPUTED',
-  'FAILED',
+  'REFUNDED',
+  'EXPIRED',
 ]);
 
 export const ticketStatus = pgEnum('ticket_status', [

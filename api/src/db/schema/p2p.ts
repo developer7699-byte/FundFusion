@@ -8,19 +8,24 @@ import {
 } from 'drizzle-orm/pg-core';
 import { orderStatus } from './enums';
 import { inr, usdt } from './money-columns';
+import { p2pQuote } from './quote';
 import { merchantProfile, user } from './identity';
 
+/**
+ * An order is a confirmed quote. It carries no price of its own: the snapshot
+ * it points at is law (PRD §7), and a second copy of the rate on this row is a
+ * second source of truth that nothing keeps in step.
+ */
 export const p2pOrder = pgTable('p2p_order', {
   id: uuid('id').primaryKey().defaultRandom(),
+  quoteId: uuid('quote_id')
+    .notNull()
+    .unique()
+    .references(() => p2pQuote.id),
   customerId: uuid('customer_id')
     .notNull()
     .references(() => user.id),
-  side: text('side').notNull(),
-  status: orderStatus('status').notNull().default('CREATED'),
-  assetSymbol: text('asset_symbol').notNull(),
-  cryptoAmount: usdt('crypto_amount').notNull(),
-  inrAmount: inr('inr_amount').notNull(),
-  feeAmount: inr('fee_amount').notNull(),
+  status: orderStatus('status').notNull().default('QUOTED'),
   idempotency: text('idempotency').notNull().unique(),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
