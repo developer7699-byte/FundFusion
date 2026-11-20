@@ -4,5 +4,6 @@ export * from './identity';
 export * from './money';
 export * from './movement';
 export * from './p2p';
+export * from './quote';
 export * from './capability';
 export * from './ops';

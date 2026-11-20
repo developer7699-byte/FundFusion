@@ -6,6 +6,7 @@ import { LedgerModule } from './ledger/ledger.module';
 import { CapabilityModule } from './capability/capability.module';
 import { AuditModule } from './audit/audit.module';
 import { V1Module } from './v1/v1.module';
+import { P2pModule } from './p2p/p2p.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { HealthController } from './health.controller';
@@ -22,6 +23,7 @@ import { OpsModule } from './ops/ops.module';
     CapabilityModule,
     AuditModule,
     V1Module,
+    P2pModule,
     PrototypeModule,
     AuthModule,
     WalletModule,

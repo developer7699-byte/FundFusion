@@ -103,3 +103,17 @@ export const disputeStatus = pgEnum('dispute_status', [
   'RESOLVED_MERCHANT',
   'CLOSED',
 ]);
+
+export const quoteSide = pgEnum('quote_side', ['BUY', 'SELL']);
+
+/**
+ * PRD §6.2. A customer enters either a USDT quantity or an INR amount and the
+ * system solves for the other. This records which one they typed: that side is
+ * exact, and the derived side absorbs the remainder. A dispute six months
+ * later can then show which figure was authoritative rather than arguing about
+ * a paisa.
+ */
+export const authoritativeSide = pgEnum('authoritative_side', [
+  'CRYPTO',
+  'FIAT',
+]);
