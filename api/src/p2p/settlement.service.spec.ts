@@ -325,7 +325,7 @@ describe('who may confirm (PRD §6.8)', () => {
  * settlement path that does not work.
  */
 describe('a fee the business has not set yet', () => {
-  async function withFee(buyFeeBps: number, markupBps: number) {
+  function withFee(buyFeeBps: number, markupBps: number) {
     const provider = new MockRateProvider();
     provider.next('100.00');
     const rateService = new RateService(provider, {
@@ -370,7 +370,7 @@ describe('a fee the business has not set yet', () => {
   }
 
   it('settles a buy order when the platform fee is zero', async () => {
-    const e = await withFee(0, 300);
+    const e = withFee(0, 300);
     await fund(merchantAccount, '200', 'merchant-funds');
     const quote = await e.quotes.create({
       userId: customerId,
@@ -390,7 +390,7 @@ describe('a fee the business has not set yet', () => {
   });
 
   it('settles a sell order when the markup is zero', async () => {
-    const e = await withFee(0, 0);
+    const e = withFee(0, 0);
     await fund(customerAccount, '100', 'customer-funds');
     await fund(merchantAccount, '200', 'merchant-funds');
     const quote = await e.quotes.create({
