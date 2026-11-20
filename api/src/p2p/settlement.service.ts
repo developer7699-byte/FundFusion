@@ -143,7 +143,7 @@ export class SettlementService {
       const { escrowAccountId, escrowBucket, escrowAmount, lines } =
         quote.side === 'SELL'
           ? await this.sellLegs(parties)
-          : await this.buyLegs(parties);
+          : this.buyLegs(parties);
 
       await this.posting.postDebit(
         escrowAccountId,
@@ -204,7 +204,7 @@ export class SettlementService {
    * instead — debited inside this same journal, out of what was locked at
    * accept. The customer receives exactly the quantity they asked for.
    */
-  private async buyLegs(p: Parties) {
+  private buyLegs(p: Parties) {
     const quantity = usdt(p.quote.usdtAmount);
     const fee = usdt(p.quote.platformFeeUsdt);
     const locked = quantity.plus(fee);
