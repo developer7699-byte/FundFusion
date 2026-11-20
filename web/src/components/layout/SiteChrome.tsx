@@ -77,6 +77,20 @@ export function SiteHeader() {
               {l.label}
             </Link>
           ))}
+          <div className="pt-2 border-t border-nx-line/50 my-1">
+            <span className="text-[10px] font-bold text-nx-muted uppercase tracking-wider block mb-1">Direct Portals</span>
+            <div className="grid grid-cols-3 gap-2 py-1">
+              <Link to="/customer/dashboard" className="text-center py-1.5 px-2 rounded-lg bg-nx-bg text-xs font-semibold text-nx-text border border-nx-line">
+                Customer
+              </Link>
+              <Link to="/merchant/dashboard" className="text-center py-1.5 px-2 rounded-lg bg-nx-bg text-xs font-semibold text-emerald-400 border border-emerald-500/20">
+                Merchant
+              </Link>
+              <Link to="/admin/dashboard" className="text-center py-1.5 px-2 rounded-lg bg-nx-bg text-xs font-semibold text-indigo-400 border border-indigo-500/20">
+                Admin
+              </Link>
+            </div>
+          </div>
           <div className="mt-3 flex items-center justify-between gap-3 border-t border-nx-line pt-3">
             <ThemeToggle />
             <div className="flex gap-2 flex-1">
@@ -110,12 +124,14 @@ export function SiteFooter() {
         </div>
         {[
           {
-            title: 'Product',
+            title: 'Product & Portals',
             items: [
+              ['/customer/dashboard', 'Customer App'],
+              ['/merchant/dashboard', 'Merchant Desk'],
+              ['/admin/dashboard', 'Admin Console'],
               ['/features', 'Features'],
               ['/how-it-works', 'How it works'],
               ['/fees', 'Fees'],
-              ['/merchant', 'Merchants'],
             ],
           },
           {

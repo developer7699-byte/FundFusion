@@ -30,7 +30,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
         id: 'usr-101',
         email: 'developer7699@fundfusion.io',
         displayName: 'developer7699',
-        roles: ['CUSTOMER', 'MERCHANT'],
+        roles: ['CUSTOMER', 'MERCHANT', 'ADMIN'],
         status: 'ACTIVE',
       })
     } finally {

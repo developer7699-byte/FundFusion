@@ -13,22 +13,30 @@ import {
 } from 'lucide-react'
 import { BackButton } from '@/components/ui/BackButton'
 import { useMerchantStore, type MerchantOrder } from '@/lib/merchant-store'
+import { useAdminStore, type GiftCardOrderRouteLog } from '@/lib/admin-store'
 import { ReleaseEscrowModal, DisputeOrderModal } from './components/MerchantModals'
 import { cn } from '@/lib/utils'
 import { useLanguage } from '@/lib/language'
 import { ToastNotification } from '@/components/ui/ToastNotification'
+import { Gift, X } from 'lucide-react'
 
 export function MerchantOrders({ filter: defaultFilter }: { filter?: 'active' | 'done' | string }) {
   const navigate = useNavigate()
   const { t } = useLanguage()
   const { myOrders } = useMerchantStore()
-  const [activeTab, setActiveTab] = useState<'ALL' | 'ACTIVE' | 'COMPLETED'>(
+  const { giftCardRouteLogs, merchantFulfillGiftCard } = useAdminStore()
+  const [activeTab, setActiveTab] = useState<'ALL' | 'ACTIVE' | 'COMPLETED' | 'VOUCHERS'>(
     defaultFilter === 'active' ? 'ACTIVE' : defaultFilter === 'done' ? 'COMPLETED' : 'ALL'
   )
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedReleaseOrder, setSelectedReleaseOrder] = useState<MerchantOrder | null>(null)
   const [selectedDisputeOrder, setSelectedDisputeOrder] = useState<MerchantOrder | null>(null)
+  const [selectedVoucherOrder, setSelectedVoucherOrder] = useState<GiftCardOrderRouteLog | null>(null)
+  const [voucherCodeInput, setVoucherCodeInput] = useState('')
+  const [voucherPinInput, setVoucherPinInput] = useState('')
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  const forwardedVouchers = giftCardRouteLogs.filter((l) => l.fulfillmentTier === 'TIER_3_MERCHANT_DESK')
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -137,19 +145,83 @@ export function MerchantOrders({ filter: defaultFilter }: { filter?: 'active' | 
         >
           {t('merchantOrders.tabCompleted')}
         </button>
-      </div>
-            activeTab === 'COMPLETED'
-              ? 'bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white shadow-xs'
+        <button
+          type="button"
+          onClick={() => setActiveTab('VOUCHERS')}
+          className={cn(
+            'flex-1 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center justify-center gap-1',
+            activeTab === 'VOUCHERS'
+              ? 'bg-white dark:bg-[#1e293b] text-amber-500 shadow-xs'
               : 'text-slate-500 hover:text-slate-800'
           )}
         >
-          Completed
+          <span>Vouchers</span>
+          {forwardedVouchers.length > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-500 text-slate-950">
+              {forwardedVouchers.length}
+            </span>
+          )}
         </button>
       </div>
 
       {/* Orders List */}
       <div className="space-y-3">
-        {filteredOrders.length === 0 ? (
+        {activeTab === 'VOUCHERS' ? (
+          forwardedVouchers.length === 0 ? (
+            <div className="p-8 text-center rounded-3xl bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-800 space-y-2">
+              <Gift className="w-8 h-8 text-slate-400 mx-auto" />
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">No Forwarded Voucher Orders</p>
+              <p className="text-[11px] text-slate-400">All gift card orders are currently in-stock or fulfilled via API.</p>
+            </div>
+          ) : (
+            forwardedVouchers.map((v) => (
+              <div
+                key={v.id}
+                className="p-4 rounded-3xl bg-white dark:bg-[#111827] border border-amber-500/40 shadow-xs space-y-3"
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-[10px] font-mono font-bold text-amber-500 block">
+                      Procurement #{v.id} · {v.buyerName}
+                    </span>
+                    <span className="text-sm font-black text-slate-900 dark:text-white">
+                      {v.brand}
+                    </span>
+                    <span className="text-xs text-slate-400 font-mono block">
+                      Value: ₹{v.denominationInr.toLocaleString('en-IN')} (${v.usdtAmount} USDT)
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                    {v.status === 'MERCHANT_COMPLETED' ? 'COMPLETED' : 'ACTION REQUIRED'}
+                  </span>
+                </div>
+
+                <div className="p-2.5 rounded-2xl bg-amber-500/10 text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                  Auto-forwarded from Router because local vault & API were out-of-stock. Fulfill to earn 1.5% commission!
+                </div>
+
+                {v.status !== 'MERCHANT_COMPLETED' ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedVoucherOrder(v)
+                      setVoucherCodeInput('')
+                      setVoucherPinInput('')
+                    }}
+                    className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs shadow-xs transition-transform active:scale-95 cursor-pointer text-center"
+                  >
+                    Enter Retail Voucher & Fulfill
+                  </button>
+                ) : (
+                  <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800 text-xs font-mono flex justify-between">
+                    <span>Code: <strong>{v.voucherCode}</strong></span>
+                    <span>Status: <strong className="text-emerald-500">Delivered</strong></span>
+                  </div>
+                )}
+              </div>
+            ))
+          )
+        ) : filteredOrders.length === 0 ? (
           <div className="p-8 text-center rounded-3xl bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-800 space-y-2">
             <History className="w-8 h-8 text-slate-400 mx-auto" />
             <p className="text-xs font-bold text-slate-700 dark:text-slate-300">No orders found in this view</p>
@@ -283,6 +355,73 @@ export function MerchantOrders({ filter: defaultFilter }: { filter?: 'active' | 
         onClose={() => setSelectedDisputeOrder(null)}
         onSuccess={showToast}
       />
+
+      {/* Manual Voucher Fulfillment Modal */}
+      {selectedVoucherOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-[#111827] w-full max-w-sm rounded-[28px] p-5 shadow-2xl border border-slate-100 dark:border-slate-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-mono text-amber-500 font-bold">#{selectedVoucherOrder.id}</span>
+                <h3 className="text-base font-black text-slate-900 dark:text-white">Manual Voucher Fulfillment</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedVoucherOrder(null)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-400">
+              Procure {selectedVoucherOrder.brand} (₹{selectedVoucherOrder.denominationInr}) and enter the voucher details below:
+            </p>
+
+            <div className="space-y-3">
+              <input
+                type="text"
+                placeholder="Enter Voucher Code (e.g. AMZN-1920-8910)"
+                value={voucherCodeInput}
+                onChange={(e) => setVoucherCodeInput(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-mono text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 focus:outline-none"
+              />
+              <input
+                type="text"
+                placeholder="Enter Security PIN (e.g. 8829)"
+                value={voucherPinInput}
+                onChange={(e) => setVoucherPinInput(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-mono text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 focus:outline-none"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setSelectedVoucherOrder(null)}
+                className="flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!voucherCodeInput.trim()) {
+                    showToast('Please enter a voucher code')
+                    return
+                  }
+                  merchantFulfillGiftCard(selectedVoucherOrder.id, voucherCodeInput.trim(), voucherPinInput.trim() || '—', 'Orbit Desk LLP')
+                  showToast('Voucher delivered to customer! Rebate credited.')
+                  setSelectedVoucherOrder(null)
+                }}
+                className="flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+              >
+                Confirm Dispatch
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

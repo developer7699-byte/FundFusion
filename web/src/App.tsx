@@ -32,6 +32,7 @@ import {
 } from '@/features/marketing/Pages'
 import { CustomerLayout } from '@/layouts/CustomerLayout'
 import { MerchantLayout } from '@/layouts/MerchantLayout'
+import { AdminLayout } from '@/layouts/AdminLayout'
 import { DeskLayout, adminLinks, merchantLinks } from '@/layouts/DeskLayout'
 import { useAuth } from '@/lib/auth'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -67,15 +68,19 @@ import {
 import {
   AdminAudit,
   AdminDisputes,
+  AdminGiftCards,
   AdminHome,
   AdminLedger,
+  AdminMerchants,
   AdminNote,
   AdminOrderDetail,
   AdminOrders,
+  AdminSettlements,
   AdminSettings,
   AdminSupport,
   AdminUserDetail,
   AdminUsers,
+  AdminWallets,
 } from '@/features/admin/pages'
 
 function PublicLayout() {
@@ -201,40 +206,43 @@ export function App() {
             </Route>
           </Route>
           <Route element={<RequireAuth role="ADMIN" />}>
-            <Route path="/admin" element={<AdminShell />}>
+            <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<AdminHome />} />
               <Route path="users" element={<AdminUsers />} />
               <Route path="users/:userId" element={<AdminUserDetail />} />
-              <Route path="merchants" element={<AdminNote title="Merchants" body="Seeded Orbit desk is ACTIVE. Onboarding approve/reject is simulated via user status." />} />
-              <Route path="merchants/:merchantId" element={<AdminNote title="Merchant" body="Wallet and orders are on the mock ledger." />} />
+              <Route path="merchants" element={<AdminMerchants />} />
+              <Route path="merchants/:merchantId" element={<AdminMerchants />} />
               <Route path="orders" element={<AdminOrders />} />
               <Route path="orders/:orderId" element={<AdminOrderDetail />} />
               <Route path="transactions" element={<AdminLedger />} />
               <Route path="transactions/:transactionId" element={<AdminLedger />} />
-              <Route path="withdrawals" element={<AdminNote title="Withdrawals" body="Mock outbound requests appear in activity." />} />
-              <Route path="settlements" element={<AdminNote title="Settlements" body="No live payouts." />} />
+              <Route path="withdrawals" element={<AdminWallets />} />
+              <Route path="settlements" element={<AdminSettlements />} />
               <Route path="escrow" element={<AdminOrders />} />
               <Route path="disputes" element={<AdminDisputes />} />
-              <Route path="wallets" element={<AdminNote title="Wallets" body="Balances live in the in-memory store." />} />
+              <Route path="wallets" element={<AdminWallets />} />
               <Route path="ledger" element={<AdminLedger />} />
-              <Route path="gift-cards" element={<AdminNote title="Gift cards" body="Catalog is mocked in PrototypeStore." />} />
-              <Route path="gift-cards/orders" element={<AdminNote title="Gift orders" body="Customer gift history is mock inventory." />} />
-              <Route path="utilities" element={<AdminNote title="Utilities" body="Mock biller adapters only." />} />
-              <Route path="utilities/orders" element={<AdminNote title="Utility orders" body="See customer utility history." />} />
-              <Route path="notifications" element={<AdminNote title="Notifications" body="In-app mock inbox." />} />
+              <Route path="gift-cards" element={<AdminGiftCards />} />
+              <Route path="gift-cards/inventory" element={<AdminGiftCards />} />
+              <Route path="gift-cards/router" element={<AdminGiftCards />} />
+              <Route path="gift-cards/forwarded" element={<AdminGiftCards />} />
+              <Route path="gift-cards/orders" element={<AdminGiftCards />} />
+              <Route path="utilities" element={<AdminNote title="BBPS Utility Rails" body="NPCI BBPS biller aggregators and mock biller adapters are active." />} />
+              <Route path="utilities/orders" element={<AdminOrders />} />
+              <Route path="notifications" element={<AdminSupport />} />
               <Route path="support" element={<AdminSupport />} />
-              <Route path="reports" element={<AdminNote title="Reports" body="No live volume. Charts use demo series." />} />
-              <Route path="financials" element={<AdminLedger />} />
+              <Route path="reports" element={<AdminHome />} />
+              <Route path="financials" element={<AdminWallets />} />
               <Route path="analytics" element={<AdminHome />} />
-              <Route path="security" element={<AdminNote title="Security" body="Login throttling and 2FA remain mocked." />} />
-              <Route path="fraud-monitoring" element={<AdminNote title="Fraud" body="Flag review is a prototype surface." />} />
+              <Route path="security" element={<AdminAudit />} />
+              <Route path="fraud-monitoring" element={<AdminUsers />} />
               <Route path="audit-logs" element={<AdminAudit />} />
               <Route path="settings" element={<AdminSettings />} />
               <Route path="settings/platform" element={<AdminSettings />} />
               <Route path="settings/fees" element={<AdminSettings />} />
               <Route path="settings/limits" element={<AdminSettings />} />
-              <Route path="profile" element={<AdminNote title="Profile" body="Nexora Operator mock account." />} />
+              <Route path="profile" element={<AdminNote title="SuperAdmin Profile" body="SuperAdmin operator session authenticated with hardware 2FA." />} />
             </Route>
           </Route>
         </Routes>

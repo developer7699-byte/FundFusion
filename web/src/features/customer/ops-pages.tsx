@@ -45,6 +45,7 @@ import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/utils'
 import { BackButton } from '@/components/ui/BackButton'
 import { useNotifications } from '@/lib/notifications'
+import { useAdminStore } from '@/lib/admin-store'
 
 type Order = {
   id: string
@@ -602,9 +603,11 @@ export function PayConfirm() {
    4. GIFT HUB (/customer/gift-cards)
    ========================================================================= */
 export function GiftHub() {
+  const { user } = useAuth()
+  const { fulfillGiftCardOrder } = useAdminStore()
   const [selectedCategory, setSelectedCategory] = useState('ALL')
   const [searchQuery, setSearchQuery] = useState('')
-  const [boughtVoucher, setBoughtVoucher] = useState<{ brand: string; code: string; pin: string } | null>(null)
+  const [boughtVoucher, setBoughtVoucher] = useState<{ brand: string; code: string; pin: string; message?: string } | null>(null)
   const [copiedCode, setCopiedCode] = useState(false)
 
   const giftBrands = [
@@ -627,9 +630,17 @@ export function GiftHub() {
   })
 
   const handleQuickBuy = (brandName: string) => {
-    const randCode = `VCH-${brandName.slice(0, 4).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`
-    const randPin = `${Math.floor(100000 + Math.random() * 900000)}`
-    setBoughtVoucher({ brand: brandName, code: randCode, pin: randPin })
+    const res = fulfillGiftCardOrder(brandName, 1000, user?.displayName || '@customer')
+    if (res.code) {
+      setBoughtVoucher({ brand: brandName, code: res.code, pin: res.pin || '—', message: res.message })
+    } else {
+      setBoughtVoucher({
+        brand: brandName,
+        code: 'FORWARDED_TO_OTC_DESK',
+        pin: 'Pending Retail Procurement',
+        message: res.message,
+      })
+    }
   }
 
   return (
@@ -738,7 +749,9 @@ export function GiftHub() {
               <h3 className="text-base font-black text-slate-900 dark:text-white">
                 {boughtVoucher.brand}
               </h3>
-              <p className="text-xs text-slate-400">Ready to redeem immediately</p>
+              <p className="text-xs text-slate-400">
+                {boughtVoucher.message || 'Ready to redeem immediately'}
+              </p>
             </div>
 
             <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-2">
