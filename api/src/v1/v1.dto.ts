@@ -1,4 +1,10 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import {
+  IsDefined,
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  MinLength,
+} from 'class-validator';
 
 export class RegisterV1Dto {
   @IsEmail()
@@ -33,6 +39,19 @@ export class RefreshDto {
   @IsString()
   @IsNotEmpty()
   refreshToken!: string;
+}
+
+export class ChangeSettingDto {
+  /**
+   * A number for an integer setting, a decimal string for a money one. Money
+   * never arrives as a JavaScript number (PRD §5.1).
+   */
+  @IsDefined()
+  value!: string | number;
+
+  @IsString()
+  @IsNotEmpty()
+  reason!: string;
 }
 
 export class DenyCapabilityDto {

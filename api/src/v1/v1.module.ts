@@ -7,6 +7,8 @@ import { AuditModule } from '../audit/audit.module';
 import { OtpService } from '../auth/v1/otp.service';
 import { SessionService } from '../auth/v1/session.service';
 import { PhoneGateGuard } from '../auth/v1/phone-gate.guard';
+import { AdminGuard } from '../auth/v1/admin.guard';
+import { SettingsModule } from '../settings/settings.module';
 import { V1Controller } from './v1.controller';
 import { V1Service } from './v1.service';
 
@@ -15,7 +17,7 @@ import { V1Service } from './v1.service';
  * and end to end. The prototype controllers are untouched.
  */
 @Module({
-  imports: [LedgerModule, CapabilityModule, AuditModule],
+  imports: [LedgerModule, CapabilityModule, AuditModule, SettingsModule],
   controllers: [V1Controller],
   providers: [
     {
@@ -27,6 +29,7 @@ import { V1Service } from './v1.service';
     OtpService,
     SessionService,
     PhoneGateGuard,
+    AdminGuard,
   ],
 })
 export class V1Module {}

@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ok } from '../common/http';
 import { CurrentUser, type AuthUser } from '../auth/current-user';
@@ -8,11 +16,15 @@ import {
   PhoneGateGuard,
   RequiresVerifiedPhone,
 } from '../auth/v1/phone-gate.guard';
+import { AdminGuard, RequiresAdmin } from '../auth/v1/admin.guard';
+import { PlatformSettingsService } from '../settings/platform-settings.service';
+import type { SettingKey } from '../settings/platform-settings';
 import { V1AuthGuard } from './v1-auth.guard';
 import { V1Service } from './v1.service';
 import type { CapabilityKey } from '../capability/capability.types';
 import {
   DenyCapabilityDto,
+  ChangeSettingDto,
   OtpRequestDto,
   OtpVerifyDto,
   RefreshDto,
@@ -26,6 +38,7 @@ export class V1Controller {
     private readonly v1: V1Service,
     private readonly otp: OtpService,
     private readonly sessions: SessionService,
+    private readonly settings: PlatformSettingsService,
   ) {}
 
   @Post('admin/seed')
@@ -73,6 +86,8 @@ export class V1Controller {
   }
 
   @Post('admin/capabilities/deny')
+  @UseGuards(V1AuthGuard, AdminGuard)
+  @RequiresAdmin()
   async deny(@Body() dto: DenyCapabilityDto) {
     return ok(
       await this.v1.denyCapability(
@@ -84,6 +99,8 @@ export class V1Controller {
   }
 
   @Post('admin/capabilities/grant')
+  @UseGuards(V1AuthGuard, AdminGuard)
+  @RequiresAdmin()
   async grant(@Body() dto: DenyCapabilityDto) {
     return ok(
       await this.v1.grantCapability(
@@ -94,7 +111,37 @@ export class V1Controller {
     );
   }
 
+  /**
+   * The commercial numbers (PRD §6, §7). Readable so an admin can see what
+   * the engine is actually running on, which is not always what anyone
+   * remembers setting.
+   */
+  @Get('admin/settings')
+  @UseGuards(V1AuthGuard, AdminGuard)
+  @RequiresAdmin()
+  async listSettings() {
+    return ok(await this.settings.all());
+  }
+
+  /** Every change is bounded, attributed and given a reason (PRD §9.4). */
+  @Put('admin/settings/:key')
+  @UseGuards(V1AuthGuard, AdminGuard)
+  @RequiresAdmin()
+  async changeSetting(
+    @CurrentUser() user: AuthUser,
+    @Param('key') key: string,
+    @Body() dto: ChangeSettingDto,
+  ) {
+    await this.settings.set(key as SettingKey, dto.value, {
+      actorId: user.sub,
+      reason: dto.reason,
+    });
+    return ok(await this.settings.all());
+  }
+
   @Get('admin/audit')
+  @UseGuards(V1AuthGuard, AdminGuard)
+  @RequiresAdmin()
   async audit() {
     return ok(await this.v1.auditTrail());
   }
