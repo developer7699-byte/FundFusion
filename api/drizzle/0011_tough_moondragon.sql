@@ -1,0 +1,2 @@
+ALTER TABLE "wallet_address" ADD COLUMN "derivation_index" integer;--> statement-breakpoint
+CREATE UNIQUE INDEX "wallet_address_network_id_derivation_index_key" ON "wallet_address" USING btree ("network_id","derivation_index");

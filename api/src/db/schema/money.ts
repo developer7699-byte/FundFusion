@@ -92,6 +92,13 @@ export const walletAddress = pgTable(
       .notNull()
       .references(() => blockchainNetwork.id),
     address: text('address').notNull(),
+    /**
+     * The BIP-44 index this address was derived at (PRD §8.1). Allocated by
+     * the database, because two users signing up at the same moment must not
+     * be handed the same index — and an index collision means two people
+     * share a deposit address.
+     */
+    derivationIndex: integer('derivation_index'),
     isDefault: boolean('is_default').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -101,6 +108,10 @@ export const walletAddress = pgTable(
     uniqueIndex('wallet_address_network_id_address_key').on(
       t.networkId,
       t.address,
+    ),
+    uniqueIndex('wallet_address_network_id_derivation_index_key').on(
+      t.networkId,
+      t.derivationIndex,
     ),
   ],
 );

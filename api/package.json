@@ -32,6 +32,8 @@
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/swagger": "^11.4.7",
     "@nestjs/throttler": "^6.7.1",
+    "@scure/bip32": "^1.7.0",
+    "@scure/bip39": "^1.6.0",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
