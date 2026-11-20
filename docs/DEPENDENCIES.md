@@ -139,6 +139,14 @@ flagged so nobody goes looking for real USDT there.
 
 ### 2.5 Custody key policy — **your decision, not mine**
 
+> **Decided 2026-11-21.** Custody material is **not** configuration. The HD
+> master seed and the gas wallet key live in the environment or the host's
+> secret manager, never in `system_setting`, never behind an admin screen, and
+> never in this repository. `api/src/settings/platform-settings.ts` states the
+> rule and a test asserts the registry holds no key whose name looks like a
+> secret. The three questions below are still yours to answer before mainnet;
+> v1 runs on a throwaway testnet seed.
+
 The most important item on this page, and a policy decision before a technical
 one.
 
@@ -330,6 +338,11 @@ roughly $10k/year — a cost absent from every reference document you have.
 ## Summary — the short version
 
 **Now:** nothing. I start M0.
+
+> **Status 2026-11-21.** M0–M2 and M4 are done. NodeReal endpoints are in
+> `api/.env`, so M3 is unblocked. The commercial numbers are now admin-editable
+> at `PUT /v1/admin/settings/:key`, bounded and audited, so §3.2 below is a
+> screen rather than a blocker.
 
 **Soon (M2–M3):** Google OAuth client · **NodeReal account** (RPC + WSS +
 explorer, one key) · ~₹150 of mainnet BNB to unlock the faucet · **your custody
