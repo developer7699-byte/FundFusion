@@ -9,7 +9,7 @@ import {
   RegisterPage,
   VerifyOtpPage,
 } from '@/features/auth/pages'
-import { CustomerDashboard } from '@/features/customer/pages'
+import { CustomerDashboard } from '@/features/customer/CustomerDashboard'
 import {
   AddressesFlow,
   DepositFlow,

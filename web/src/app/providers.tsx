@@ -9,8 +9,6 @@ import {
 import { ThemeProvider } from '@/lib/theme'
 import { LanguageProvider } from '@/lib/language'
 
-const queryClient = new QueryClient()
-
 interface Session {
   accessToken: string
   refreshToken: string
@@ -24,6 +22,9 @@ interface Session {
  * figures for an account that does not exist.
  */
 export function AppProviders({ children }: { children: ReactNode }) {
+  // Per instance, not per module: a cache shared by every mount outlives the
+  // session it was filled for, and one test's balances show up in the next.
+  const [queryClient] = useState(() => new QueryClient())
   const [user, setUser] = useState<SessionUser | null>(null)
   const [pending, setPending] = useState<PendingCode | null>(null)
   const [loading, setLoading] = useState(true)

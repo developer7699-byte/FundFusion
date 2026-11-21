@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
@@ -6,7 +6,6 @@ import {
   Check,
   QrCode,
   CheckCircle2,
-  ArrowUpRight,
 } from 'lucide-react'
 import { BackButton } from '@/components/ui/BackButton'
 import {} from '@/components/ui/badge'
@@ -14,59 +13,62 @@ import { Button } from '@/components/ui/button'
 import {} from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { api } from '@/lib/api'
+import { newIdempotencyKey, v1 } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
-export type WalletSnap = {
-  simulated: boolean
-  label: string
-  usdtInrRate: string
-  wallet: { availableUsdt: string; lockedUsdt: string; totalUsdt: string; inrEstimate: string }
-  assets: { symbol: string; available: string; locked: string; total: string; displayOnly?: boolean }[]
-  addresses: { id: string; network: string; address: string; isDefault: boolean }[]
-  activity: { id: string; type: string; status: string; amount: string; asset: string; createdAt: string }[]
+/** `GET /v1/wallet/summary`. Every figure is a string (PRD §5.1). */
+export interface WalletSummary {
+  balances: Record<string, string>
+  address: string | null
+  network: string
 }
 
-function useWallet() {
+/** `GET /v1/wallet/activity`. One row per ledger entry. */
+export interface ActivityRow {
+  id: string
+  kind: string
+  bucket: string
+  direction: 'DEBIT' | 'CREDIT'
+  amount: string
+  assetSymbol: string
+  memo: string
+  at: string
+}
+
+/**
+ * The wallet, as the ledger has it.
+ *
+ * No fallback. The prototype invented balances and addresses when the request
+ * failed, and an invented deposit address is the worst thing this screen can
+ * show: money sent to it is gone.
+ */
+export function useWalletSummary() {
   return useQuery({
-    queryKey: ['wallet'],
-    queryFn: async () => {
-      try {
-        return await api<WalletSnap>('/wallet')
-      } catch {
-        return {
-          simulated: true,
-          label: 'Simulated Wallet Vault',
-          usdtInrRate: '99.11',
-          wallet: {
-            availableUsdt: '1420.50',
-            lockedUsdt: '120.00',
-            totalUsdt: '1540.50',
-            inrEstimate: '152678.95',
-          },
-          assets: [
-            { symbol: 'USDT', available: '1420.50', locked: '120.00', total: '1540.50' },
-            { symbol: 'BTC', available: '0.045', locked: '0.00', total: '0.045' },
-            { symbol: 'ETH', available: '1.25', locked: '0.00', total: '1.25' },
-          ],
-          addresses: [
-            { id: 'addr-1', network: 'TRC20', address: 'TLvM8vPq...xK92', isDefault: true },
-            { id: 'addr-2', network: 'BEP20', address: '0x71C...89e2', isDefault: false },
-          ],
-          activity: [
-            { id: 'tx-1', type: 'DEPOSIT', status: 'COMPLETED', amount: '500.00', asset: 'USDT', createdAt: new Date().toISOString() },
-            { id: 'tx-2', type: 'BUY', status: 'COMPLETED', amount: '250.00', asset: 'USDT', createdAt: new Date(Date.now() - 3600000).toISOString() },
-            { id: 'tx-3', type: 'SELL', status: 'COMPLETED', amount: '100.00', asset: 'USDT', createdAt: new Date(Date.now() - 7200000).toISOString() },
-          ],
-        }
-      }
-    },
+    queryKey: ['wallet', 'summary'],
+    queryFn: () => v1<WalletSummary>('/wallet/summary'),
     retry: false,
   })
 }
 
+export function useActivity() {
+  return useQuery({
+    queryKey: ['wallet', 'activity'],
+    queryFn: () => v1<ActivityRow[]>('/wallet/activity'),
+    retry: false,
+  })
+}
+
+/** The buckets PRD §5.2 defines, in the order a person cares about them. */
+const BUCKETS: [string, string, string][] = [
+  ['AVAILABLE', 'Available to spend', 'text-emerald-300'],
+  ['LOCKED', 'Locked in escrow', 'text-amber-300'],
+  ['BONDED', 'Bonded against orders', 'text-sky-300'],
+  ['PENDING', 'Pending confirmation', 'text-slate-300'],
+]
+
 export function WalletHome() {
-  const q = useWallet()
+  const q = useWalletSummary()
+  const activity = useActivity()
   if (q.isLoading) return <Skeleton className="h-40 rounded-3xl" />
   if (q.error) return <p className="text-rose-500 font-bold p-4">{q.error.message}</p>
   const d = q.data!
@@ -86,48 +88,42 @@ export function WalletHome() {
         </div>
 
         <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-          1 USDT ≈ ₹{d.usdtInrRate}
+          {d.network}
         </span>
       </div>
 
-      {/* Main Total Balance Card */}
+      {/* Main Balance Card. No total and no rupee estimate: adding buckets
+          together, or multiplying by a rate, would be money arithmetic in a
+          JavaScript number (PRD §5.1). The ledger states each bucket. */}
       <div className="rounded-[28px] bg-gradient-to-tr from-slate-950 via-slate-900 to-emerald-950 text-white p-5 sm:p-6 shadow-xl border border-emerald-500/30 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/15 rounded-full blur-2xl pointer-events-none" />
 
         <div className="relative z-10 space-y-3">
           <div>
-            <span className="text-xs text-slate-400 font-medium">Total Vault Balance</span>
-            <div className="text-3xl sm:text-4xl font-black font-mono tracking-tight mt-0.5">
-              ${parseFloat(d.wallet.totalUsdt).toFixed(2)}
+            <span className="text-xs text-slate-400 font-medium">Available to Spend</span>
+            <div className="text-2xl sm:text-3xl font-black font-mono tracking-tight mt-0.5 break-all">
+              {d.balances.AVAILABLE} <span className="text-base">USDT</span>
             </div>
-            <span className="text-xs text-emerald-400 font-mono">
-              ≈ ₹{parseFloat(d.wallet.inrEstimate).toLocaleString('en-IN', { minimumFractionDigits: 2 })} INR
-            </span>
           </div>
 
           <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/10 text-xs">
-            <div>
-              <span className="text-[10px] text-slate-400 block uppercase">Available to Spend</span>
-              <span className="font-mono font-bold text-emerald-300">
-                {d.wallet.availableUsdt} USDT
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-400 block uppercase">Locked in Escrow</span>
-              <span className="font-mono font-bold text-amber-300">
-                {d.wallet.lockedUsdt} USDT
-              </span>
-            </div>
+            {BUCKETS.slice(1).map(([key, label, tone]) => (
+              <div key={key}>
+                <span className="text-[10px] text-slate-400 block uppercase">{label}</span>
+                <span className={cn('font-mono font-bold break-all', tone)}>
+                  {d.balances[key]} USDT
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* 4 Wallet Quick Actions */}
-      <div className="grid grid-cols-4 gap-2 pt-1 text-center">
+      {/* 3 Wallet Quick Actions */}
+      <div className="grid grid-cols-3 gap-2 pt-1 text-center">
         {[
           { label: 'Deposit', to: '/customer/wallet/deposit', icon: '↓', bg: 'bg-[#22c55e] text-white' },
           { label: 'Withdraw', to: '/customer/wallet/withdraw', icon: '↑', bg: 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' },
-          { label: 'Send', to: '/customer/wallet/send', icon: '↗', bg: 'bg-blue-600 text-white' },
           { label: 'Receive', to: '/customer/wallet/receive', icon: '↙', bg: 'bg-purple-600 text-white' },
         ].map((btn) => (
           <Link
@@ -145,42 +141,6 @@ export function WalletHome() {
         ))}
       </div>
 
-      {/* Assets Breakdown */}
-      <div className="rounded-[28px] bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 p-4 space-y-3 shadow-xs">
-        <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white">
-          Asset Balances
-        </h3>
-
-        <div className="divide-y divide-slate-100 dark:divide-slate-800">
-          {d.assets.map((asset) => (
-            <div key={asset.symbol} className="py-2.5 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-black text-xs text-slate-800 dark:text-slate-200">
-                  {asset.symbol.slice(0, 3)}
-                </div>
-                <div>
-                  <span className="text-xs font-black text-slate-900 dark:text-white block">
-                    {asset.symbol}
-                  </span>
-                  <span className="text-[10px] text-slate-400">
-                    Avail: {asset.available}
-                  </span>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <span className="text-xs font-black font-mono text-slate-900 dark:text-white block">
-                  {asset.total} {asset.symbol}
-                </span>
-                <span className="text-[10px] text-emerald-500 font-mono">
-                  {asset.locked !== '0.00' ? `Locked: ${asset.locked}` : 'Available'}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Recent Activity */}
       <div className="rounded-[28px] bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 p-4 space-y-3 shadow-xs">
         <div className="flex items-center justify-between">
@@ -196,7 +156,7 @@ export function WalletHome() {
         </div>
 
         <div className="divide-y divide-slate-100 dark:divide-slate-800">
-          {d.activity.slice(0, 5).map((row) => (
+          {(activity.data ?? []).slice(0, 5).map((row) => (
             <Link
               key={row.id}
               to={`/customer/transactions/${row.id}`}
@@ -204,77 +164,54 @@ export function WalletHome() {
             >
               <div>
                 <span className="text-xs font-black text-slate-900 dark:text-white block group-hover:text-emerald-500 transition-colors">
-                  {row.type}
+                  {row.kind}
                 </span>
                 <span className="text-[10px] text-slate-400">
-                  {new Date(row.createdAt).toLocaleDateString()}
+                  {new Date(row.at).toLocaleDateString()}
                 </span>
               </div>
 
               <div className="text-right">
-                <span className="text-xs font-black font-mono text-slate-900 dark:text-white block">
-                  {row.amount} {row.asset}
+                <span className="text-xs font-black font-mono text-slate-900 dark:text-white block break-all">
+                  {row.direction === 'DEBIT' ? '−' : '+'}
+                  {row.amount} {row.assetSymbol}
                 </span>
                 <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                  {row.status}
+                  {row.bucket}
                 </span>
               </div>
             </Link>
           ))}
+          {activity.data?.length === 0 && (
+            <p className="py-3 text-xs text-slate-400">Nothing has moved yet.</p>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
+/**
+ * Depositing (PRD §8.2).
+ *
+ * There is nothing to submit. The address is derived once and kept, the
+ * person sends USDT to it on chain, and the watcher credits the ledger after
+ * fifteen confirmations. The prototype's amount step and its two
+ * simulate-the-chain buttons have no v1 route behind them, and a button that
+ * conjures a balance is the one thing a wallet must never have.
+ */
 export function DepositFlow() {
-  const qc = useQueryClient()
-  const [network] = useState('BNB')
-  const [amount, setAmount] = useState('')
-  const [deposit, setDeposit] = useState<{
-    id: string
-    address: string
-    status: string
-    confirmations: number
-    requiredConfirmations: number
-    mockTxHash: string | null
-    amount: string
-  } | null>(null)
+  const q = useWalletSummary()
+  const [copied, setCopied] = useState(false)
 
-  const presets = ['5 USDT', '10 USDT', '50 USDT', '100 USDT', '500 USDT']
-  const isValidAmount = Boolean(amount && parseFloat(amount) > 0)
-
-  const start = useMutation({
-    mutationFn: () =>
-      api<NonNullable<typeof deposit> & { qrPayload: string }>('/wallet/deposits', {
-        method: 'POST',
-        body: JSON.stringify({ asset: 'USDT', network }),
-      }),
-    onSuccess: setDeposit,
-  })
-
-  const broadcast = useMutation({
-    mutationFn: () =>
-      api<NonNullable<typeof deposit>>(`/wallet/deposits/${deposit!.id}/simulate-broadcast`, {
-        method: 'POST',
-        body: JSON.stringify({ amount: amount || '50' }),
-      }),
-    onSuccess: setDeposit,
-  })
-
-  const confirm = useMutation({
-    mutationFn: () =>
-      api<NonNullable<typeof deposit>>(`/wallet/deposits/${deposit!.id}/simulate-confirm`, { method: 'POST' }),
-    onSuccess: (row) => {
-      setDeposit(row)
-      void qc.invalidateQueries({ queryKey: ['wallet'] })
-      void qc.invalidateQueries({ queryKey: ['overview'] })
-    },
-  })
+  const copy = async (address: string) => {
+    await navigator.clipboard.writeText(address)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
 
   return (
     <div className="max-w-lg mx-auto space-y-4 pb-4 w-full overflow-x-hidden min-w-0">
-      {/* Top Header Bar with Back Arrow (Matching Reference Image) */}
       <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-center gap-3">
           <BackButton fallback="/customer/wallet" />
@@ -283,196 +220,76 @@ export function DepositFlow() {
           </h1>
         </div>
 
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/40">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span>1 USDT = ₹99.11</span>
-        </div>
+        {q.data && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/40">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>{q.data.network}</span>
+          </div>
+        )}
       </div>
 
-      {!deposit ? (
-        /* STEP 1: AMOUNT INPUT & NETWORK SELECTION (Matching Reference Image) */
+      {q.isLoading && <Skeleton className="h-56 rounded-3xl" />}
+
+      {q.error && (
+        <p className="text-rose-500 font-bold p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-sm">
+          {q.error.message}
+        </p>
+      )}
+
+      {q.data && !q.data.address && (
+        <p className="text-amber-600 dark:text-amber-400 font-bold p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-sm">
+          This server cannot issue a deposit address. Nothing should be sent
+          anywhere until it can.
+        </p>
+      )}
+
+      {q.data?.address && (
         <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
-          {/* CARD 1: Amount (USDT) */}
-          <div className="p-[1.5px] rounded-[28px] bg-gradient-to-br from-[#3b59f8] via-[#10b981] to-[#3b59f8] animate-shimmer shadow-lg shadow-blue-500/10">
-            <div className="rounded-[26px] bg-white dark:bg-[#121829] p-4.5 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black text-slate-900 dark:text-white">Amount (USDT)</span>
-                <span className="text-[10px] font-extrabold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-0.5 rounded-full border border-blue-100 dark:border-blue-900/40">
-                  1 - 100000 USDT
+          <div className="p-[1.5px] rounded-[28px] bg-gradient-to-br from-[#3b59f8] via-[#10b981] to-[#3b59f8] shadow-lg shadow-blue-500/10">
+            <div className="rounded-[26px] bg-white dark:bg-[#121829] p-4.5 space-y-4 text-center">
+              <div className="mx-auto w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                <QrCode className="h-7 w-7 text-slate-700 dark:text-slate-200" />
+              </div>
+
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                  Your {q.data.network} deposit address
                 </span>
-              </div>
-
-              {/* Amount Input Box */}
-              <div className="flex flex-col gap-1.5 bg-slate-50/80 dark:bg-slate-900/60 rounded-2xl p-3.5 border border-slate-200/60 dark:border-slate-800 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all shadow-inner group">
-                <div className="flex items-center gap-3">
-                  {/* Gold/Yellow Overlapping Dual Coin Icon (Matching Reference Image) */}
-                  <div className="w-7 h-7 rounded-full bg-amber-100 dark:bg-amber-950/60 flex items-center justify-center shrink-0 border border-amber-200/60">
-                    <svg className="w-4.5 h-4.5 text-amber-500" viewBox="0 0 24 24" fill="none">
-                      <circle cx="15" cy="8" r="4.5" stroke="currentColor" strokeWidth="2" />
-                      <circle cx="9" cy="14" r="4.5" stroke="currentColor" strokeWidth="2" />
-                      <path d="M14.5 7v2M8.5 13v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                    </svg>
-                  </div>
-
-                  <input
-                    type="number"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full bg-transparent text-2xl font-black text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none tracking-tight"
-                  />
-                  <span className="text-xs font-black text-slate-400 shrink-0 bg-slate-200/50 dark:bg-slate-800 px-2.5 py-1 rounded-lg">
-                    USDT
-                  </span>
-                </div>
-
-                {/* Live INR Calculated Value Display */}
-                {isValidAmount && (
-                  <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/50 dark:border-slate-800 text-[11px] font-bold text-slate-500 dark:text-slate-400 animate-in fade-in duration-150">
-                    <span>You pay ≈</span>
-                    <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      <span>₹{(parseFloat(amount) * 99.11).toLocaleString('en-IN', { minimumFractionDigits: 2 })} INR</span>
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Quick Select Preset Pills (Matching Reference Image) */}
-              <div className="flex flex-wrap gap-2">
-                {presets.map((p) => {
-                  const val = p.split(' ')[0]
-                  const isSelected = amount === val
-                  return (
-                    <button
-                      key={p}
-                      onClick={() => setAmount(val)}
-                      className={cn(
-                        'px-3.5 py-1.5 rounded-full text-xs font-extrabold border transition-all cursor-pointer transform active:scale-95',
-                        isSelected
-                          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-blue-600 shadow-md shadow-blue-500/25 scale-105'
-                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200/80 dark:border-slate-700 hover:border-blue-400'
-                      )}
-                    >
-                      {p}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* CARD 2: Deposit network (Matching Reference Image) */}
-          <div className="rounded-[26px] bg-white dark:bg-[#121829] border border-slate-100 dark:border-slate-800/80 p-4.5 space-y-3 shadow-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-slate-900 dark:text-white">Deposit network</span>
-              <span className="text-[10px] font-extrabold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-0.5 rounded-full border border-blue-100 dark:border-blue-900/40">
-                1 AVAILABLE
-              </span>
-            </div>
-
-            {/* Selected Network Option (BEP20 USDT) */}
-            <div className="rounded-2xl border-2 border-blue-600 dark:border-blue-500 bg-[#f4f7ff] dark:bg-blue-950/40 p-3.5 flex items-center justify-between cursor-pointer shadow-xs transition-all">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center shrink-0 border border-amber-200/60">
-                  <svg className="w-5 h-5 text-amber-500" viewBox="0 0 24 24" fill="none">
-                    <circle cx="15" cy="8" r="4.5" stroke="currentColor" strokeWidth="2" />
-                    <circle cx="9" cy="14" r="4.5" stroke="currentColor" strokeWidth="2" />
-                    <path d="M14.5 7v2M8.5 13v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="text-xs font-black text-slate-900 dark:text-white tracking-tight">
-                    CRYPTO · USDT (BEP20) · USDT (BEP20)
-                  </h4>
-                  <p className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 mt-0.5">
-                    CRYPTO · USDT
-                  </p>
-                </div>
-              </div>
-
-              {/* Active Radio Indicator Icon */}
-              <div className="w-5 h-5 rounded-full border-2 border-blue-600 dark:border-blue-400 flex items-center justify-center shrink-0">
-                <div className="w-2.5 h-2.5 rounded-full bg-blue-600 dark:bg-blue-400" />
-              </div>
-            </div>
-          </div>
-
-          {/* Primary Action Button (Matching Reference Image) */}
-          <button
-            disabled={!isValidAmount || start.isPending}
-            onClick={() => start.mutate()}
-            className={cn(
-              'w-full rounded-2xl py-4 text-xs font-black flex items-center justify-center gap-2 transition-all shadow-md group relative overflow-hidden',
-              isValidAmount
-                ? 'bg-gradient-to-r from-[#3b59f8] to-[#2d46e5] hover:from-[#2d46e5] hover:to-[#2237bf] text-white cursor-pointer active:scale-98 shadow-blue-500/25'
-                : 'bg-[#9bb0fc] dark:bg-blue-950/60 text-white cursor-not-allowed shadow-none'
-            )}
-          >
-            <span>{start.isPending ? 'Generating session...' : 'Proceed to pay'}</span>
-            <span className="transition-transform group-hover:translate-x-1">→</span>
-          </button>
-
-          {/* Subtext below button */}
-          <p className="text-[10px] font-extrabold text-slate-400 text-center flex items-center justify-center gap-1.5 pt-1">
-            <span>⬡</span>
-            <span>15-minute session • cancellable after 2 minutes</span>
-          </p>
-        </div>
-      ) : (
-        /* STEP 2: GENERATED DEPOSIT ADDRESS & SIMULATION */
-        <div className="space-y-4 animate-in fade-in duration-300">
-          <div className="rounded-[28px] bg-white dark:bg-[#121829] border border-slate-100 dark:border-slate-800 p-5 space-y-4 shadow-sm">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-              <span className="text-xs font-black uppercase text-slate-400">Deposit Address Ready</span>
-              <span className="text-[10px] font-extrabold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                {deposit.status}
-              </span>
-            </div>
-
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-black uppercase text-slate-400">BEP20 Mock Address</span>
-              <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 break-all font-mono text-xs font-bold text-slate-900 dark:text-white">
-                {deposit.address}
-              </div>
-            </div>
-
-            {deposit.status === 'ADDRESS_READY' && (
-              <div className="space-y-3 pt-2">
-                <button
-                  onClick={() => broadcast.mutate()}
-                  disabled={broadcast.isPending}
-                  className="w-full rounded-2xl py-3.5 text-xs font-black bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md cursor-pointer active:scale-95 transition-all"
-                >
-                  {broadcast.isPending ? 'Simulating Deposit...' : 'Simulate Incoming USDT Transfer'}
-                </button>
-              </div>
-            )}
-
-            {(deposit.status === 'BROADCAST_SIMULATED' || deposit.status === 'CONFIRMING') && (
-              <button
-                onClick={() => confirm.mutate()}
-                disabled={confirm.isPending}
-                className="w-full rounded-2xl py-3.5 text-xs font-black bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md cursor-pointer active:scale-95 transition-all"
-              >
-                {confirm.isPending ? 'Confirming Ledger...' : 'Confirm Ledger Credit'}
-              </button>
-            )}
-
-            {deposit.status === 'COMPLETED' && (
-              <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 text-center space-y-2">
-                <span className="text-2xl">🎉</span>
-                <p className="text-xs font-black text-emerald-700 dark:text-emerald-400">
-                  Deposit Successfully Credited!
+                <p className="mt-2 font-mono text-xs sm:text-sm break-all text-slate-900 dark:text-white">
+                  {q.data.address}
                 </p>
-                <Link
-                  to="/customer/dashboard"
-                  className="inline-block px-5 py-2 rounded-full bg-emerald-600 text-white text-xs font-extrabold cursor-pointer"
-                >
-                  Return to Dashboard
-                </Link>
               </div>
-            )}
+
+              <Button
+                type="button"
+                onClick={() => void copy(q.data!.address!)}
+                className="w-full h-11 rounded-full font-bold text-sm bg-slate-900 dark:bg-white text-white dark:text-slate-900"
+              >
+                {copied ? (
+                  <span className="flex items-center gap-2 justify-center">
+                    <Check className="h-4 w-4" /> Copied
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2 justify-center">
+                    <Copy className="h-4 w-4" /> Copy address
+                  </span>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          <div className="rounded-[28px] bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 p-4 space-y-2 shadow-xs">
+            <h3 className="text-xs font-extrabold text-slate-900 dark:text-white">
+              Before you send
+            </h3>
+            <ul className="text-[11px] text-slate-500 dark:text-slate-400 space-y-1.5 list-disc pl-4">
+              <li>Send USDT on {q.data.network} only. Anything else is lost.</li>
+              <li>
+                Your balance moves after fifteen confirmations, not when the
+                transaction is broadcast.
+              </li>
+              <li>The address is yours and does not change. Reuse it.</li>
+            </ul>
           </div>
         </div>
       )}
@@ -480,186 +297,218 @@ export function DepositFlow() {
   )
 }
 
-function Outbound({ kind }: { kind: 'SEND' | 'WITHDRAW' }) {
+/**
+ * Withdrawing (PRD §8.4).
+ *
+ * Three conditions, all of them the server's: the address is on the
+ * allowlist, its cooldown has elapsed, and a *fresh* authenticator code rides
+ * on this request — the session is never sufficient. None of them is checked
+ * here. This screen collects what the server needs and shows, word for word,
+ * whichever refusal comes back; a second copy of the rules in the browser is
+ * a second thing to keep in step, and the browser's copy cannot be trusted
+ * anyway.
+ */
+export function WithdrawFlow() {
   const qc = useQueryClient()
-  const [toAddress, setToAddress] = useState('')
+  const summary = useWalletSummary()
+  const allowlist = useQuery({
+    queryKey: ['wallet', 'allowlist'],
+    queryFn: () =>
+      v1<{ address: string; label: string | null; usableAt: string }[]>(
+        '/wallet/allowlist',
+      ),
+    retry: false,
+  })
+
+  const [address, setAddress] = useState('')
   const [amount, setAmount] = useState('')
-  const [network, setNetwork] = useState('TRX')
-  const [receipt, setReceipt] = useState<Record<string, string> | null>(null)
+  const [code, setCode] = useState('')
+  const [receipt, setReceipt] = useState<{ id: string } | null>(null)
   const [error, setError] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
-  const path = kind === 'SEND' ? '/wallet/send' : '/wallet/withdrawals'
-  const isSend = kind === 'SEND'
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    setIsSubmitting(true)
+    setSubmitting(true)
     try {
-      const row = await api<Record<string, string>>(path, {
+      const row = await v1<{ id: string }>('/wallet/withdrawals', {
         method: 'POST',
-        body: JSON.stringify({
-          asset: 'USDT',
-          network,
-          toAddress,
-          amount,
-        }),
+        // A retry of this request must not become a second withdrawal
+        // (PRD §5 rule 2).
+        idempotencyKey: newIdempotencyKey(),
+        body: JSON.stringify({ address, amount, code }),
       })
       setReceipt(row)
-      void qc.invalidateQueries({ queryKey: ['wallet'] })
-      void qc.invalidateQueries({ queryKey: ['overview'] })
+      await qc.invalidateQueries({ queryKey: ['wallet'] })
     } catch (err) {
-      // Fallback mock receipt if mock server API fails
-      setReceipt({
-        receipt: `TX-${Date.now().toString().slice(-8)}`,
-        amount: amount || '50',
-        fee: '1.00 USDT',
-        note: `${kind} request registered successfully in vault ledger.`,
-      })
+      setError(err instanceof Error ? err.message : 'That withdrawal was refused.')
     } finally {
-      setIsSubmitting(false)
+      setSubmitting(false)
     }
   }
 
   return (
     <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
-      {/* Top Header */}
       <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-center gap-2.5">
           <BackButton fallback="/customer/wallet" />
           <div>
             <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
-              {isSend ? 'Send USDT' : 'Withdraw USDT'}
+              Withdraw USDT
             </h1>
-            <p className="text-[11px] text-slate-500">Fast crypto transfer to any address</p>
+            <p className="text-[11px] text-slate-500">
+              To an allowlisted address, on {summary.data?.network ?? 'chain'}
+            </p>
           </div>
         </div>
-
-        <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-          Fee: 1 USDT
-        </span>
       </div>
 
-      {!receipt ? (
-        <form onSubmit={handleSubmit} className="space-y-3.5">
-          {/* Network Selection Pills */}
-          <div className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-2 shadow-2xs">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              Transfer Network
-            </span>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { id: 'TRX', name: 'TRC20 (Tron)', fee: '1.00 USDT' },
-                { id: 'BNB', name: 'BEP20 (BSC)', fee: '0.29 USDT' },
-                { id: 'ETH', name: 'ERC20 (ETH)', fee: '3.50 USDT' },
-              ].map((n) => (
-                <button
-                  key={n.id}
-                  type="button"
-                  onClick={() => setNetwork(n.id)}
-                  className={cn(
-                    'py-2 px-2 rounded-xl text-center border transition-all cursor-pointer',
-                    network === n.id
-                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-black'
-                      : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
-                  )}
-                >
-                  <span className="text-xs block font-bold">{n.id}</span>
-                  <span className="text-[9px] block text-slate-400 mt-0.5">{n.fee}</span>
-                </button>
-              ))}
-            </div>
+      {receipt ? (
+        <div className="rounded-[28px] bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 p-5 space-y-3 text-center shadow-xs">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+            <CheckCircle2 className="h-7 w-7" />
           </div>
-
-          {/* Recipient Address */}
-          <div className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-2 shadow-2xs">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              Destination Address
-            </span>
-            <input
-              type="text"
-              value={toAddress}
-              onChange={(e) => setToAddress(e.target.value)}
-              placeholder="Paste TRC20 / BEP20 recipient address"
-              required
-              className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-mono font-bold focus:outline-none"
-            />
-          </div>
-
-          {/* Amount */}
-          <div className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-2 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                Withdrawal Amount
-              </span>
-              <span className="text-[10px] font-mono font-bold text-emerald-600">
-                Available: 1,420.50 USDT
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
-                required
-                className="w-full text-2xl font-black font-mono bg-transparent focus:outline-none text-slate-900 dark:text-white"
-              />
-              <span className="text-xs font-black text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg">
-                USDT
-              </span>
-            </div>
-          </div>
-
-          {error && <p className="text-xs text-rose-500 font-bold">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-3.5 rounded-2xl bg-[#0a2316] text-white hover:bg-emerald-950 font-black text-xs shadow-lg transition-transform active:scale-95 cursor-pointer flex items-center justify-center gap-2"
-          >
-            <span>{isSubmitting ? 'Signing Transfer...' : `Confirm & ${isSend ? 'Send' : 'Withdraw'}`}</span>
-            <ArrowUpRight className="w-4 h-4" />
-          </button>
-        </form>
-      ) : (
-        <div className="p-5 rounded-[28px] bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 text-center space-y-3 shadow-2xs animate-in zoom-in-95">
-          <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-500 mx-auto flex items-center justify-center">
-            <CheckCircle2 className="w-7 h-7" />
-          </div>
-          <h2 className="text-base font-black text-slate-900 dark:text-white">
-            Withdrawal Broadcasted!
-          </h2>
-          <p className="text-xs text-slate-400 font-mono">Receipt: {receipt.receipt}</p>
-          <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl text-left text-xs space-y-1">
-            <div className="flex justify-between">
-              <span className="text-slate-400">Amount Sent</span>
-              <span className="font-bold text-slate-900 dark:text-white">{amount || '50'} USDT</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Network Fee</span>
-              <span className="font-bold text-emerald-600">1.00 USDT</span>
-            </div>
-          </div>
-          <Link
-            to="/customer/wallet"
-            className="w-full py-2.5 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 text-xs font-bold block"
-          >
-            Back to Wallet
+          <p className="text-sm font-bold text-slate-900 dark:text-white">
+            Withdrawal requested
+          </p>
+          <p className="text-[11px] text-slate-500 font-mono break-all">{receipt.id}</p>
+          <p className="text-[11px] text-slate-500">
+            It is paid out by the payout job, and appears in your activity when
+            the chain confirms it.
+          </p>
+          <Link to="/customer/wallet">
+            <Button className="w-full h-11 rounded-full font-semibold bg-slate-900 dark:bg-white text-white dark:text-slate-900">
+              Back to wallet
+            </Button>
           </Link>
         </div>
+      ) : (
+        <form onSubmit={submit} className="space-y-3.5">
+          <div className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-3 shadow-2xs">
+            <div className="space-y-1.5">
+              <label
+                htmlFor="withdraw-address"
+                className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block"
+              >
+                Destination address
+              </label>
+              <Input
+                id="withdraw-address"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                required
+                placeholder="0x..."
+                className="h-11 rounded-xl font-mono text-xs"
+              />
+              {allowlist.data && allowlist.data.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {allowlist.data.map((a) => (
+                    <button
+                      key={a.address}
+                      type="button"
+                      onClick={() => setAddress(a.address)}
+                      className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-mono hover:bg-indigo-500/20 transition cursor-pointer"
+                    >
+                      {a.label ?? `${a.address.slice(0, 10)}…`}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <label
+                htmlFor="withdraw-amount"
+                className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block"
+              >
+                Amount (USDT)
+              </label>
+              <Input
+                id="withdraw-amount"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                required
+                inputMode="decimal"
+                placeholder="0.00"
+                className="h-11 rounded-xl font-mono"
+              />
+              {summary.data && (
+                <p className="text-[10px] text-slate-400 font-mono break-all">
+                  Available: {summary.data.balances.AVAILABLE} USDT
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <label
+                htmlFor="withdraw-code"
+                className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block"
+              >
+                Authenticator code
+              </label>
+              <Input
+                id="withdraw-code"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                required
+                inputMode="numeric"
+                placeholder="000000"
+                className="h-11 rounded-xl font-mono tracking-widest"
+              />
+              <p className="text-[10px] text-slate-400">
+                A fresh code, on this withdrawal. Being signed in is not enough.
+              </p>
+            </div>
+          </div>
+
+          {error && (
+            <p className="text-xs text-rose-500 font-medium bg-rose-500/10 p-2.5 rounded-xl border border-rose-500/20">
+              {error}
+            </p>
+          )}
+
+          <Button
+            type="submit"
+            disabled={submitting}
+            className="w-full h-11 rounded-full font-semibold text-sm bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg"
+          >
+            {submitting ? 'Requesting...' : 'Request withdrawal'}
+          </Button>
+        </form>
       )}
     </div>
   )
 }
 
+/**
+ * v1 has no route that sends USDT between two accounts on this platform.
+ * PRD §3 lists it as a goal, so the screen stays and says where it is rather
+ * than quietly becoming a withdrawal, which moves money somewhere else
+ * entirely.
+ */
 export function SendFlow() {
-  return <Outbound kind="SEND" />
-}
-
-export function WithdrawFlow() {
-  return <Outbound kind="WITHDRAW" />
+  return (
+    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
+      <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800">
+        <BackButton fallback="/customer/wallet" />
+        <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+          Send USDT
+        </h1>
+      </div>
+      <div className="rounded-[28px] bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 p-5 space-y-3 text-center shadow-xs">
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          Sending to another account on this platform is not part of this
+          release.
+        </p>
+        <Link to="/customer/wallet/withdraw">
+          <Button className="w-full h-11 rounded-full font-semibold bg-slate-900 dark:bg-white text-white dark:text-slate-900">
+            Withdraw to a chain address instead
+          </Button>
+        </Link>
+      </div>
+    </div>
+  )
 }
 
 export function ReceiveFlow() {
@@ -1370,33 +1219,14 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
 }
 
 export function TransactionsFlow() {
-  const q = useWallet()
+  const q = useActivity()
   const [filterType, setFilterType] = useState('ALL')
-  const [search] = useState('')
 
-  const allRows = [
-    ...(q.data?.activity ?? []),
-    { id: 'tx-4', type: 'BILL_PAY', status: 'COMPLETED', amount: '3.25', asset: 'USDT', createdAt: new Date(Date.now() - 14400000).toISOString() },
-    { id: 'tx-5', type: 'GIFT_CARD', status: 'COMPLETED', amount: '5.46', asset: 'USDT', createdAt: new Date(Date.now() - 28800000).toISOString() },
-    { id: 'tx-6', type: 'RECHARGE', status: 'COMPLETED', amount: '2.17', asset: 'USDT', createdAt: new Date(Date.now() - 86400000).toISOString() },
-  ]
-
-  const filtered = allRows.filter((r) => {
-    const matchesFilter =
-      filterType === 'ALL' ||
-      (filterType === 'DEPOSIT' && r.type === 'DEPOSIT') ||
-      (filterType === 'BUY' && r.type === 'BUY') ||
-      (filterType === 'SELL' && r.type === 'SELL') ||
-      (filterType === 'BILLS' && (r.type === 'BILL_PAY' || r.type === 'RECHARGE')) ||
-      (filterType === 'GIFTS' && r.type === 'GIFT_CARD')
-
-    const matchesSearch =
-      r.type.toLowerCase().includes(search.toLowerCase()) ||
-      r.status.toLowerCase().includes(search.toLowerCase()) ||
-      r.id.toLowerCase().includes(search.toLowerCase())
-
-    return matchesFilter && matchesSearch
-  })
+  // The prototype padded this list with BILL_PAY, GIFT_CARD and RECHARGE rows
+  // it invented in the browser — categories PRD §3 removed from v1 entirely.
+  const rows = q.data ?? []
+  const filtered =
+    filterType === 'ALL' ? rows : rows.filter((r) => r.kind === filterType)
 
   return (
     <div className="space-y-4 max-w-lg mx-auto w-full pb-2">
@@ -1419,7 +1249,7 @@ export function TransactionsFlow() {
 
       {/* Filter Chips Bar */}
       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-        {['ALL', 'DEPOSIT', 'BUY', 'SELL', 'BILLS', 'GIFTS'].map((tab) => (
+        {['ALL', 'DEPOSIT', 'WITHDRAWAL', 'ESCROW', 'SETTLEMENT', 'DISPUTE'].map((tab) => (
           <button
             key={tab}
             type="button"
@@ -1444,8 +1274,7 @@ export function TransactionsFlow() {
           </div>
         ) : (
           filtered.map((item) => {
-            const isPositive = item.type === 'DEPOSIT' || item.type === 'BUY'
-            const inrVal = (parseFloat(item.amount) * 91.5).toFixed(2)
+            const isPositive = item.direction === 'CREDIT'
 
             return (
               <Link
@@ -1467,10 +1296,10 @@ export function TransactionsFlow() {
 
                   <div className="min-w-0">
                     <span className="text-xs font-black text-slate-900 dark:text-white block group-hover:text-emerald-500 transition-colors truncate">
-                      {item.type.replace('_', ' ')}
+                      {item.kind.replace('_', ' ')}
                     </span>
                     <span className="text-[10px] text-slate-400 block font-mono">
-                      {new Date(item.createdAt).toLocaleDateString([], {
+                      {new Date(item.at).toLocaleDateString([], {
                         month: 'short',
                         day: 'numeric',
                         hour: '2-digit',
@@ -1487,10 +1316,10 @@ export function TransactionsFlow() {
                       isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-white'
                     )}
                   >
-                    {isPositive ? '+' : '-'}{item.amount} {item.asset}
+                    {isPositive ? '+' : '−'}{item.amount} {item.assetSymbol}
                   </span>
                   <span className="text-[10px] text-slate-400 font-mono">
-                    ≈ ₹{inrVal}
+                    {item.bucket}
                   </span>
                 </div>
               </Link>
@@ -1504,25 +1333,26 @@ export function TransactionsFlow() {
 
 export function TransactionDetailFlow() {
   const { transactionId } = useParams()
-  const q = useQuery({
-    queryKey: ['activity', transactionId],
-    queryFn: () => api<{ type: string; status: string; amount: string; asset: string; createdAt: string }>(`/wallet/activity/${transactionId}`).catch(() => ({
-      type: 'USDT Escrow Order',
-      status: 'COMPLETED',
-      amount: '250.00',
-      asset: 'USDT',
-      createdAt: new Date().toISOString(),
-    })),
-  })
+  const q = useActivity()
+  const row = q.data?.find((r) => r.id === transactionId)
 
-  const row = q.data || {
-    type: 'USDT Escrow Order',
-    status: 'COMPLETED',
-    amount: '250.00',
-    asset: 'USDT',
-    createdAt: new Date().toISOString(),
+  if (q.isLoading) return <Skeleton className="h-40 rounded-3xl" />
+  if (q.error) return <p className="text-rose-500 font-bold p-4">{q.error.message}</p>
+  if (!row) {
+    return (
+      <div className="space-y-4 max-w-lg mx-auto w-full pb-2">
+        <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800">
+          <BackButton fallback="/customer/transactions" />
+          <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+            Transaction
+          </h1>
+        </div>
+        <p className="p-8 text-center text-xs text-slate-400 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+          No entry with that id is yours.
+        </p>
+      </div>
+    )
   }
-
   return (
     <div className="space-y-4 max-w-lg mx-auto w-full pb-6">
       <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800">
@@ -1544,32 +1374,30 @@ export function TransactionDetailFlow() {
 
         <div>
           <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-500/10 px-2.5 py-0.5 rounded-full">
-            {row.status}
+            {row.bucket}
           </span>
-          <h2 className="text-2xl font-black text-slate-900 dark:text-white mt-2 font-mono">
-            {row.amount} {row.asset}
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white mt-2 font-mono break-all">
+            {row.direction === 'DEBIT' ? '−' : '+'}
+            {row.amount} {row.assetSymbol}
           </h2>
-          <p className="text-xs text-slate-400 font-mono mt-0.5">
-            ≈ ₹{(parseFloat(row.amount || '0') * 91.5).toLocaleString('en-IN', { minimumFractionDigits: 2 })} INR
-          </p>
         </div>
 
         <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-left text-xs space-y-2">
           <div className="flex justify-between">
             <span className="text-slate-500">Transaction ID:</span>
-            <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{transactionId || 'TXN-892104'}</span>
+            <span className="font-mono font-bold text-slate-800 dark:text-slate-200 break-all">{transactionId}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-500">Type:</span>
-            <span className="font-bold text-slate-800 dark:text-slate-200">{row.type}</span>
+            <span className="font-bold text-slate-800 dark:text-slate-200">{row.kind}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-500">Timestamp:</span>
-            <span className="font-mono text-slate-700 dark:text-slate-300">{new Date(row.createdAt).toLocaleString()}</span>
+            <span className="font-mono text-slate-700 dark:text-slate-300">{new Date(row.at).toLocaleString()}</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">Escrow Network:</span>
-            <span className="font-bold text-emerald-600 dark:text-emerald-400">TRC20 Verified</span>
+          <div className="flex justify-between gap-3">
+            <span className="text-slate-500 shrink-0">Journal memo:</span>
+            <span className="text-right text-slate-700 dark:text-slate-300 break-all">{row.memo}</span>
           </div>
         </div>
 

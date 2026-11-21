@@ -5,22 +5,19 @@ import {} from '@/lib/utils'
 import { useLanguage } from '@/lib/language'
 
 interface TotalAssetsCardProps {
-  totalUsdt?: string
-  inrEstimate?: string
-  usdtInrRate?: string
+  /** A string at full scale, straight from the ledger (PRD §5.1). */
+  availableUsdt?: string
   onOpenDeposit?: () => void
   onOpenSell?: () => void
 }
 
 export function TotalAssetsCard({
-  totalUsdt = '0.00',
-  inrEstimate = '0.00',
+  availableUsdt = '0.000000000000000000',
   onOpenDeposit,
   onOpenSell,
 }: TotalAssetsCardProps) {
   const { t } = useLanguage()
   const [isVisible, setIsVisible] = useState(true)
-  const rawBalance = parseFloat(totalUsdt) || 0
 
   return (
     <div className="w-full rounded-[28px] bg-white dark:bg-[#111827] border border-slate-100/90 dark:border-slate-800/80 p-4 sm:p-5 shadow-xs space-y-4">
@@ -41,8 +38,8 @@ export function TotalAssetsCard({
 
         {/* 2. Large Balance Display Matching Screenshot 3 */}
         <div className="flex items-baseline gap-2">
-          <span className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white font-mono">
-            {isVisible ? `$${rawBalance.toFixed(2)}` : '$••••••'}
+          <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white font-mono break-all">
+            {isVisible ? availableUsdt : '••••••'}
           </span>
         </div>
 
@@ -52,10 +49,7 @@ export function TotalAssetsCard({
             ₮
           </div>
           <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            USDT, across all networks
-          </span>
-          <span className="text-[11px] text-slate-400 font-mono">
-            (≈ ₹{isVisible ? inrEstimate : '••••'})
+            USDT available to spend
           </span>
         </div>
       </div>
