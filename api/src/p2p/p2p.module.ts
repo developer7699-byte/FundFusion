@@ -14,6 +14,7 @@ import { CapabilityService } from '../capability/capability.service';
 import { AbandonmentService } from './abandonment.service';
 import { AssignmentService } from './assignment.service';
 import { EligibilityService } from './eligibility.service';
+import { OrderFeedService } from './order-feed.service';
 import { OrderService } from './order.service';
 import { QuoteService } from './quote.service';
 import { SettlementService } from './settlement.service';
@@ -71,14 +72,38 @@ import { TimeoutService } from './timeout.service';
         balances: BalanceService,
         capabilities: CapabilityService,
         accounts: AccountService,
+        settings: PlatformSettingsService,
       ) =>
-        new EligibilityService(db.db, quotes, balances, capabilities, accounts),
+        new EligibilityService(
+          db.db,
+          quotes,
+          balances,
+          capabilities,
+          accounts,
+          settings,
+        ),
       inject: [
         DbService,
         QuoteService,
         BalanceService,
         CapabilityService,
         AccountService,
+        PlatformSettingsService,
+      ],
+    },
+    {
+      provide: OrderFeedService,
+      useFactory: (
+        db: DbService,
+        quotes: QuoteService,
+        eligibility: EligibilityService,
+        settings: PlatformSettingsService,
+      ) => new OrderFeedService(db.db, quotes, eligibility, settings),
+      inject: [
+        DbService,
+        QuoteService,
+        EligibilityService,
+        PlatformSettingsService,
       ],
     },
     {
@@ -89,13 +114,23 @@ import { TimeoutService } from './timeout.service';
         eligibility: EligibilityService,
         posting: PostingService,
         accounts: AccountService,
-      ) => new AssignmentService(db.db, quotes, eligibility, posting, accounts),
+        settings: PlatformSettingsService,
+      ) =>
+        new AssignmentService(
+          db.db,
+          quotes,
+          eligibility,
+          posting,
+          accounts,
+          settings,
+        ),
       inject: [
         DbService,
         QuoteService,
         EligibilityService,
         PostingService,
         AccountService,
+        PlatformSettingsService,
       ],
     },
     {
@@ -136,6 +171,7 @@ import { TimeoutService } from './timeout.service';
     TimeoutService,
     QuoteService,
     OrderService,
+    OrderFeedService,
     EligibilityService,
     AssignmentService,
     SettlementService,

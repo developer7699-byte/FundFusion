@@ -221,6 +221,55 @@ describe('merchant eligibility (PRD §6.5)', () => {
   });
 });
 
+/**
+ * Review Focus #1. PRD §9.1 records that the one-phone-one-account rule — the
+ * thing that made holding both sides of a trade inconvenient — is gone, and
+ * that a replacement control is an open question (q38). Until there is one,
+ * the engine refuses the trade outright: self-dealing is the single place
+ * this platform's incentives can be gamed, and an HTTP surface makes it one
+ * request.
+ */
+describe('self-dealing (PRD §6.5, §9.1)', () => {
+  it('refuses a merchant accepting their own order', async () => {
+    await fund(customerAccount, '500', 'self-funds');
+    await t.pool.query(
+      `INSERT INTO merchant_profile (user_id, desk_name, status, buy_enabled, sell_enabled)
+       VALUES ($1, 'own-desk', 'ACTIVE', true, true)`,
+      [customerId],
+    );
+    await capabilities.grant(customerId, 'P2P_SELL', {
+      actorId: null,
+      reason: 'merchant onboarding',
+    });
+    const order = await sellOrder('self-1');
+
+    await expect(
+      assignments.accept(order.id, customerId, 'self-accept'),
+    ).rejects.toThrow(/SELF_DEALING_REFUSED/);
+  });
+
+  it('bonds nothing when a self-dealing accept is refused', async () => {
+    await fund(customerAccount, '500', 'self-funds');
+    await t.pool.query(
+      `INSERT INTO merchant_profile (user_id, desk_name, status, buy_enabled, sell_enabled)
+       VALUES ($1, 'own-desk', 'ACTIVE', true, true)`,
+      [customerId],
+    );
+    await capabilities.grant(customerId, 'P2P_SELL', {
+      actorId: null,
+      reason: 'merchant onboarding',
+    });
+    const order = await sellOrder('self-2');
+
+    await expect(
+      assignments.accept(order.id, customerId, 'self-accept'),
+    ).rejects.toThrow();
+    expect(await balances.balance(customerAccount, 'BONDED')).toBe(
+      '0.000000000000000000',
+    );
+  });
+});
+
 describe('accepting (PRD §6.7)', () => {
   it('moves the order to ACCEPTED and records who won', async () => {
     const order = await sellOrder();

@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -70,13 +71,24 @@ export class AssignmentService {
         throw new ConflictException('ORDER_ALREADY_ASSIGNED');
       }
 
-      // 2. Still open, and not a stale price someone waited to pick off.
+      // 2. Not both sides of the same trade. PRD §9.1 gave up the
+      //    one-phone-one-account rule that used to make this inconvenient,
+      //    and self-dealing on the engine is the one place this platform's
+      //    incentives can be gamed — so it is refused outright rather than
+      //    discouraged. Before the bond, so a refusal moves nothing.
+      if (order.customerId === merchantUserId) {
+        throw new ForbiddenException(
+          'SELF_DEALING_REFUSED: you placed this order, so you cannot also fill it.',
+        );
+      }
+
+      // 3. Still open, and not a stale price someone waited to pick off.
       if (!canTransition(order.status, 'ACCEPTED')) {
         throw new ConflictException('ORDER_ALREADY_ASSIGNED');
       }
       await this.assertWithinWindow(order);
 
-      // 3 and 4. Capability and desk status, then the wallet lock, then
+      // 4 and 5. Capability and desk status, then the wallet lock, then
       // eligibility re-read inside it.
       const accountId = await this.accounts.ensureAccount(
         merchantUserId,
@@ -86,7 +98,7 @@ export class AssignmentService {
       await this.accounts.lockForUpdate(tx, accountId);
       const owed = await this.eligibility.check(merchantUserId, order, tx);
 
-      // 5. UNIQUE(order_id) is the second arbiter, in case the row lock is
+      // 6. UNIQUE(order_id) is the second arbiter, in case the row lock is
       // ever removed by someone who does not know what it was for.
       const [assignment] = await tx
         .insert(schema.merchantAssignment)
@@ -98,7 +110,7 @@ export class AssignmentService {
         })
         .returning();
 
-      // 6. The bond, then the state.
+      // 7. The bond, then the state.
       await this.bond(tx, owed, orderId, idempotencyKey);
       await tx
         .update(schema.p2pOrder)
