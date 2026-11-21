@@ -24,6 +24,13 @@ const DEPOSIT_PATH = "m/44'/60'/0'/0";
  */
 const GAS_PATH = "m/44'/60'/0'/1/0";
 
+/**
+ * The hot wallet, on a third branch again. It holds a few days of expected
+ * withdrawals (PRD §8.3) — the one balance here that is neither a user's
+ * deposit nor gas — and pays withdrawals out.
+ */
+const HOT_PATH = "m/44'/60'/0'/2/0";
+
 function master(seedPhrase: string): HDKey {
   const phrase = seedPhrase?.trim();
   if (!phrase) {
@@ -60,6 +67,11 @@ export function gasAccount(seedPhrase: string): PrivateKeyAccount {
   return accountAt(master(seedPhrase), GAS_PATH);
 }
 
+/** The account deposits sweep into, and withdrawals pay out from. */
+export function hotAccount(seedPhrase: string): PrivateKeyAccount {
+  return accountAt(master(seedPhrase), HOT_PATH);
+}
+
 /** Derivation from an already-built master key, for a service holding one. */
 export function depositAccountFrom(
   key: HDKey,
@@ -68,4 +80,4 @@ export function depositAccountFrom(
   return accountAt(key, `${DEPOSIT_PATH}/${index}`);
 }
 
-export { DEPOSIT_PATH, GAS_PATH, master as masterKey };
+export { DEPOSIT_PATH, GAS_PATH, HOT_PATH, master as masterKey };

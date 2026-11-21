@@ -1,7 +1,7 @@
 import { generateMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { isAddress } from 'viem';
-import { depositAccount, gasAccount } from './derivation';
+import { depositAccount, gasAccount, hotAccount } from './derivation';
 
 const seed = generateMnemonic(wordlist, 128);
 
@@ -29,6 +29,23 @@ describe('key derivation (PRD §8.1)', () => {
 
     expect(deposits).not.toContain(gas);
     expect(new Set(deposits).size).toBe(deposits.length);
+  });
+
+  /**
+   * The hot wallet holds days of withdrawals (PRD §8.3), so it is the one
+   * address with a real balance that is neither a user's nor the gas
+   * wallet's. Its own branch keeps it that way.
+   */
+  it('derives a hot wallet distinct from the gas wallet and every deposit', () => {
+    const hot = hotAccount(seed).address;
+    const deposits = Array.from(
+      { length: 50 },
+      (_, i) => depositAccount(seed, i).address,
+    );
+
+    expect(hot).not.toBe(gasAccount(seed).address);
+    expect(deposits).not.toContain(hot);
+    expect(hotAccount(seed).address).toBe(hot);
   });
 
   it('refuses a seed that is not a valid mnemonic', () => {

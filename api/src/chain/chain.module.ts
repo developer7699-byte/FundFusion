@@ -3,12 +3,15 @@ import { DbService } from '../db/db.service';
 import { AccountService } from '../ledger/account.service';
 import { LedgerModule } from '../ledger/ledger.module';
 import { PostingService } from '../ledger/posting.service';
+import { PlatformSettingsService } from '../settings/platform-settings.service';
 import { SettingsModule } from '../settings/settings.module';
 import { chainConfigFrom, type ChainConfig } from './chain.config';
+import { hotAccount } from './derivation';
 import { DepositWatcherService } from './deposit-watcher.service';
 import { HdWalletService } from './hd-wallet.service';
 import { SweepService } from './sweep.service';
 import { ViemChainClient } from './viem-chain.client';
+import { ViemSigner } from './viem-signer';
 
 export const CHAIN_CONFIG = Symbol('CHAIN_CONFIG');
 export const CHAIN_CLIENT = Symbol('CHAIN_CLIENT');
@@ -19,7 +22,7 @@ export interface ChainServices {
   wallets: HdWalletService;
   /** Null until a token contract exists to watch for. */
   watcher: DepositWatcherService | null;
-  /** Null until the signer and hot wallet arrive with the live sweep. */
+  /** Null until a token contract exists for a sweep to move. */
   sweeps: SweepService | null;
 }
 
@@ -115,16 +118,49 @@ export class ChainModule {
           inject: [DbService, CHAIN_CLIENT, PostingService, CHAIN_CONFIG],
         },
         {
+          provide: SweepService,
+          useFactory: (
+            db: DbService,
+            client: ViemChainClient,
+            settings: PlatformSettingsService,
+            config: ChainConfig,
+          ): SweepService | null => {
+            // A sweep moves a token. Without one there is nothing to move,
+            // which is the ordinary state of a fresh testnet environment.
+            if (!config.usdtAddress) return null;
+
+            const seedPhrase = process.env.BSC_HD_SEED ?? '';
+            return new SweepService(
+              db.db,
+              client,
+              new ViemSigner({
+                httpUrl: config.httpUrl,
+                seedPhrase,
+                tokenAddress: config.usdtAddress,
+              }),
+              settings,
+              {
+                tokenAddress: config.usdtAddress,
+                hotWalletAddress: hotAccount(seedPhrase).address,
+                networkCode: 'BSC_TESTNET',
+              },
+            );
+          },
+          inject: [
+            DbService,
+            CHAIN_CLIENT,
+            PlatformSettingsService,
+            CHAIN_CONFIG,
+          ],
+        },
+        {
           provide: CHAIN_SERVICES,
           useFactory: (
             wallets: HdWalletService,
             watcher: DepositWatcherService | null,
-          ): ChainServices | null =>
-            // The sweeper needs a signer, which arrives with the hot wallet
-            // in Task 6's live half. Until then deposits are watched and
-            // credited; nothing moves them on.
-            ({ wallets, watcher, sweeps: null }),
-          inject: [HdWalletService, DepositWatcherService],
+            sweeps: SweepService | null,
+          ): ChainServices | null => ({ wallets, watcher, sweeps }),
+          inject: [HdWalletService, DepositWatcherService, SweepService],
         },
       ],
       exports: [
@@ -133,6 +169,7 @@ export class ChainModule {
         CHAIN_SERVICES,
         HdWalletService,
         DepositWatcherService,
+        SweepService,
       ],
     };
   }
