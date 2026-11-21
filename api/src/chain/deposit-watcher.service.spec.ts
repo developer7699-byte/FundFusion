@@ -26,6 +26,12 @@ class FakeChain implements ChainClient {
   assertNetwork(): Promise<void> {
     return Promise.resolve();
   }
+  nativeBalance(): Promise<string> {
+    return Promise.resolve('0');
+  }
+  tokenBalance(): Promise<string> {
+    return Promise.resolve('0');
+  }
   finalizedBlockNumber(): Promise<bigint> {
     return Promise.resolve(this.finalized);
   }

@@ -15,6 +15,10 @@ const TRANSFER_EVENT = parseAbiItem(
   'event Transfer(address indexed from, address indexed to, uint256 value)',
 );
 
+const BALANCE_OF = parseAbiItem(
+  'function balanceOf(address owner) view returns (uint256)',
+);
+
 /** BEP-20 USDT has 18 decimals, which is why the ledger column does too. */
 const TOKEN_DECIMALS = 18;
 
@@ -67,6 +71,23 @@ export class ViemChainClient implements ChainClient {
       );
     }
     return number;
+  }
+
+  async nativeBalance(address: string): Promise<string> {
+    const wei = await this.client.getBalance({
+      address: address as `0x${string}`,
+    });
+    return formatUnits(wei, 18);
+  }
+
+  async tokenBalance(token: string, address: string): Promise<string> {
+    const raw = await this.client.readContract({
+      address: token as `0x${string}`,
+      abi: [BALANCE_OF],
+      functionName: 'balanceOf',
+      args: [address as `0x${string}`],
+    });
+    return formatUnits(raw, TOKEN_DECIMALS);
   }
 
   async transferLogs(

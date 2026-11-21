@@ -23,4 +23,8 @@ export interface ChainClient {
     token: string,
     toAddresses: string[],
   ): Promise<TransferLog[]>;
+  /** Native BNB, as a decimal string. */
+  nativeBalance(address: string): Promise<string>;
+  /** BEP-20 balance of the configured token, as a decimal string. */
+  tokenBalance(token: string, address: string): Promise<string>;
 }

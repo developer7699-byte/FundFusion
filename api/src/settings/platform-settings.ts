@@ -128,6 +128,30 @@ export const PLATFORM_SETTINGS = {
     description:
       'Abandonments that carry no cooldown. A first-time buyer whose bank app failed is not an attacker.',
   },
+  'wallet.sweepThresholdUsdt': {
+    kind: 'MONEY_USDT',
+    default: '10',
+    min: '0.000001',
+    max: '1000000',
+    description:
+      'A deposit address is swept once it holds at least this much. Below it the BNB spent on the sweep costs more than the sweep moves (PRD §8.3).',
+  },
+  'wallet.gasTopUpBnb': {
+    kind: 'MONEY_USDT',
+    default: '0.002',
+    min: '0.0001',
+    max: '1',
+    description:
+      'BNB sent to a deposit address so it can pay for its own sweep. A freshly derived address has none — that is the BEP-20 gas trap (PRD §8.3).',
+  },
+  'wallet.gasFloorBnb': {
+    kind: 'MONEY_USDT',
+    default: '0.05',
+    min: '0.001',
+    max: '100',
+    description:
+      'Sweeping stops when the gas wallet falls below this. Running it dry halts every sweep while nothing errors and every dashboard stays green (PRD §13.3).',
+  },
 } as const satisfies Record<string, SettingDefinition>;
 
 export type SettingKey = keyof typeof PLATFORM_SETTINGS;
