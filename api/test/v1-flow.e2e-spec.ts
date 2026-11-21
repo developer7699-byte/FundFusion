@@ -138,9 +138,15 @@ describe('v1 flow (e2e)', () => {
       .get('/api/v1/auth/me')
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
-    const me = data<{ emailVerified: boolean; canMoveMoney: boolean }>(res);
+    const me = data<{
+      emailVerified: boolean;
+      canMoveMoney: boolean;
+      roles: string[];
+    }>(res);
     expect(me.emailVerified).toBe(true);
     expect(me.canMoveMoney).toBe(false);
+    // The web shell routes on these; without them every account looks alike.
+    expect(me.roles).toEqual(['CUSTOMER']);
   });
 
   // The financial gate: no deposit address, no balance, no orders until an

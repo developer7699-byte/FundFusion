@@ -246,11 +246,19 @@ export class V1Service {
       .where(eq(schema.user.id, userId))
       .limit(1);
 
+    const roles = await this.db
+      .select({ name: schema.role.name })
+      .from(schema.userRole)
+      .innerJoin(schema.role, eq(schema.role.id, schema.userRole.roleId))
+      .where(eq(schema.userRole.userId, userId));
+
     return {
       ...row,
       emailVerified: Boolean(row?.emailVerifiedAt),
       // PRD §9.1: this is what decides whether money can move.
       canMoveMoney: Boolean(row?.emailVerifiedAt && row?.mfaEnrolledAt),
+      // What the web shell routes on (PRD §9.2).
+      roles: roles.map((r) => r.name).sort(),
       capabilities: [...(await this.capabilities.effective(userId))].sort(),
     };
   }

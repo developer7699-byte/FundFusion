@@ -13,6 +13,9 @@ beforeAll(() => {
 beforeEach(async () => {
   await t.reset();
   merchants = new MerchantService(t.db, new CapabilityService(t.db));
+  await t.pool.query(
+    `INSERT INTO role (name) VALUES ('MERCHANT') ON CONFLICT DO NOTHING`,
+  );
   userId = await seedUser(t.pool, 'desk@example.test');
 });
 
@@ -37,5 +40,16 @@ describe('opening a merchant desk (PRD §6.5, §9.3)', () => {
     await expect(merchants.open(userId, 'Andheri Desk')).rejects.toThrow(
       /already/i,
     );
+  });
+
+  it('gives the user the MERCHANT role, so the merchant shell is reachable', async () => {
+    await merchants.open(userId, 'Bandra Desk');
+
+    const roles = await t.pool.query<{ name: string }>(
+      `SELECT r.name FROM user_role ur JOIN role r ON r.id = ur.role_id
+        WHERE ur.user_id = $1`,
+      [userId],
+    );
+    expect(roles.rows.map((r) => r.name)).toContain('MERCHANT');
   });
 });

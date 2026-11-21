@@ -1,38 +1,47 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { api } from '@/lib/api'
-import { AuthContext, type SessionUser } from '@/lib/auth'
+import { signedIn, signOut, storeSession, v1 } from '@/lib/api'
+import {
+  AuthContext,
+  type PendingCode,
+  type SessionUser,
+} from '@/lib/auth'
 import { ThemeProvider } from '@/lib/theme'
 import { LanguageProvider } from '@/lib/language'
 
 const queryClient = new QueryClient()
 
+interface Session {
+  accessToken: string
+  refreshToken: string
+}
+
+/**
+ * The session, read from the server.
+ *
+ * Nothing here invents a user when a request fails. The prototype did, and a
+ * fabricated session is worse than no session: every screen below it shows
+ * figures for an account that does not exist.
+ */
 export function AppProviders({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null)
+  const [pending, setPending] = useState<PendingCode | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const loadMe = useCallback(async () => {
+  const loadMe = useCallback(async (): Promise<SessionUser | null> => {
+    if (!signedIn()) {
+      setUser(null)
+      setLoading(false)
+      return null
+    }
     try {
-      if (!localStorage.getItem('nx.access')) {
-        const tokens = await api<{ accessToken: string; refreshToken: string }>('/auth/login', {
-          method: 'POST',
-          body: JSON.stringify({ email: 'customer@example.test', password: 'Password123!' }),
-        }).catch(() => null)
-        if (tokens) {
-          localStorage.setItem('nx.access', tokens.accessToken)
-          localStorage.setItem('nx.refresh', tokens.refreshToken)
-        }
-      }
-      const me = await api<SessionUser>('/auth/me')
+      const me = await v1<SessionUser>('/auth/me')
       setUser(me)
+      return me
     } catch {
-      setUser({
-        id: 'usr-101',
-        email: 'developer7699@fundfusion.io',
-        displayName: 'developer7699',
-        roles: ['CUSTOMER', 'MERCHANT'],
-        status: 'ACTIVE',
-      })
+      signOut()
+      setUser(null)
+      return null
     } finally {
       setLoading(false)
     }
@@ -46,70 +55,63 @@ export function AppProviders({ children }: { children: ReactNode }) {
     () => ({
       user,
       loading,
+      pending,
       login: async (email: string, password: string) => {
-        try {
-          const tokens = await api<{ accessToken: string; refreshToken: string }>('/auth/login', {
-            method: 'POST',
-            body: JSON.stringify({ email, password }),
-          })
-          localStorage.setItem('nx.access', tokens.accessToken)
-          localStorage.setItem('nx.refresh', tokens.refreshToken)
-          const me = await api<SessionUser>('/auth/me')
-          setUser(me)
-          return me
-        } catch {
-          // Graceful fallback for offline API / preview dev mode:
-          const isMerchant = email.toLowerCase().includes('merchant')
-          const isAdmin = email.toLowerCase().includes('admin')
-          const mockUser: SessionUser = {
-            id: 'usr-101',
-            email: email || 'customer@example.test',
-            displayName: email ? email.split('@')[0] : 'Demo User',
-            roles: isAdmin ? ['ADMIN', 'CUSTOMER'] : isMerchant ? ['MERCHANT', 'CUSTOMER'] : ['CUSTOMER'],
-            status: 'ACTIVE',
-          }
-          localStorage.setItem('nx.access', 'mock-access-token')
-          localStorage.setItem('nx.refresh', 'mock-refresh-token')
-          setUser(mockUser)
-          return mockUser
-        }
+        await v1('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email, password }),
+        })
+        setPending({ email, purpose: 'LOGIN' as const })
       },
-      register: async (payload: { email: string; password: string; displayName: string }) => {
-        try {
-          const tokens = await api<{ accessToken: string; refreshToken: string }>('/auth/register', {
-            method: 'POST',
-            body: JSON.stringify(payload),
-          })
-          localStorage.setItem('nx.access', tokens.accessToken)
-          localStorage.setItem('nx.refresh', tokens.refreshToken)
-          const me = await api<SessionUser>('/auth/me')
-          setUser(me)
-          return me
-        } catch {
-          const mockUser: SessionUser = {
-            id: 'usr-101',
-            email: payload.email || 'customer@example.test',
-            displayName: payload.displayName || 'Demo User',
-            roles: ['CUSTOMER'],
-            status: 'ACTIVE',
-          }
-          localStorage.setItem('nx.access', 'mock-access-token')
-          localStorage.setItem('nx.refresh', 'mock-refresh-token')
-          setUser(mockUser)
-          return mockUser
-        }
+      register: async (payload: {
+        email: string
+        password: string
+        displayName: string
+      }) => {
+        await v1('/auth/register', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        })
+        setPending({ email: payload.email, purpose: 'REGISTER' as const })
+      },
+      verifyCode: async (code: string) => {
+        if (!pending) throw new Error('There is no sign-in waiting for a code.')
+        const path =
+          pending.purpose === 'REGISTER'
+            ? '/auth/register/verify'
+            : '/auth/login/verify'
+        const session = await v1<Session>(path, {
+          method: 'POST',
+          body: JSON.stringify({ email: pending.email, code }),
+        })
+        storeSession(session)
+        setPending(null)
+        const me = await loadMe()
+        if (!me) throw new Error('That session could not be read back.')
+        return me
+      },
+      beginMfa: async () => {
+        const begun = await v1<{ secret: string }>('/auth/mfa/begin', {
+          method: 'POST',
+        })
+        return begun.secret
+      },
+      confirmMfa: async (code: string) => {
+        await v1('/auth/mfa/confirm', {
+          method: 'POST',
+          body: JSON.stringify({ code }),
+        })
+        const me = await loadMe()
+        if (!me) throw new Error('That session could not be read back.')
+        return me
       },
       logout: async () => {
-        try {
-          await api('/auth/logout', { method: 'POST' }).catch(() => null)
-        } finally {
-          localStorage.removeItem('nx.access')
-          localStorage.removeItem('nx.refresh')
-          setUser(null)
-        }
+        signOut()
+        setUser(null)
+        setPending(null)
       },
     }),
-    [user, loading, loadMe],
+    [user, loading, pending, loadMe],
   )
 
   return (

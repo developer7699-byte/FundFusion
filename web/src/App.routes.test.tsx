@@ -1,5 +1,41 @@
+import { beforeEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { App } from '@/App'
+import { TOKEN_KEY } from '@/lib/api'
+
+/**
+ * The customer shell is behind a session and the financial gate (PRD §9.1),
+ * so reaching the routes under test means being signed in and enrolled.
+ */
+const ME = {
+  id: 'u1',
+  email: 'a@example.test',
+  displayName: 'a',
+  emailVerified: true,
+  canMoveMoney: true,
+  roles: ['CUSTOMER'],
+  capabilities: [],
+}
+
+beforeEach(() => {
+  localStorage.clear()
+  vi.restoreAllMocks()
+  localStorage.setItem(TOKEN_KEY, 'a-token')
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            success: true,
+            data: String(url).endsWith('/auth/me') ? ME : {},
+          }),
+      } as Response),
+    ),
+  )
+})
 
 function renderAt(path: string) {
   window.history.pushState({}, '', path)

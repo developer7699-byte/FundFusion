@@ -48,6 +48,21 @@ export class MerchantService {
       })
       .returning();
 
+    // The role is what the web shell routes on; the capabilities are what the
+    // engine checks. Both, or a merchant has a desk they cannot navigate to.
+    const [merchantRole] = await this.db
+      .select({ id: schema.role.id })
+      .from(schema.role)
+      .where(eq(schema.role.name, 'MERCHANT'))
+      .limit(1);
+
+    if (merchantRole) {
+      await this.db
+        .insert(schema.userRole)
+        .values({ userId, roleId: merchantRole.id })
+        .onConflictDoNothing();
+    }
+
     for (const capability of ['P2P_BUY', 'P2P_SELL'] as const) {
       await this.capabilities.grant(userId, capability, {
         actorId: userId,

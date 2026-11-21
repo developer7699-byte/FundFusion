@@ -2,7 +2,13 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom
 import { AppProviders } from '@/app/providers'
 import { PrototypeBanner, SiteFooter, SiteHeader } from '@/components/layout/SiteChrome'
 import { NotFound } from '@/components/layout/NotFound'
-import { ForgotPasswordPage, LoginPage, RegisterPage, VerifyOtpPage } from '@/features/auth/pages'
+import {
+  EnrolAuthenticatorPage,
+  ForgotPasswordPage,
+  LoginPage,
+  RegisterPage,
+  VerifyOtpPage,
+} from '@/features/auth/pages'
 import { CustomerDashboard } from '@/features/customer/pages'
 import {
   AddressesFlow,
@@ -83,14 +89,29 @@ function PublicLayout() {
   )
 }
 
-function RequireAuth({ role }: { role?: string }) {
+/**
+ * Who may see a screen, and — for the screens that move money — whether the
+ * financial gate is open (PRD §9.1, §9.2).
+ *
+ * `money` sends an unenrolled person to enrolment rather than letting them
+ * reach a screen whose every request the server would refuse with a 403 they
+ * cannot act on.
+ */
+function RequireAuth({ role, money }: { role?: string; money?: boolean }) {
   const { user, loading } = useAuth()
   if (loading) return <Skeleton className="m-8 h-40" />
   if (!user) return <Navigate to="/login" replace />
-  if (role && !user.roles.includes(role) && !user.roles.includes('ADMIN')) {
+  if (role && !user.roles.includes(role) && !isStaff(user.roles)) {
     return <Navigate to="/" replace />
   }
+  if (money && !user.canMoveMoney) {
+    return <Navigate to="/enrol-authenticator" replace />
+  }
   return <Outlet />
+}
+
+function isStaff(roles: string[]): boolean {
+  return roles.includes('SUPER_ADMIN') || roles.includes('SUPPORT')
 }
 
 function AdminShell() {
@@ -128,26 +149,35 @@ export function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route element={<RequireAuth />}>
+            <Route
+              path="/enrol-authenticator"
+              element={<EnrolAuthenticatorPage />}
+            />
+          </Route>
           <Route path="/verify-otp" element={<VerifyOtpPage />} />
 
           <Route element={<RequireAuth role="CUSTOMER" />}>
             <Route path="/customer" element={<CustomerLayout />}>
               <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="dashboard" element={<CustomerDashboard />} />
-              <Route path="wallet" element={<WalletHome />} />
-              <Route path="wallet/deposit" element={<DepositFlow />} />
-              <Route path="wallet/withdraw" element={<WithdrawFlow />} />
-              <Route path="wallet/send" element={<SendFlow />} />
-              <Route path="wallet/receive" element={<ReceiveFlow />} />
-              <Route path="wallet/addresses" element={<AddressesFlow />} />
-              <Route path="buy" element={<QuoteFlow side="BUY" />} />
-              <Route path="sell" element={<QuoteFlow side="SELL" />} />
-              <Route path="convert" element={<QuoteFlow side="CONVERT" />} />
-              <Route path="request" element={<RequestMoneyPage />} />
-              <Route path="orders" element={<OrdersList />} />
-              <Route path="orders/:orderId" element={<OrderDetail />} />
-              <Route path="transactions" element={<TransactionsFlow />} />
-              <Route path="transactions/:transactionId" element={<TransactionDetailFlow />} />
+              {/* Everything below needs an enrolled authenticator (PRD §9.1). */}
+              <Route element={<RequireAuth money />}>
+                <Route path="dashboard" element={<CustomerDashboard />} />
+                <Route path="wallet" element={<WalletHome />} />
+                <Route path="wallet/deposit" element={<DepositFlow />} />
+                <Route path="wallet/withdraw" element={<WithdrawFlow />} />
+                <Route path="wallet/send" element={<SendFlow />} />
+                <Route path="wallet/receive" element={<ReceiveFlow />} />
+                <Route path="wallet/addresses" element={<AddressesFlow />} />
+                <Route path="buy" element={<QuoteFlow side="BUY" />} />
+                <Route path="sell" element={<QuoteFlow side="SELL" />} />
+                <Route path="convert" element={<QuoteFlow side="CONVERT" />} />
+                <Route path="request" element={<RequestMoneyPage />} />
+                <Route path="orders" element={<OrdersList />} />
+                <Route path="orders/:orderId" element={<OrderDetail />} />
+                <Route path="transactions" element={<TransactionsFlow />} />
+                <Route path="transactions/:transactionId" element={<TransactionDetailFlow />} />
+              </Route>
               <Route path="notifications" element={<NoticeCenter />} />
               <Route path="support" element={<SupportDesk />} />
               <Route path="support/:ticketId" element={<TicketDetail />} />
@@ -162,17 +192,20 @@ export function App() {
           <Route element={<RequireAuth role="MERCHANT" />}>
             <Route path="/merchant" element={<MerchantLayout />}>
               <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="dashboard" element={<MerchantHome />} />
-              <Route path="available-orders" element={<MerchantAvailable />} />
-              <Route path="active-orders" element={<MerchantOrders filter="active" />} />
-              <Route path="completed-orders" element={<MerchantOrders filter="done" />} />
-              <Route path="orders" element={<MerchantOrders />} />
-              <Route path="orders/:orderId" element={<MerchantOrderDetail />} />
-              <Route path="wallet" element={<MerchantWallet />} />
-              <Route path="earnings" element={<MerchantEarnings />} />
-              <Route path="settlements" element={<MerchantWallet />} />
-              <Route path="withdrawals" element={<MerchantWallet />} />
-              <Route path="performance" element={<MerchantEarnings />} />
+              {/* Everything below needs an enrolled authenticator (PRD §9.1). */}
+              <Route element={<RequireAuth money />}>
+                <Route path="dashboard" element={<MerchantHome />} />
+                <Route path="available-orders" element={<MerchantAvailable />} />
+                <Route path="active-orders" element={<MerchantOrders filter="active" />} />
+                <Route path="completed-orders" element={<MerchantOrders filter="done" />} />
+                <Route path="orders" element={<MerchantOrders />} />
+                <Route path="orders/:orderId" element={<MerchantOrderDetail />} />
+                <Route path="wallet" element={<MerchantWallet />} />
+                <Route path="earnings" element={<MerchantEarnings />} />
+                <Route path="settlements" element={<MerchantWallet />} />
+                <Route path="withdrawals" element={<MerchantWallet />} />
+                <Route path="performance" element={<MerchantEarnings />} />
+              </Route>
               <Route path="payment-methods" element={<MerchantPaymentMethods />} />
               <Route path="notifications" element={<MerchantNotices />} />
               <Route path="profile" element={<MerchantProfile />} />
@@ -181,7 +214,7 @@ export function App() {
             </Route>
           </Route>
 
-          <Route element={<RequireAuth role="ADMIN" />}>
+          <Route element={<RequireAuth role="SUPER_ADMIN" />}>
             <Route path="/admin" element={<AdminShell />}>
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<AdminHome />} />

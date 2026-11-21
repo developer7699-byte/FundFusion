@@ -4,38 +4,13 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion } from 'framer-motion'
-import { ShieldCheck, Zap, Clock, Mail, Lock, User, CheckCircle2, ArrowLeft } from 'lucide-react'
+import { ShieldCheck, Zap, Clock, Mail, Lock, User, ArrowLeft } from 'lucide-react'
 
 import { Logo } from '@/components/brand/Logo'
 import { ThemeToggle } from '@/components/brand/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useAuth } from '@/lib/auth'
-import { api } from '@/lib/api'
-
-// Google SVG Icon
-function GoogleIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" className="shrink-0">
-      <path
-        fill="#EA4335"
-        d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.2 9 5 12 5z"
-      />
-      <path
-        fill="#4285F4"
-        d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 10.8 0 12s.7 2.3 1.9 4.7l3.7-2.9z"
-      />
-      <path
-        fill="#34A853"
-        d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.2-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z"
-      />
-    </svg>
-  )
-}
+import { homeFor, useAuth } from '@/lib/auth'
 
 function AuthLayout({
   title,
@@ -221,11 +196,7 @@ export function LoginPage() {
 
   // Redirect immediately if already authenticated
   useEffect(() => {
-    if (user) {
-      if (user.roles.includes('ADMIN')) navigate('/admin/dashboard', { replace: true })
-      else if (user.roles.includes('MERCHANT')) navigate('/merchant/dashboard', { replace: true })
-      else navigate('/customer/dashboard', { replace: true })
-    }
+    if (user) navigate(homeFor(user), { replace: true })
   }, [user, navigate])
 
   const form = useForm({
@@ -238,46 +209,8 @@ export function LoginPage() {
     form.setValue('password', pass)
   }
 
-  const handleGoogleLogin = async () => {
-    setError('')
-    setLoading(true)
-    try {
-      const me = await login('customer@example.test', 'Example!Demo1')
-      if (me.roles.includes('ADMIN')) navigate('/admin/dashboard')
-      else if (me.roles.includes('MERCHANT')) navigate('/merchant/dashboard')
-      else navigate('/customer/dashboard')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Google sign in failed')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   return (
     <AuthLayout title="Welcome back" subtitle="Sign in to your FundFusion account.">
-      {/* Google Sign In Button */}
-      <button
-        type="button"
-        onClick={handleGoogleLogin}
-        disabled={loading}
-        className="w-full h-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-[0_4px_18px_rgba(37,99,235,0.35)] hover:shadow-[0_6px_22px_rgba(37,99,235,0.5)] hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
-      >
-        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-xs">
-          <GoogleIcon />
-        </div>
-        <span>Continue with Google</span>
-      </button>
-
-      {/* Divider */}
-      <div className="relative my-5 flex items-center justify-center">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-slate-200 dark:border-slate-800" />
-        </div>
-        <span className="relative bg-white dark:bg-[#121829] px-3 text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
-          Or continue with email
-        </span>
-      </div>
-
       {/* Form */}
       <form
         className="space-y-3.5"
@@ -285,10 +218,10 @@ export function LoginPage() {
           setError('')
           setLoading(true)
           try {
-            const me = await login(v.email, v.password)
-            if (me.roles.includes('ADMIN')) navigate('/admin/dashboard')
-            else if (me.roles.includes('MERCHANT')) navigate('/merchant/dashboard')
-            else navigate('/customer/dashboard')
+            // Step one of two (PRD §9.1). A code goes to the address; the
+            // session is minted on the next screen, not here.
+            await login(v.email, v.password)
+            navigate('/verify-otp')
           } catch (e) {
             setError(e instanceof Error ? e.message : 'Sign in failed')
           } finally {
@@ -340,14 +273,14 @@ export function LoginPage() {
             <span>Demo:</span>
             <button
               type="button"
-              onClick={() => fillDemo('customer@example.test', 'Example!Demo1')}
+              onClick={() => fillDemo('customer@demo.test', 'Example!Demo1')}
               className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-500 font-medium transition cursor-pointer"
             >
               User
             </button>
             <button
               type="button"
-              onClick={() => fillDemo('merchant@example.test', 'Example!Demo1')}
+              onClick={() => fillDemo('merchant@demo.test', 'Example!Demo1')}
               className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-500 font-medium transition cursor-pointer"
             >
               Merchant
@@ -399,32 +332,6 @@ export function RegisterPage() {
 
   return (
     <AuthLayout title="Create your account" subtitle="Start your crypto journey in less than 60 seconds.">
-      {/* Google Sign In Button */}
-      <button
-        type="button"
-        onClick={() => {
-          form.setValue('displayName', 'Demo User')
-          form.setValue('email', `user_${Math.floor(Math.random() * 1000)}@fundfusion.io`)
-          form.setValue('password', 'Example!Demo1')
-        }}
-        className="w-full h-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-[0_4px_18px_rgba(37,99,235,0.35)] hover:shadow-[0_6px_22px_rgba(37,99,235,0.5)] hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
-      >
-        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-xs">
-          <GoogleIcon />
-        </div>
-        <span>Continue with Google</span>
-      </button>
-
-      {/* Divider */}
-      <div className="relative my-5 flex items-center justify-center">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-slate-200 dark:border-slate-800" />
-        </div>
-        <span className="relative bg-white dark:bg-[#121829] px-3 text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
-          Or register with email
-        </span>
-      </div>
-
       <form
         className="space-y-3.5"
         onSubmit={form.handleSubmit(async (v) => {
@@ -432,7 +339,7 @@ export function RegisterPage() {
           setLoading(true)
           try {
             await register(v)
-            navigate('/verify-otp', { state: { email: v.email } })
+            navigate('/verify-otp')
           } catch (e) {
             setError(e instanceof Error ? e.message : 'Registration failed')
           } finally {
@@ -517,66 +424,29 @@ export function RegisterPage() {
   )
 }
 
+/**
+ * v1 has no password-reset route (PRD §9.1 defines sign-in and nothing else),
+ * so this screen says so. The prototype's version posted to a mock endpoint
+ * and told everyone the code was 246810, which reads as a working reset.
+ */
 export function ForgotPasswordPage() {
-  const [done, setDone] = useState(false)
-  const [loading, setLoading] = useState(false)
-
   return (
-    <AuthLayout title="Reset your password" subtitle="We will send a one-time verification code to your email.">
-      {done ? (
-        <div className="space-y-4 text-center py-4">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-            <CheckCircle2 className="h-7 w-7" />
-          </div>
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            Mock OTP request sent successfully! Use code <span className="font-mono font-bold text-indigo-500">246810</span> on the verification screen.
-          </p>
-          <Link to="/verify-otp">
-            <Button className="w-full h-11 rounded-full font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg">
-              Proceed to Verify OTP
-            </Button>
-          </Link>
+    <AuthLayout
+      title="Reset your password"
+      subtitle="Not something you can do yourself yet."
+    >
+      <div className="space-y-4 text-center py-4">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/30">
+          <ShieldCheck className="h-7 w-7" />
         </div>
-      ) : (
-        <form
-          className="space-y-4"
-          onSubmit={async (e) => {
-            e.preventDefault()
-            setLoading(true)
-            const email = new FormData(e.currentTarget).get('email') as string
-            try {
-              await api('/auth/otp/request', { method: 'POST', body: JSON.stringify({ email }) })
-              setDone(true)
-            } catch {
-              setDone(true)
-            } finally {
-              setLoading(false)
-            }
-          }}
-        >
-          <div className="relative">
-            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
-            <Input
-              name="email"
-              type="email"
-              required
-              placeholder="Enter your email address"
-              className="pl-10 h-11 rounded-xl bg-slate-50 dark:bg-[#0c101d] border-slate-200 dark:border-slate-800"
-            />
-          </div>
-          <Button
-            type="submit"
-            disabled={loading}
-            className="w-full h-11 rounded-full font-semibold text-sm bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-[0_4px_20px_rgba(99,102,241,0.35)]"
-          >
-            {loading ? 'Sending code...' : 'Send OTP Code'}
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          Password reset is not part of this release. Ask support to reset the
+          account, then sign in with the new password and your emailed code.
+        </p>
+        <Link to="/login">
+          <Button className="w-full h-11 rounded-full font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg">
+            Back to Sign in
           </Button>
-        </form>
-      )}
-
-      <div className="mt-6 text-center text-sm">
-        <Link to="/login" className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
-          Back to Sign in
         </Link>
       </div>
     </AuthLayout>
@@ -584,58 +454,71 @@ export function ForgotPasswordPage() {
 }
 
 export function VerifyOtpPage() {
-  const [message, setMessage] = useState('')
+  const { pending, verifyCode } = useAuth()
+  const navigate = useNavigate()
+  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // A reload loses the half-finished sign-in. There is nothing to verify
+  // without it, and an email box here would invite verifying someone else's.
+  useEffect(() => {
+    if (!pending) navigate('/login', { replace: true })
+  }, [pending, navigate])
+
   return (
-    <AuthLayout title="Verify OTP Code" subtitle="Prototype verification code is mocked as 246810.">
+    <AuthLayout
+      title="Check your email"
+      subtitle={
+        pending
+          ? `We sent a one-time code to ${pending.email}.`
+          : 'Start again from the sign-in screen.'
+      }
+    >
       <form
         className="space-y-4"
         onSubmit={async (e) => {
           e.preventDefault()
+          setError('')
           setLoading(true)
-          const data = new FormData(e.currentTarget)
+          const code = String(new FormData(e.currentTarget).get('code') ?? '')
           try {
-            const result = await api<{ verified: boolean }>('/auth/otp/verify', {
-              method: 'POST',
-              body: JSON.stringify({ email: data.get('email'), code: data.get('code') }),
+            const me = await verifyCode(code)
+            // The authenticator is the financial gate (PRD §9.1). Someone who
+            // has not enrolled one is sent there, not to a screen that would
+            // refuse every request it makes.
+            navigate(me.canMoveMoney ? homeFor(me) : '/enrol-authenticator', {
+              replace: true,
             })
-            setMessage(
-              result.verified
-                ? 'Verified successfully! Redirecting...'
-                : 'Invalid verification code'
-            )
-          } catch {
-            setMessage('Verification completed in prototype mode.')
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'That code was not accepted.')
           } finally {
             setLoading(false)
           }
         }}
       >
-        <div className="relative">
-          <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
-          <Input
-            name="email"
-            type="email"
-            required
-            placeholder="Email address"
-            className="pl-10 h-11 rounded-xl bg-slate-50 dark:bg-[#0c101d] border-slate-200 dark:border-slate-800"
-          />
+        <div className="space-y-1.5">
+          <label
+            htmlFor="emailed-code"
+            className="text-xs font-medium text-slate-600 dark:text-slate-300"
+          >
+            Emailed code
+          </label>
+          <div className="relative">
+            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
+            <Input
+              id="emailed-code"
+              name="code"
+              required
+              autoComplete="one-time-code"
+              placeholder="246810"
+              className="pl-10 h-11 rounded-xl bg-slate-50 dark:bg-[#0c101d] border-slate-200 dark:border-slate-800 tracking-widest font-mono"
+            />
+          </div>
         </div>
 
-        <div className="relative">
-          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
-          <Input
-            name="code"
-            required
-            placeholder="One-time code (e.g. 246810)"
-            className="pl-10 h-11 rounded-xl bg-slate-50 dark:bg-[#0c101d] border-slate-200 dark:border-slate-800 tracking-widest font-mono"
-          />
-        </div>
-
-        {message && (
-          <p className="text-sm text-center font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 p-2.5 rounded-xl border border-emerald-500/20">
-            {message}
+        {error && (
+          <p className="text-xs text-rose-500 text-center font-medium bg-rose-500/10 p-2 rounded-xl border border-rose-500/20">
+            {error}
           </p>
         )}
 
@@ -644,7 +527,7 @@ export function VerifyOtpPage() {
           disabled={loading}
           className="w-full h-11 rounded-full font-semibold text-sm bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg"
         >
-          {loading ? 'Verifying...' : 'Verify & Continue'}
+          {loading ? 'Verifying...' : 'Continue'}
         </Button>
       </form>
 
@@ -657,4 +540,107 @@ export function VerifyOtpPage() {
   )
 }
 
+/**
+ * The financial gate (PRD §9.1). Until an authenticator is enrolled the
+ * account has no deposit address, no balance and cannot place orders, so
+ * every money screen sends an unenrolled person here rather than letting
+ * them collect a 403 they cannot act on.
+ */
+export function EnrolAuthenticatorPage() {
+  const { user, beginMfa, confirmMfa } = useAuth()
+  const navigate = useNavigate()
+  const [secret, setSecret] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
+  useEffect(() => {
+    let live = true
+    beginMfa()
+      .then((s) => live && setSecret(s))
+      .catch((e: unknown) =>
+        live && setError(e instanceof Error ? e.message : 'Enrolment could not start.'),
+      )
+    return () => {
+      live = false
+    }
+  }, [beginMfa])
+
+  return (
+    <AuthLayout
+      title="Add your authenticator"
+      subtitle="Moving money needs a code from an authenticator app."
+    >
+      <div className="space-y-4">
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0c101d] p-4 text-center">
+          <p className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            Setup key
+          </p>
+          <p className="mt-2 font-mono text-sm tracking-widest break-all text-slate-900 dark:text-white">
+            {secret || 'Preparing...'}
+          </p>
+          <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
+            Save it now — it is not shown again.
+          </p>
+        </div>
+
+        <form
+          className="space-y-4"
+          onSubmit={async (e) => {
+            e.preventDefault()
+            setError('')
+            setLoading(true)
+            const code = String(new FormData(e.currentTarget).get('code') ?? '')
+            try {
+              const me = await confirmMfa(code)
+              navigate(homeFor(me), { replace: true })
+            } catch (err) {
+              setError(err instanceof Error ? err.message : 'That code was not accepted.')
+            } finally {
+              setLoading(false)
+            }
+          }}
+        >
+          <div className="space-y-1.5">
+            <label
+              htmlFor="authenticator-code"
+              className="text-xs font-medium text-slate-600 dark:text-slate-300"
+            >
+              Authenticator code
+            </label>
+            <div className="relative">
+              <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
+              <Input
+                id="authenticator-code"
+                name="code"
+                required
+                inputMode="numeric"
+                placeholder="000000"
+                className="pl-10 h-11 rounded-xl bg-slate-50 dark:bg-[#0c101d] border-slate-200 dark:border-slate-800 tracking-widest font-mono"
+              />
+            </div>
+          </div>
+
+          {error && (
+            <p className="text-xs text-rose-500 text-center font-medium bg-rose-500/10 p-2 rounded-xl border border-rose-500/20">
+              {error}
+            </p>
+          )}
+
+          <Button
+            type="submit"
+            disabled={loading || !secret}
+            className="w-full h-11 rounded-full font-semibold text-sm bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg"
+          >
+            {loading ? 'Confirming...' : 'Confirm'}
+          </Button>
+        </form>
+
+        {user && (
+          <p className="text-center text-[11px] text-slate-500 dark:text-slate-400">
+            Signed in as {user.email}
+          </p>
+        )}
+      </div>
+    </AuthLayout>
+  )
+}
