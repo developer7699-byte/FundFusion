@@ -96,6 +96,21 @@ export const ticketStatus = pgEnum('ticket_status', [
   'CLOSED',
 ]);
 
+/**
+ * PRD §6.10's closed list, stated so it holds on both sides of a trade.
+ *
+ * RELEASE pays the escrow to the counterparty as a normal settlement would —
+ * the payer did pay. REFUND returns it to whoever posted it — they did not.
+ * SPLIT divides it. REFUND_WITH_PENALTY refunds in full and draws
+ * compensation from the defaulting party's bond.
+ */
+export const disputeOutcome = pgEnum('dispute_outcome', [
+  'RELEASE',
+  'REFUND',
+  'SPLIT',
+  'REFUND_WITH_PENALTY',
+]);
+
 export const disputeStatus = pgEnum('dispute_status', [
   'OPEN',
   'UNDER_REVIEW',

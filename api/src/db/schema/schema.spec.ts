@@ -143,3 +143,76 @@ describe('scope (PRD §3)', () => {
     );
   });
 });
+
+/**
+ * PRD §6.10. A dispute is a core operational surface, not an edge case, and
+ * its four outcomes are a closed list the database enforces.
+ */
+describe('dispute', () => {
+  /**
+   * `ticket_id` pointed at `support_ticket`, which M6 owns. A dispute that
+   * cannot exist without a support ticket cannot exist in M5 at all.
+   */
+  it('can exist without a support ticket', async () => {
+    const [ticket] = (await columns('dispute')).filter(
+      (c) => c.column_name === 'ticket_id',
+    );
+    const nullable = await client.query(
+      `SELECT is_nullable FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'dispute'
+          AND column_name = 'ticket_id'`,
+    );
+
+    expect(ticket).toBeDefined();
+    expect((nullable.rows[0] as { is_nullable: string }).is_nullable).toBe(
+      'YES',
+    );
+  });
+
+  it('records the outcome, who decided it, and why', async () => {
+    const names = (await columns('dispute')).map((c) => c.column_name);
+
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'outcome',
+        'opened_by',
+        'resolved_by',
+        'resolved_at',
+        'resolution_reason',
+        'counterparty_amount',
+        'penalty_amount',
+      ]),
+    );
+  });
+
+  /** Amounts here settle USDT, so they carry the same scale as the ledger. */
+  it('holds its amounts at the ledger scale', async () => {
+    const amounts = (await columns('dispute')).filter((c) =>
+      ['counterparty_amount', 'penalty_amount'].includes(c.column_name),
+    );
+
+    expect(amounts).toHaveLength(2);
+    for (const column of amounts) {
+      expect(column.data_type).toBe('numeric');
+      expect(column.numeric_precision).toBe(38);
+      expect(column.numeric_scale).toBe(18);
+    }
+  });
+
+  /** §6.10's list is closed. A fifth outcome is a schema change, not a typo. */
+  it('refuses an outcome outside the closed list', async () => {
+    const values = await client.query(
+      `SELECT e.enumlabel FROM pg_enum e
+         JOIN pg_type t ON t.oid = e.enumtypid
+        WHERE t.typname = 'dispute_outcome'
+        ORDER BY e.enumsortorder`,
+    );
+
+    expect(values.rows.map((r: { enumlabel: string }) => r.enumlabel)).toEqual([
+      'RELEASE',
+      'REFUND',
+      'SPLIT',
+      'REFUND_WITH_PENALTY',
+    ]);
+  });
+});

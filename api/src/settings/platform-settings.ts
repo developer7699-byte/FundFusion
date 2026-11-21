@@ -200,6 +200,22 @@ export const PLATFORM_SETTINGS = {
     description:
       'How long a newly allowlisted address waits before it may be withdrawn to. The window in which the real owner sees the security email and intervenes (PRD §8.4).',
   },
+  'dispute.penaltyBps': {
+    kind: 'INTEGER',
+    default: 1000,
+    min: 0,
+    max: 5000,
+    description:
+      "Compensation drawn from a defaulting merchant's bond, in basis points of the order (PRD §6.10). Capped well below the bond on purpose: full forfeiture over a genuine bank outage would dry up merchant supply.",
+  },
+  'dispute.defaultsBeforePause': {
+    kind: 'INTEGER',
+    default: 3,
+    min: 1,
+    max: 20,
+    description:
+      'How many disputes resolved against a merchant pause their desk (PRD §6.10).',
+  },
   'reconciliation.dustToleranceUsdt': {
     kind: 'MONEY_USDT',
     default: '0.01',
