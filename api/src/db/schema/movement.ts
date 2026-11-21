@@ -1,23 +1,68 @@
-import { integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { usdt } from './money-columns';
 import { blockchainNetwork, walletAccount } from './money';
 import { user } from './identity';
 
-export const deposit = pgTable('deposit', {
+export const deposit = pgTable(
+  'deposit',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => walletAccount.id),
+    networkId: uuid('network_id')
+      .notNull()
+      .references(() => blockchainNetwork.id),
+    amount: usdt('amount').notNull(),
+    status: text('status').notNull(),
+    txHash: text('tx_hash'),
+    /**
+     * One transaction can carry several transfers, so the log index is part of
+     * what makes a deposit unique — without it a two-transfer transaction
+     * credits once.
+     */
+    logIndex: integer('log_index'),
+    blockNumber: bigint('block_number', { mode: 'bigint' }),
+    confirmations: integer('confirmations').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('deposit_network_id_tx_hash_log_index_key').on(
+      t.networkId,
+      t.txHash,
+      t.logIndex,
+    ),
+  ],
+);
+
+/**
+ * Where the deposit watcher stopped. PRD §8.2: it reads at the finalized
+ * head, so this never runs ahead of finality — and it only advances once a
+ * range has been credited, because a cursor that moves past a block nobody
+ * processed is a deposit nobody will ever see.
+ */
+export const chainCursor = pgTable('chain_cursor', {
   id: uuid('id').primaryKey().defaultRandom(),
-  accountId: uuid('account_id')
-    .notNull()
-    .references(() => walletAccount.id),
   networkId: uuid('network_id')
     .notNull()
+    .unique()
     .references(() => blockchainNetwork.id),
-  amount: usdt('amount').notNull(),
-  status: text('status').notNull(),
-  txHash: text('tx_hash'),
-  confirmations: integer('confirmations').notNull().default(0),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  lastScannedBlock: bigint('last_scanned_block', {
+    mode: 'bigint',
+  }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true })
     .notNull()
     .defaultNow(),

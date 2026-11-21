@@ -85,6 +85,13 @@
       "when": 1795208724605,
       "tag": "0011_tough_moondragon",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795230652712,
+      "tag": "0012_complex_stryfe",
+      "breakpoints": true
     }
   ]
 }
