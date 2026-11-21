@@ -120,6 +120,22 @@ REVENUE       3.000000000000000000
 That is PRD §15's first done-condition, met on testnet, through the routes
 the screens call.
 
+A buy followed, over the same routes with the sides reversed — the customer
+submits the UTR and the **merchant** confirms receipt:
+
+| Step | Result |
+|---|---|
+| `POST /v1/p2p/quotes` side BUY | 20 USDT for ₹1998.20 at ₹99.91 |
+| accept → customer UTR → merchant confirms | `COMPLETED` |
+| balances | customer 50 → **70**, merchant 247 → **227** |
+
+The customer asked for 20 USDT and received exactly 20. The merchant fee was
+`0.000000000000000000`, because `quote.buyFeeBps` defaults to 0 — "zero until
+the business sets it", blocked on commercial decision D-01 (PRD §18). So PRD
+§15's second done-condition is only half shown here: the buy-side maths is
+exact, but the fee leg carries no value at the default setting. The leg
+itself is covered by `settlement.service.spec.ts`.
+
 ### Not verified
 
 - **The click-through itself.** The browser could not be driven from the
@@ -127,8 +143,6 @@ the screens call.
   HTTP with the screens' own routes, headers and idempotency keys — not by a
   person using the screens. The screens' own behaviour is covered by
   `auth-v1`, `wallet-v1`, `orders-v1` and `merchant-v1` tests.
-- **The buy side**, for the same reason. Its routes are the same; the fee
-  moves from the merchant instead (PRD §6.4).
 
 ---
 
