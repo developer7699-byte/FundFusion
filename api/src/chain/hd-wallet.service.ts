@@ -1,18 +1,12 @@
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { HDKey } from '@scure/bip32';
-import { mnemonicToSeedSync, validateMnemonic } from '@scure/bip39';
-import { wordlist } from '@scure/bip39/wordlists/english';
 import { and, eq, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { privateKeyToAccount } from 'viem/accounts';
-import { toHex } from 'viem';
 import * as schema from '../db/schema';
 import { AccountService, DRIZZLE } from '../ledger/account.service';
+import { depositAccountFrom, masterKey } from './derivation';
 
 type Db = NodePgDatabase<typeof schema>;
-
-/** BIP-44 for an EVM chain. BSC shares coin type 60 with Ethereum. */
-const ACCOUNT_PATH = "m/44'/60'/0'/0";
 
 export const BSC_TESTNET_NETWORK = 'BSC_TESTNET';
 
@@ -46,30 +40,14 @@ export class HdWalletService {
     private readonly accounts: AccountService,
     config: HdWalletConfig,
   ) {
-    const phrase = config.seedPhrase?.trim();
-    if (!phrase) {
-      throw new Error(
-        'BSC_HD_SEED is not set. Custody cannot start without a seed, and inventing one would strand every deposit made against it.',
-      );
-    }
-    if (!validateMnemonic(phrase, wordlist)) {
-      throw new Error(
-        'BSC_HD_SEED is not a valid BIP-39 mnemonic. A mistyped seed derives different addresses, silently.',
-      );
-    }
-
-    this.master = HDKey.fromMasterSeed(mnemonicToSeedSync(phrase));
+    this.master = masterKey(config.seedPhrase);
     this.networkCode = config.networkCode ?? BSC_TESTNET_NETWORK;
     this.assetSymbol = config.assetSymbol ?? 'USDT';
   }
 
   /** The address derived at `index`. Pure: same seed, same answer. */
   addressAt(index: number): string {
-    const child = this.master.derive(`${ACCOUNT_PATH}/${index}`);
-    if (!child.privateKey) {
-      throw new Error(`Could not derive a key at index ${index}.`);
-    }
-    return privateKeyToAccount(toHex(child.privateKey)).address;
+    return depositAccountFrom(this.master, index).address;
   }
 
   /**
