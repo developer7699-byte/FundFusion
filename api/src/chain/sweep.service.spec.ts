@@ -1,6 +1,5 @@
 import { AccountService } from '../ledger/account.service';
 import { BalanceService } from '../ledger/balance.service';
-import { PostingService } from '../ledger/posting.service';
 import {
   makeTestDb,
   seedAsset,
@@ -61,7 +60,6 @@ class FakeSigner implements Signer {
 let t: TestDb;
 let accounts: AccountService;
 let balances: BalanceService;
-let posting: PostingService;
 let chain: FakeChain;
 let signer: FakeSigner;
 let sweeps: SweepService;
@@ -72,7 +70,6 @@ beforeAll(() => {
   t = makeTestDb();
   accounts = new AccountService(t.db);
   balances = new BalanceService(t.db);
-  posting = new PostingService(t.db, accounts, balances);
 }, 30000);
 
 beforeEach(async () => {
@@ -172,9 +169,8 @@ describe('sweeping (PRD §8.3)', () => {
     holds('100');
     signer.failTokenSweep = new Error('out of gas');
 
-    const result = await sweeps.sweepOnce().catch((e: Error) => e);
+    await expect(sweeps.sweepOnce()).rejects.toThrow(/out of gas/);
 
-    expect(String(result)).toMatch(/out of gas/);
     const r = await t.pool.query<{ n: number }>(
       `SELECT count(*)::int AS n FROM transfer`,
     );
