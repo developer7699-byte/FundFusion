@@ -16,6 +16,7 @@ import {
   WithdrawFlow,
 } from '@/features/customer/wallet-flows'
 import { LandingPage } from '@/features/marketing/LandingPage'
+import { SpinePage } from '@/spine/SpinePage'
 import {
   AboutPage,
   BlogPage,
@@ -101,6 +102,8 @@ export function App() {
     <AppProviders>
       <BrowserRouter>
         <Routes>
+        {/* M4.5 spine — the real v1 API on testnet (PRD §14). */}
+        <Route path="/spine" element={<SpinePage />} />
           <Route element={<PublicLayout />}>
             <Route path="/" element={<LandingPage />} />
             <Route path="/about" element={<AboutPage />} />
