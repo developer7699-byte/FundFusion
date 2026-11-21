@@ -68,22 +68,77 @@ export const chainCursor = pgTable('chain_cursor', {
     .defaultNow(),
 });
 
-export const withdrawal = pgTable('withdrawal', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  accountId: uuid('account_id')
-    .notNull()
-    .references(() => walletAccount.id),
-  amount: usdt('amount').notNull(),
-  fee: usdt('fee').notNull(),
-  address: text('address').notNull(),
-  status: text('status').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+/**
+ * An address a user has said they withdraw to (PRD §8.4).
+ *
+ * `usableFrom` is the 24-hour cooldown, and it is the control that matters
+ * most here: an attacker who has taken over a session can add their own
+ * address, but cannot use it today — which is the window in which the real
+ * owner sees the security email and intervenes.
+ */
+export const withdrawalAddress = pgTable(
+  'withdrawal_address',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => user.id),
+    networkId: uuid('network_id')
+      .notNull()
+      .references(() => blockchainNetwork.id),
+    address: text('address').notNull(),
+    label: text('label'),
+    /** Not usable before this instant. Set once, at creation. */
+    usableFrom: timestamp('usable_from', { withTimezone: true }).notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    /**
+     * Re-saving an address must not restart its cooldown, so the same
+     * address is the same row. Without this, waiting out the cooldown is
+     * optional: add, wait nothing, add again.
+     */
+    uniqueIndex('withdrawal_address_user_id_network_id_address_key').on(
+      t.userId,
+      t.networkId,
+      t.address,
+    ),
+  ],
+);
+
+export const withdrawal = pgTable(
+  'withdrawal',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => walletAccount.id),
+    amount: usdt('amount').notNull(),
+    fee: usdt('fee').notNull(),
+    address: text('address').notNull(),
+    /** QUEUED, APPROVED, SENT or REJECTED. */
+    status: text('status').notNull(),
+    /**
+     * PRD §5 rule 2: a money operation is idempotent. A retried request
+     * returns the withdrawal it already created rather than a second one.
+     */
+    idempotencyKey: text('idempotency_key'),
+    txHash: text('tx_hash'),
+    reviewedBy: uuid('reviewed_by').references(() => user.id),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    reviewReason: text('review_reason'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [uniqueIndex('withdrawal_idempotency_key_key').on(t.idempotencyKey)],
+);
 
 export const transfer = pgTable('transfer', {
   id: uuid('id').primaryKey().defaultRandom(),

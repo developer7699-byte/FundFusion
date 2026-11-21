@@ -42,6 +42,7 @@ export function makeTestDb(options: { max?: number } = {}): TestDb {
           session, otp_challenge,
           ledger_entry, ledger_transaction, merchant_assignment,
           p2p_order, p2p_quote, merchant_profile,
+          withdrawal, withdrawal_address, deposit, chain_cursor,
           wallet_address, wallet_account, wallet,
           blockchain_network, asset,
           user_role, "user", role

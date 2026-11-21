@@ -4,7 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema';
 import { AuditService } from '../audit/audit.service';
 import { DRIZZLE } from '../ledger/account.service';
-import { usdt, usdtString } from '../money/money';
+import { Decimal, usdt, usdtString } from '../money/money';
 import {
   PLATFORM_SETTINGS,
   SETTING_KEYS,
@@ -123,6 +123,8 @@ export class PlatformSettingsService implements SettingsReader {
     key: SettingKey,
     next: number,
   ): Promise<void> {
+    await this.assertWithdrawalCapsAgree(key, next);
+
     if (key !== 'quote.ttlSeconds' && key !== 'order.searchWindowSeconds') {
       return;
     }
@@ -190,6 +192,39 @@ export class PlatformSettingsService implements SettingsReader {
       (row?.value as { value: string | number } | undefined)?.value ??
       PLATFORM_SETTINGS[key].default
     );
+  }
+
+  /**
+   * PRD §8.4 stacks three limits on one withdrawal. Each only binds if the
+   * one above it is larger, and a limit that cannot bind is worse than no
+   * limit: whoever set it believes they capped something.
+   */
+  private async assertWithdrawalCapsAgree(
+    key: SettingKey,
+    next: number,
+  ): Promise<void> {
+    const keys = [
+      'withdrawal.autoApproveUsdt',
+      'withdrawal.dailyCapUsdt',
+      'withdrawal.weeklyCapUsdt',
+    ] as const;
+    if (!(keys as readonly string[]).includes(key)) return;
+
+    const read = async (k: (typeof keys)[number]) =>
+      new Decimal(k === key ? String(next) : await this.money(k));
+
+    const [autoApprove, daily, weekly] = await Promise.all(keys.map(read));
+
+    if (weekly.lt(daily)) {
+      throw new BadRequestException(
+        `A weekly cap of ${weekly.toFixed()} below the daily cap of ${daily.toFixed()} can never bind — the daily cap would stop every withdrawal first.`,
+      );
+    }
+    if (autoApprove.gt(daily)) {
+      throw new BadRequestException(
+        `An auto-approve threshold of ${autoApprove.toFixed()} above the daily cap of ${daily.toFixed()} approves everything the cap allows without review.`,
+      );
+    }
   }
 
   private async stored(): Promise<Map<string, string | number>> {

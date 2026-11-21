@@ -152,6 +152,54 @@ export const PLATFORM_SETTINGS = {
     description:
       'Sweeping stops when the gas wallet falls below this. Running it dry halts every sweep while nothing errors and every dashboard stays green (PRD §13.3).',
   },
+  'withdrawal.minUsdt': {
+    kind: 'MONEY_USDT',
+    default: '10',
+    min: '0.000001',
+    max: '100000',
+    description:
+      'The smallest withdrawal accepted. Below this the network fee is most of what moves.',
+  },
+  'withdrawal.feeUsdt': {
+    kind: 'MONEY_USDT',
+    default: '0',
+    min: '0',
+    max: '100',
+    description:
+      'A flat fee charged on top of the amount withdrawn, in USDT. Zero until the business sets it.',
+  },
+  'withdrawal.autoApproveUsdt': {
+    kind: 'MONEY_USDT',
+    default: '100',
+    min: '0',
+    max: '1000000',
+    description:
+      'Withdrawals at or below this auto-approve; anything above queues for manual review (PRD §8.4).',
+  },
+  'withdrawal.dailyCapUsdt': {
+    kind: 'MONEY_USDT',
+    default: '1000',
+    min: '0.000001',
+    max: '10000000',
+    description:
+      'How much one user may withdraw in a rolling 24 hours. The control that defeats the patient attacker withdrawing just under the threshold (PRD §8.4).',
+  },
+  'withdrawal.weeklyCapUsdt': {
+    kind: 'MONEY_USDT',
+    default: '5000',
+    min: '0.000001',
+    max: '10000000',
+    description:
+      'How much one user may withdraw in a rolling 7 days (PRD §8.4).',
+  },
+  'withdrawal.addressCooldownHours': {
+    kind: 'INTEGER',
+    default: 24,
+    min: 0,
+    max: 168,
+    description:
+      'How long a newly allowlisted address waits before it may be withdrawn to. The window in which the real owner sees the security email and intervenes (PRD §8.4).',
+  },
 } as const satisfies Record<string, SettingDefinition>;
 
 export type SettingKey = keyof typeof PLATFORM_SETTINGS;

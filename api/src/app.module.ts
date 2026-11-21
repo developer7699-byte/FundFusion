@@ -14,6 +14,7 @@ import { AuthModule } from './auth/auth.module';
 import { HealthController } from './health.controller';
 import { PrototypeModule } from './prototype/prototype.module';
 import { WalletModule } from './wallet/wallet.module';
+import { WalletV1Module } from './wallet/v1/wallet-v1.module';
 import { OpsModule } from './ops/ops.module';
 
 @Module({
@@ -31,6 +32,7 @@ import { OpsModule } from './ops/ops.module';
     PrototypeModule,
     AuthModule,
     WalletModule,
+    WalletV1Module,
     OpsModule,
   ],
   controllers: [HealthController],

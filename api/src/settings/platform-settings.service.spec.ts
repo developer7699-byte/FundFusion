@@ -138,6 +138,38 @@ describe('numbers that must agree with each other', () => {
 });
 
 /** PRD §9.4: every privileged action carries an actor and a reason. */
+describe('the withdrawal caps must agree with each other', () => {
+  /**
+   * A weekly cap below the daily one is unreachable: the daily cap can never
+   * bind, and whoever set it believes they capped a week.
+   */
+  it('refuses a weekly cap below the daily cap', async () => {
+    await expect(
+      settings.set('withdrawal.weeklyCapUsdt', '100', change()),
+    ).rejects.toThrow(/never bind/i);
+  });
+
+  /**
+   * Auto-approving more than a day's cap allows means the threshold cannot
+   * bind either — every withdrawal the cap permits is approved without
+   * review.
+   */
+  it('refuses an auto-approve threshold above the daily cap', async () => {
+    await expect(
+      settings.set('withdrawal.autoApproveUsdt', '100000', change()),
+    ).rejects.toThrow(/without review/i);
+  });
+
+  it('allows a consistent set', async () => {
+    await expect(
+      settings.set('withdrawal.dailyCapUsdt', '2000', change()),
+    ).resolves.toBeUndefined();
+    await expect(
+      settings.set('withdrawal.autoApproveUsdt', '500', change()),
+    ).resolves.toBeUndefined();
+  });
+});
+
 describe('accountability', () => {
   it('records who changed what, and why', async () => {
     await settings.set('rate.markupBps', 250, change('margin review Q4'));
