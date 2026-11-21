@@ -1,191 +1,156 @@
 import { useState } from 'react'
-import {} from 'react-router-dom'
-import {
-  Store,
-  Search,
-} from 'lucide-react'
+import { Store } from 'lucide-react'
 import { BackButton } from '@/components/ui/BackButton'
-import { useMerchantStore, type MerchantOrder } from '@/lib/merchant-store'
-import { AcceptOrderModal } from './components/MerchantModals'
-import { cn } from '@/lib/utils'
-import { ToastNotification } from '@/components/ui/ToastNotification'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { acceptOrder, openDesk, useDesk, useFeed } from './v1'
+import { useQueryClient } from '@tanstack/react-query'
 
+/**
+ * The live order feed (PRD §6.7).
+ *
+ * Every order is broadcast to every eligible merchant at one instant and the
+ * first to accept wins atomically. This screen never decides eligibility —
+ * it shows what the server offered and reports, word for word, whichever
+ * refusal comes back when the race is lost.
+ */
 export function MerchantAvailable() {
-  const { availableOrders, availableUsdt } = useMerchantStore()
-  const [filter, setFilter] = useState<'ALL' | 'UPI' | 'IMPS' | 'HIGH'>('ALL')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedOrder, setSelectedOrder] = useState<MerchantOrder | null>(null)
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const qc = useQueryClient()
+  const desk = useDesk()
+  const feed = useFeed()
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState<string | null>(null)
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg)
-    setTimeout(() => setToastMessage(null), 3500)
+  const accept = async (orderId: string) => {
+    setError('')
+    setBusy(orderId)
+    try {
+      await acceptOrder(orderId)
+      await qc.invalidateQueries({ queryKey: ['merchant'] })
+      await qc.invalidateQueries({ queryKey: ['wallet'] })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'That order could not be taken.')
+    } finally {
+      setBusy(null)
+    }
   }
 
-  const filteredOrders = availableOrders.filter((o) => {
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase()
-      const match =
-        o.id.toLowerCase().includes(q) ||
-        o.buyerName.toLowerCase().includes(q) ||
-        o.paymentMethod.toLowerCase().includes(q)
-      if (!match) return false
+  const open = async () => {
+    setError('')
+    setBusy('desk')
+    try {
+      await openDesk('My Desk')
+      await qc.invalidateQueries({ queryKey: ['merchant'] })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'That desk could not be opened.')
+    } finally {
+      setBusy(null)
     }
-
-    if (filter === 'UPI') return o.paymentType === 'UPI'
-    if (filter === 'IMPS') return o.paymentType === 'IMPS' || o.paymentType === 'BANK'
-    if (filter === 'HIGH') return o.inrAmount >= 25000
-    return true
-  })
+  }
 
   return (
-    <div className="space-y-4 max-w-lg mx-auto w-full pb-4 relative">
-      {/* Toast Notification */}
-      <ToastNotification message={toastMessage} onClose={() => setToastMessage(null)} />
-
-      {/* Top Header */}
+    <div className="space-y-4 max-w-lg mx-auto w-full pb-2">
       <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-center gap-2.5">
           <BackButton fallback="/merchant/dashboard" />
           <div>
-            <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-1.5">
-              <span>Available Order Book</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-mono font-bold">
-                {availableOrders.length}
-              </span>
+            <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+              Available Orders
             </h1>
-            <p className="text-[11px] text-slate-500">Pick up orders to lock escrow & earn fees</p>
+            <p className="text-[11px] text-slate-500">
+              First to accept wins. Live.
+            </p>
           </div>
         </div>
-
-        <div className="text-right">
-          <span className="text-[10px] text-slate-400 block">Available</span>
-          <span className="font-mono text-xs font-black text-emerald-600 dark:text-emerald-400">
-            {availableUsdt.toFixed(2)} USDT
+        {desk.data && (
+          <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+            {desk.data.status}
           </span>
-        </div>
-      </div>
-
-      {/* Search Input */}
-      <div className="relative">
-        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by order ID or buyer username..."
-          className="w-full pl-9 pr-4 py-2 rounded-2xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-xs font-semibold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-        />
-      </div>
-
-      {/* Filter Chips */}
-      <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1 text-xs">
-        {[
-          { id: 'ALL', label: 'All Orders' },
-          { id: 'UPI', label: 'Instant UPI' },
-          { id: 'IMPS', label: 'IMPS Bank' },
-          { id: 'HIGH', label: 'High Value (₹25K+)' },
-        ].map((f) => (
-          <button
-            key={f.id}
-            type="button"
-            onClick={() => setFilter(f.id as any)}
-            className={cn(
-              'px-3 py-1.5 rounded-full font-bold text-xs shrink-0 transition-all cursor-pointer',
-              filter === f.id
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
-            )}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Available Orders List */}
-      <div className="space-y-3">
-        {filteredOrders.length === 0 ? (
-          <div className="p-8 text-center rounded-3xl bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-800 space-y-2">
-            <Store className="w-8 h-8 text-slate-400 mx-auto" />
-            <p className="text-xs font-bold text-slate-700 dark:text-slate-300">No available orders matching filter</p>
-            <p className="text-[11px] text-slate-500">New customer orders will appear here automatically.</p>
-          </div>
-        ) : (
-          filteredOrders.map((order) => {
-            const canAfford = availableUsdt >= order.usdtAmount
-            return (
-              <div
-                key={order.id}
-                className="p-4 rounded-3xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800/90 shadow-2xs hover:border-emerald-500/40 transition-all space-y-3"
-              >
-                {/* Header */}
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-extrabold text-xs text-slate-900 dark:text-white">
-                        {order.buyerName}
-                      </span>
-                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.2 rounded-full">
-                        {order.buyerRating}
-                      </span>
-                      <span className="text-[10px] text-slate-400">({order.buyerTrades} trades)</span>
-                    </div>
-                    <span className="text-[10px] text-slate-400 font-mono block pt-0.5">
-                      Order #{order.id} · {order.createdAt}
-                    </span>
-                  </div>
-
-                  <div className="text-right">
-                    <span className="text-base font-black text-slate-900 dark:text-white font-mono block">
-                      ₹{order.inrAmount.toLocaleString('en-IN')}
-                    </span>
-                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-mono font-bold">
-                      {order.usdtAmount.toFixed(2)} USDT
-                    </span>
-                  </div>
-                </div>
-
-                {/* Details Strip */}
-                <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2 text-[11px]">
-                  <div>
-                    <span className="text-slate-400 block text-[9px] uppercase font-bold">Payment Rail</span>
-                    <span className="font-bold text-slate-800 dark:text-slate-200">{order.paymentMethod}</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-slate-400 block text-[9px] uppercase font-bold">Est. Fee Earnings</span>
-                    <span className="font-mono font-black text-amber-500">
-                      +{((order.usdtAmount * 0.015)).toFixed(2)} USDT
-                    </span>
-                  </div>
-                </div>
-
-                {/* Action Button */}
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-[10px] text-slate-400">
-                    {canAfford ? 'Escrow will lock upon accept' : 'Insufficient vault balance'}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={!canAfford}
-                    onClick={() => setSelectedOrder(order)}
-                    className="py-2 px-5 rounded-xl bg-[#0a2316] dark:bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-black text-xs shadow-md active:scale-95 transition-all cursor-pointer"
-                  >
-                    Accept Order
-                  </button>
-                </div>
-              </div>
-            )
-          })
         )}
       </div>
 
-      <AcceptOrderModal
-        order={selectedOrder}
-        isOpen={!!selectedOrder}
-        onClose={() => setSelectedOrder(null)}
-        onSuccess={showToast}
-      />
+      {!desk.isLoading && !desk.data && (
+        <div className="rounded-[28px] bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 p-5 space-y-3 text-center shadow-xs">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-indigo-500/10 text-indigo-500">
+            <Store className="h-7 w-7" />
+          </div>
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            You have no merchant desk. Opening one lets you take orders; what
+            you can actually take is decided by your USDT balance.
+          </p>
+          <Button
+            type="button"
+            onClick={() => void open()}
+            disabled={busy === 'desk'}
+            className="w-full h-11 rounded-full font-semibold bg-slate-900 dark:bg-white text-white dark:text-slate-900"
+          >
+            {busy === 'desk' ? 'Opening...' : 'Open a desk'}
+          </Button>
+        </div>
+      )}
+
+      {error && (
+        <p className="text-xs text-rose-500 font-medium bg-rose-500/10 p-2.5 rounded-xl border border-rose-500/20">
+          {error}
+        </p>
+      )}
+
+      {feed.isLoading && <Skeleton className="h-24 rounded-2xl" />}
+      {feed.error && (
+        <p className="text-rose-500 font-bold p-4 text-sm">{feed.error.message}</p>
+      )}
+
+      <div className="space-y-2">
+        {!feed.isLoading && (feed.data ?? []).length === 0 && desk.data && (
+          <div className="p-8 text-center text-xs text-slate-400 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+            Nothing to take right now.
+          </div>
+        )}
+
+        {(feed.data ?? []).map((o) => (
+          <div
+            key={o.orderId}
+            className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-3 shadow-xs"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <span className="text-xs font-black text-slate-900 dark:text-white block">
+                  Customer {o.side === 'SELL' ? 'sells' : 'buys'} USDT
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  Expires {new Date(o.expiresAt).toLocaleTimeString()}
+                </span>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="text-xs font-black font-mono text-slate-900 dark:text-white block break-all">
+                  {o.usdtAmount} USDT
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  ₹{o.inrAmount} at ₹{o.customerRate}
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-slate-50 dark:bg-slate-800/60 p-2.5 text-[11px] flex justify-between gap-3">
+              <span className="text-slate-500">
+                {o.side === 'SELL' ? 'You bond' : 'You lock'}
+              </span>
+              <span className="font-mono font-bold text-slate-800 dark:text-slate-200 break-all">
+                {o.obligationUsdt} USDT
+              </span>
+            </div>
+
+            <Button
+              type="button"
+              onClick={() => void accept(o.orderId)}
+              disabled={busy === o.orderId}
+              className="w-full h-10 rounded-full font-semibold text-xs bg-emerald-500 text-white"
+            >
+              {busy === o.orderId ? 'Accepting...' : 'Accept order'}
+            </Button>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
-

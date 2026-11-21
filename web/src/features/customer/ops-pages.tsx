@@ -141,7 +141,13 @@ export function OrdersList() {
 /* =========================================================================
    2. ORDER DETAIL (/customer/orders/:orderId)
    ========================================================================= */
-export function OrderDetail() {
+/**
+ * One order, for whichever party is looking at it. The merchant desk renders
+ * this same screen: the states, the snapshot and the single allowed action
+ * are the engine's, not the shell's, so two copies would be two places to
+ * get `actionFor` wrong.
+ */
+export function OrderDetail({ backTo = '/customer/orders' }: { backTo?: string } = {}) {
   const { orderId } = useParams()
   const qc = useQueryClient()
   const [utr, setUtr] = useState('')
@@ -184,7 +190,7 @@ export function OrderDetail() {
     <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
       <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-center gap-2.5">
-          <BackButton fallback="/customer/orders" />
+          <BackButton fallback={backTo} />
           <div>
             <h1 className="text-base font-black text-slate-900 dark:text-white">
               Order Details

@@ -1,3 +1,20 @@
+/**
+ * The merchant desk's local mock, kept only for what v1 cannot yet serve.
+ *
+ * Still backed by this file: settlement accounts, notices, earnings and the
+ * desk profile. None has a v1 route — payment instructions are out of scope
+ * for M4.6, and notifications arrive with M6.
+ *
+ * NOT backed by this file any more: the order feed, the desk's orders and its
+ * balances. Those come from the engine and the ledger, through
+ * `features/merchant/v1.ts` and `GET /v1/wallet/summary`.
+ *
+ * Money here is a JavaScript `number`, which PRD §5.1 forbids for real money.
+ * That is tolerable only because nothing in this file is real: every figure
+ * is invented in the browser and none of it reaches a journal. When a route
+ * appears for one of these, the screen moves to it and its slice leaves here
+ * rather than being converted to strings in place.
+ */
 import { useState, useEffect, useCallback } from 'react'
 
 export interface MerchantOrder {
