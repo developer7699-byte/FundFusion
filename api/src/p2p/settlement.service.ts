@@ -11,8 +11,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema';
 import { AccountService, DRIZZLE } from '../ledger/account.service';
 import { PostingService } from '../ledger/posting.service';
-import type { PostingLine } from '../ledger/ledger.types';
-import { usdt, usdtString } from '../money/money';
+import { buyLegs, sellLegs } from './settlement-legs';
 import { EligibilityService } from './eligibility.service';
 import type { Order } from './order.service';
 import { canTransition } from './order.state';
@@ -156,8 +155,12 @@ export class SettlementService {
 
       const { escrowAccountId, escrowBucket, escrowAmount, lines } =
         quote.side === 'SELL'
-          ? await this.sellLegs(parties)
-          : this.buyLegs(parties);
+          ? sellLegs(
+              quote,
+              parties,
+              (await this.eligibility.obligation(quote)).amountUsdt,
+            )
+          : buyLegs(quote, parties);
 
       await this.posting.postDebit(
         escrowAccountId,
@@ -179,62 +182,6 @@ export class SettlementService {
 
       return row;
     });
-  }
-
-  /**
-   * PRD §6.3. The customer's escrowed USDT splits between the merchant and
-   * platform revenue, and the merchant's bond comes back in the same journal.
-   * The platform's cut is taken from the asset it custodies — the merchant is
-   * never credited the full quantity.
-   */
-  private async sellLegs(p: Parties) {
-    const quantity = usdt(p.quote.usdtAmount);
-    const fee = usdt(p.quote.platformFeeUsdt);
-    const merchantCredit = quantity.minus(fee);
-    const bond = usdt((await this.eligibility.obligation(p.quote)).amountUsdt);
-
-    // A zero fee is a legal configuration — PRD §6.4 leaves the figure to the
-    // business — and a journal leg of zero is not. Omitting it keeps the
-    // journal balanced, because the merchant's credit is the complement.
-    const lines: PostingLine[] = nonZero([
-      leg(p.customerAccountId, 'LOCKED', 'DEBIT', quantity),
-      leg(p.merchantAccountId, 'AVAILABLE', 'CREDIT', merchantCredit),
-      platformLeg('REVENUE', 'CREDIT', fee),
-      leg(p.merchantAccountId, 'BONDED', 'DEBIT', bond),
-      leg(p.merchantAccountId, 'AVAILABLE', 'CREDIT', bond),
-    ]);
-
-    return {
-      escrowAccountId: p.customerAccountId,
-      escrowBucket: 'LOCKED' as const,
-      escrowAmount: usdtString(quantity),
-      lines,
-    };
-  }
-
-  /**
-   * PRD §6.4. The customer paid rupees straight into the merchant's bank, so
-   * the platform never sees that money and charges the merchant in USDT
-   * instead — debited inside this same journal, out of what was locked at
-   * accept. The customer receives exactly the quantity they asked for.
-   */
-  private buyLegs(p: Parties) {
-    const quantity = usdt(p.quote.usdtAmount);
-    const fee = usdt(p.quote.platformFeeUsdt);
-    const locked = quantity.plus(fee);
-
-    const lines: PostingLine[] = nonZero([
-      leg(p.merchantAccountId, 'LOCKED', 'DEBIT', locked),
-      leg(p.customerAccountId, 'AVAILABLE', 'CREDIT', quantity),
-      platformLeg('REVENUE', 'CREDIT', fee),
-    ]);
-
-    return {
-      escrowAccountId: p.merchantAccountId,
-      escrowBucket: 'LOCKED' as const,
-      escrowAmount: usdtString(locked),
-      lines,
-    };
   }
 
   private async parties(orderId: string, tx?: Db): Promise<Parties> {
@@ -280,41 +227,4 @@ export class SettlementService {
       ),
     };
   }
-}
-
-/**
- * Drop legs that carry nothing. The ledger refuses a zero leg, and rightly:
- * it is a movement that did not happen. The journal still balances, because
- * the amounts that remain are complements of each other.
- */
-function nonZero(lines: PostingLine[]): PostingLine[] {
-  return lines.filter((line) => usdt(line.amount).gt(0));
-}
-
-function leg(
-  accountId: string,
-  accountType: PostingLine['accountType'],
-  direction: PostingLine['direction'],
-  amount: { toFixed: () => string },
-): PostingLine {
-  return {
-    accountId,
-    accountType,
-    direction,
-    amount: usdtString(usdt(amount.toFixed())),
-    assetSymbol: 'USDT',
-  };
-}
-
-function platformLeg(
-  accountType: PostingLine['accountType'],
-  direction: PostingLine['direction'],
-  amount: { toFixed: () => string },
-): PostingLine {
-  return {
-    accountType,
-    direction,
-    amount: usdtString(usdt(amount.toFixed())),
-    assetSymbol: 'USDT',
-  };
 }

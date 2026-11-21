@@ -6,7 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { desc, eq, inArray, type SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema';
 import { AuditService } from '../audit/audit.service';
@@ -149,7 +149,7 @@ export class DisputeService {
     );
   }
 
-  private async rows(where: Parameters<typeof and>[0]): Promise<DisputeView[]> {
+  private async rows(where: SQL): Promise<DisputeView[]> {
     const rows = await this.db
       .select({
         dispute: schema.dispute,
