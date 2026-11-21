@@ -1,229 +1,138 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useState } from 'react'
-import {
-  CheckCircle2,
-  ShieldCheck,
-  Copy,
-  Check,
-  ChevronRight,
-  QrCode,
-  Gift,
-  Send,
-  HelpCircle,
-  Search,
-  X,
-  ArrowDownLeft,
-  ArrowUpRight,
-  ArrowRight,
-} from 'lucide-react'
-import {} from '@/components/ui/badge'
-import {} from '@/components/ui/button'
-import {} from '@/components/ui/card'
-import {} from '@/components/ui/input'
-import { api } from '@/lib/api'
+import { CheckCircle2, Send, HelpCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
+import { newIdempotencyKey, v1 } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/utils'
 import { BackButton } from '@/components/ui/BackButton'
 import { useNotifications } from '@/lib/notifications'
 
 type Order = {
-  id: string
-  kind: string
+  orderId: string
   status: string
+  side: 'BUY' | 'SELL'
   usdtAmount: string
   inrAmount: string
-  timeline: { at: string; status: string; note: string }[]
-  utr?: string
-  upiId?: string
-  beneficiary?: string
+  customerRate: string
+  platformFeeUsdt: string
+  role: 'CUSTOMER' | 'MERCHANT'
+  merchantUserId: string | null
+  utr: string | null
+  broadcastAt: string | null
+  updatedAt: string
 }
+
+/**
+ * The one thing this party may do to this order right now (PRD §6.8).
+ *
+ * Whoever receives the rupees confirms them, and the payer submits a UTR as
+ * evidence. On a sell the customer receives; on a buy the customer pays. Any
+ * other state offers nothing — a button the engine would refuse costs a
+ * person a 409 they cannot read.
+ */
+function actionFor(o: Order): 'CONFIRM_RECEIPT' | 'SUBMIT_UTR' | null {
+  const payer = o.side === 'BUY' ? 'CUSTOMER' : 'MERCHANT'
+  const iAmPayer = o.role === payer
+  if (o.status === 'ACCEPTED' && iAmPayer) return 'SUBMIT_UTR'
+  if (o.status === 'PAYMENT_SUBMITTED' && !iAmPayer) return 'CONFIRM_RECEIPT'
+  return null
+}
+
+const OPEN_STATES = ['QUOTED', 'AWAITING_MERCHANT', 'ACCEPTED', 'PAYMENT_SUBMITTED']
 
 /* =========================================================================
    1. ORDERS LIST (/customer/orders)
    ========================================================================= */
 export function OrdersList() {
-  const [activeFilter, setActiveFilter] = useState<'ALL' | 'P2P' | 'UPI' | 'UTILITIES'>('ALL')
-  const q = useQuery({ queryKey: ['orders'], queryFn: () => api<Order[]>('/orders').catch(() => []) })
-
-  // Mock demo orders if none exist
-  const mockOrders: Order[] = [
-    {
-      id: 'ord-89201',
-      kind: 'BUY_USDT',
-      status: 'ESCROW_LOCKED',
-      usdtAmount: '50.00',
-      inrAmount: '4575.00',
-      beneficiary: 'EscrowDesk_Fast',
-      upiId: 'merchant.desk@okaxis',
-      timeline: [
-        { at: '14:20', status: 'CREATED', note: 'Order matched with verified merchant' },
-        { at: '14:21', status: 'ESCROW_LOCKED', note: '50.00 USDT held safely in smart escrow' },
-      ],
-    },
-    {
-      id: 'ord-88319',
-      kind: 'UPI_PAY',
-      status: 'COMPLETED',
-      usdtAmount: '3.82',
-      inrAmount: '350.00',
-      beneficiary: 'Starbucks Coffee',
-      upiId: 'starbucks@icici',
-      utr: 'UTR993810294821',
-      timeline: [
-        { at: 'Yesterday', status: 'COMPLETED', note: 'Merchant confirmed UPI receipt' },
-      ],
-    },
-    {
-      id: 'ord-87102',
-      kind: 'GIFT_CARD',
-      status: 'COMPLETED',
-      usdtAmount: '10.92',
-      inrAmount: '1000.00',
-      beneficiary: 'Amazon Pay Gift Voucher',
-      utr: 'VCH-AMZN-8921-901',
-      timeline: [
-        { at: 'Nov 10', status: 'COMPLETED', note: 'Voucher code delivered to vault' },
-      ],
-    },
-    {
-      id: 'ord-86004',
-      kind: 'UTILITY_BILL',
-      status: 'COMPLETED',
-      usdtAmount: '15.84',
-      inrAmount: '1450.00',
-      beneficiary: 'BESCOM Electricity Bill',
-      timeline: [
-        { at: 'Nov 08', status: 'COMPLETED', note: 'BBPS biller settled at zero fee' },
-      ],
-    },
-  ]
-
-  const orders = (q.data && q.data.length > 0) ? q.data : mockOrders
-
-  const filteredOrders = orders.filter((o) => {
-    if (activeFilter === 'ALL') return true
-    if (activeFilter === 'P2P') return o.kind.includes('BUY') || o.kind.includes('SELL')
-    if (activeFilter === 'UPI') return o.kind.includes('UPI')
-    if (activeFilter === 'UTILITIES') return o.kind.includes('UTILITY') || o.kind.includes('GIFT')
-    return true
+  const [filter, setFilter] = useState<'ALL' | 'OPEN' | 'DONE'>('ALL')
+  const q = useQuery({
+    queryKey: ['orders'],
+    queryFn: () => v1<Order[]>('/p2p/orders'),
+    retry: false,
   })
 
+  const rows = (q.data ?? []).filter((o) =>
+    filter === 'ALL'
+      ? true
+      : filter === 'OPEN'
+        ? OPEN_STATES.includes(o.status)
+        : !OPEN_STATES.includes(o.status),
+  )
+
   return (
-    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
-      {/* Top Header */}
+    <div className="space-y-4 max-w-lg mx-auto w-full pb-2">
       <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-center gap-2.5">
           <BackButton fallback="/customer/dashboard" />
           <div>
             <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
-              My Orders & Swaps
+              Orders
             </h1>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">P2P Escrow & Utility History</p>
+            <p className="text-[11px] text-slate-500">Escrow and settlement</p>
           </div>
         </div>
-
-        <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-          Escrow Protected
+        <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+          {rows.length}
         </span>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-900/60 overflow-x-auto no-scrollbar">
-        {[
-          { id: 'ALL', label: 'All Orders' },
-          { id: 'P2P', label: 'P2P Crypto' },
-          { id: 'UPI', label: 'UPI QR' },
-          { id: 'UTILITIES', label: 'Bills & Gifts' },
-        ].map((tab) => (
+      <div className="flex items-center gap-1.5">
+        {(['ALL', 'OPEN', 'DONE'] as const).map((tab) => (
           <button
-            key={tab.id}
+            key={tab}
             type="button"
-            onClick={() => setActiveFilter(tab.id as any)}
+            onClick={() => setFilter(tab)}
             className={cn(
-              'flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer',
-              activeFilter === tab.id
-                ? 'bg-white dark:bg-slate-800 text-slate-950 dark:text-white shadow-xs'
-                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              'px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer',
+              filter === tab
+                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200',
             )}
           >
-            {tab.label}
+            {tab}
           </button>
         ))}
       </div>
 
-      {/* Orders List */}
-      <div className="space-y-2.5">
-        {filteredOrders.map((o) => {
-          const isCompleted = o.status === 'COMPLETED'
-          const isLocked = o.status === 'ESCROW_LOCKED' || o.status === 'PENDING'
+      {q.isLoading && <Skeleton className="h-24 rounded-2xl" />}
+      {q.error && (
+        <p className="text-rose-500 font-bold p-4 text-sm">{q.error.message}</p>
+      )}
 
-          return (
-            <Link
-              key={o.id}
-              to={`/customer/orders/${o.id}`}
-              className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 flex items-center justify-between hover:border-emerald-500/40 hover:shadow-xs transition-all group block shadow-2xs"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div
-                  className={cn(
-                    'w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 text-base',
-                    o.kind.includes('BUY') || o.kind.includes('SELL')
-                      ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400'
-                      : o.kind.includes('UPI')
-                      ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
-                      : 'bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400'
-                  )}
-                >
-                  {o.kind.includes('BUY') ? (
-                    <ArrowDownLeft className="w-5 h-5 text-emerald-500" />
-                  ) : o.kind.includes('SELL') ? (
-                    <ArrowUpRight className="w-5 h-5 text-blue-500" />
-                  ) : o.kind.includes('UPI') ? (
-                    <QrCode className="w-5 h-5 text-emerald-500" />
-                  ) : (
-                    <Gift className="w-5 h-5 text-purple-500" />
-                  )}
-                </div>
-
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-black text-slate-900 dark:text-white truncate">
-                      {o.beneficiary || o.kind.replace('_', ' ')}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-slate-400 font-mono block">
-                    ID: {o.id}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <div className="text-right">
-                  <span className="text-xs font-black text-slate-900 dark:text-white block font-mono">
-                    ₹{o.inrAmount}
-                  </span>
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold block">
-                    {o.usdtAmount} USDT
-                  </span>
-                  <span
-                    className={cn(
-                      'text-[9px] font-black px-1.5 py-0.2 rounded-full inline-block mt-0.5',
-                      isCompleted
-                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                        : isLocked
-                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 animate-pulse'
-                        : 'bg-slate-100 text-slate-500'
-                    )}
-                  >
-                    {o.status.replace('_', ' ')}
-                  </span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-              </div>
-            </Link>
-          )
-        })}
+      <div className="space-y-2">
+        {!q.isLoading && rows.length === 0 && (
+          <div className="p-8 text-center text-xs text-slate-400 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+            No orders yet.
+          </div>
+        )}
+        {rows.map((o) => (
+          <Link
+            key={o.orderId}
+            to={`/customer/orders/${o.orderId}`}
+            className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 flex items-center justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-all shadow-xs group cursor-pointer"
+          >
+            <div className="min-w-0">
+              <span className="text-xs font-black text-slate-900 dark:text-white block group-hover:text-emerald-500 transition-colors">
+                {o.side} · {o.status.replace(/_/g, ' ')}
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {new Date(o.updatedAt).toLocaleString()}
+              </span>
+            </div>
+            <div className="text-right shrink-0">
+              <span className="text-xs font-black font-mono text-slate-900 dark:text-white block break-all">
+                {o.usdtAmount} USDT
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono">
+                ₹{o.inrAmount}
+              </span>
+            </div>
+          </Link>
+        ))}
       </div>
     </div>
   )
@@ -235,775 +144,188 @@ export function OrdersList() {
 export function OrderDetail() {
   const { orderId } = useParams()
   const qc = useQueryClient()
-  const [copied, setCopied] = useState(false)
-  const [actionDone, setActionDone] = useState<string | null>(null)
+  const [utr, setUtr] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
 
   const q = useQuery({
     queryKey: ['order', orderId],
-    queryFn: () => api<Order>(`/orders/${orderId}`).catch(() => null),
+    queryFn: () => v1<Order>(`/p2p/orders/${orderId}`),
+    retry: false,
   })
 
-  const fallbackOrder: Order = {
-    id: orderId || 'ord-89201',
-    kind: 'BUY_USDT',
-    status: 'ESCROW_LOCKED',
-    usdtAmount: '50.00',
-    inrAmount: '4575.00',
-    beneficiary: 'EscrowDesk_Fast',
-    upiId: 'merchant.fast@okicici',
-    utr: 'UTR99482019482',
-    timeline: [
-      { at: '14:20', status: 'CREATED', note: 'Order placed by customer' },
-      { at: '14:21', status: 'ESCROW_LOCKED', note: '50.00 USDT locked in escrow ledger' },
-      { at: '14:22', status: 'AWAITING_PAYMENT', note: 'Transfer ₹4575.00 to merchant UPI' },
-    ],
+  if (q.isLoading) return <Skeleton className="h-40 rounded-3xl" />
+  if (q.error)
+    return <p className="text-rose-500 font-bold p-4 text-sm">{q.error.message}</p>
+
+  const o = q.data!
+  const action = actionFor(o)
+
+  const after = async () => {
+    await qc.invalidateQueries({ queryKey: ['order', orderId] })
+    await qc.invalidateQueries({ queryKey: ['wallet'] })
+    await qc.invalidateQueries({ queryKey: ['orders'] })
   }
 
-  const o = q.data || fallbackOrder
-
-  const handleCopy = (text: string) => {
-    navigator.clipboard?.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  const run = async (work: () => Promise<unknown>) => {
+    setError('')
+    setBusy(true)
+    try {
+      await work()
+      await after()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'That was refused.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
     <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
-      {/* Top Bar */}
       <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-center gap-2.5">
           <BackButton fallback="/customer/orders" />
           <div>
-            <h1 className="text-base font-black text-slate-900 dark:text-white">Order Details</h1>
-            <p className="text-[11px] text-slate-500 font-mono">{o.id}</p>
+            <h1 className="text-base font-black text-slate-900 dark:text-white">
+              Order Details
+            </h1>
+            <p className="text-[11px] text-slate-500 font-mono break-all">{o.orderId}</p>
           </div>
         </div>
-
         <span
           className={cn(
             'text-[10px] font-black px-2.5 py-1 rounded-full',
             o.status === 'COMPLETED'
               ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-              : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+              : o.status === 'DISPUTED'
+                ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
           )}
         >
-          {o.status.replace('_', ' ')}
+          {o.status.replace(/_/g, ' ')}
         </span>
       </div>
 
-      {/* Main Escrow Hero Card */}
-      <div className="rounded-[28px] bg-gradient-to-tr from-slate-950 via-slate-900 to-emerald-950 text-white p-5 space-y-3.5 shadow-xl border border-emerald-500/30">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-slate-400 font-medium">Escrow Amount</span>
-          <span className="text-xs font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-            🛡️ 100% Protected
-          </span>
-        </div>
-
-        <div>
-          <div className="text-3xl font-black font-mono tracking-tight text-white">
-            {o.usdtAmount} USDT
-          </div>
-          <span className="text-xs text-emerald-300 font-mono">
-            ≈ ₹{o.inrAmount} INR
-          </span>
-        </div>
-
-        <div className="pt-2 border-t border-white/10 grid grid-cols-2 gap-2 text-xs">
-          <div>
-            <span className="text-[10px] text-slate-400 block">Recipient / Merchant</span>
-            <span className="font-bold text-white truncate block">{o.beneficiary || 'Verified Desk'}</span>
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-400 block">Exchange Rate</span>
-            <span className="font-bold font-mono text-emerald-300">₹91.50 / USDT</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Payment Details Box */}
-      {o.upiId && (
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-3 shadow-2xs">
-          <span className="text-xs font-black text-slate-900 dark:text-white block">
-            Payment Transfer Details
-          </span>
-
-          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800">
-            <div>
-              <span className="text-[10px] text-slate-400 block">Merchant UPI ID</span>
-              <span className="text-xs font-mono font-black text-slate-900 dark:text-white">
-                {o.upiId}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleCopy(o.upiId!)}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 flex items-center gap-1 cursor-pointer"
-            >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copied ? 'Copied' : 'Copy'}</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Timeline Steps */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-3 shadow-2xs">
-        <span className="text-xs font-black text-slate-900 dark:text-white block">
-          Order Status History
-        </span>
-        <div className="space-y-3">
-          {o.timeline.map((t, idx) => (
-            <div key={`${t.at}-${idx}`} className="flex items-start gap-2.5 text-xs">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
-              <div className="min-w-0">
-                <span className="font-bold text-slate-900 dark:text-white block">{t.status}</span>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">{t.note}</span>
-                <span className="text-[9px] text-slate-400 font-mono block mt-0.5">{t.at}</span>
-              </div>
+      {/* The snapshot. It is law: this order settles at these figures however
+          far the market has moved since (PRD §7). */}
+      <div className="rounded-[28px] bg-gradient-to-tr from-slate-950 via-slate-900 to-emerald-950 text-white p-5 space-y-3 shadow-xl border border-emerald-500/30">
+        <dl className="space-y-2 text-sm">
+          {[
+            ['Side', o.side],
+            ['USDT', o.usdtAmount],
+            ['Rupees', `₹${o.inrAmount}`],
+            ['Rate', `₹${o.customerRate} per USDT`],
+            ['Platform fee', `${o.platformFeeUsdt} USDT`],
+            ['UTR', o.utr ?? 'Not submitted'],
+          ].map(([label, value]) => (
+            <div key={label} className="flex justify-between gap-3">
+              <dt className="text-slate-400">{label}</dt>
+              <dd className="font-mono font-bold text-right break-all">{value}</dd>
             </div>
           ))}
-        </div>
+        </dl>
       </div>
 
-      {/* Actions */}
-      <div className="space-y-2 pt-1">
-        {actionDone && (
-          <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4" />
-            <span>{actionDone}</span>
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                await api(`/orders/${o.id}/cancel`, { method: 'POST' })
-                void qc.invalidateQueries()
-              } catch {}
-              setActionDone('Order cancellation requested')
-            }}
-            className="py-2.5 px-3 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 cursor-pointer text-center"
-          >
-            Cancel Order
-          </button>
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                await api(`/orders/${o.id}/dispute`, {
-                  method: 'POST',
-                  body: JSON.stringify({ reason: 'Payment made but escrow not released' }),
-                })
-                void qc.invalidateQueries()
-              } catch {}
-              setActionDone('Escrow dispute opened with arbitrator')
-            }}
-            className="py-2.5 px-3 rounded-xl text-xs font-bold bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 hover:bg-rose-100 border border-rose-200/60 dark:border-rose-900/40 cursor-pointer text-center"
-          >
-            Raise Dispute
-          </button>
-        </div>
-
-        <Link
-          to="/customer/support"
-          className="w-full py-2.5 rounded-xl text-xs font-bold bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center gap-1.5"
+      {action === 'SUBMIT_UTR' && (
+        <form
+          className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-2.5 shadow-2xs"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void run(() =>
+              v1(`/p2p/orders/${o.orderId}/utr`, {
+                method: 'POST',
+                body: JSON.stringify({ utr }),
+              }),
+            )
+          }}
         >
-          <HelpCircle className="w-4 h-4" />
-          <span>Need Help with this Order? Contact Support</span>
-        </Link>
-      </div>
-    </div>
-  )
-}
-
-/* =========================================================================
-   3. PAY CONFIRM (/customer/pay/confirm)
-   ========================================================================= */
-export function PayConfirm() {
-  const [searchParams] = useSearchParams()
-  const initialVpa = searchParams.get('vpa') || 'demo.shop@okicici'
-  const [upi] = useState(initialVpa)
-  const [amount, setAmount] = useState('500')
-  const [note, setNote] = useState('Payment for purchase')
-  const [isPaid, setIsPaid] = useState(false)
-  const [receiptData, setReceiptData] = useState<{ id: string; utr: string } | null>(null)
-
-  const usdtEquivalent = (parseFloat(amount || '0') / 91.5).toFixed(2)
-
-  const handlePay = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      const order = await api<Order>('/orders', {
-        method: 'POST',
-        body: JSON.stringify({ kind: 'UPI_PAY', inrAmount: amount, upiId: upi, beneficiary: 'Merchant Store' }),
-      })
-      setReceiptData({ id: order.id, utr: `UTR${Date.now().toString().slice(-10)}` })
-    } catch {
-      setReceiptData({ id: `ord-${Date.now().toString().slice(-6)}`, utr: `UTR${Date.now().toString().slice(-10)}` })
-    }
-    setIsPaid(true)
-  }
-
-  if (isPaid && receiptData) {
-    return (
-      <div className="space-y-4 max-w-lg mx-auto w-full pb-4 text-center animate-in zoom-in-95 duration-200">
-        <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-500 mx-auto flex items-center justify-center shadow-lg border border-emerald-500/30">
-          <CheckCircle2 className="w-8 h-8" />
-        </div>
-
-        <div>
-          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-            Payment Successful
-          </span>
-          <h2 className="text-2xl font-black text-slate-900 dark:text-white mt-1">₹{amount}.00</h2>
-          <p className="text-xs text-slate-400 font-mono mt-0.5">
-            Debited {usdtEquivalent} USDT @ ₹91.50
-          </p>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 text-left space-y-2.5 text-xs shadow-2xs">
-          <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-            <span className="text-slate-400">Paid to UPI ID</span>
-            <span className="font-mono font-bold text-slate-900 dark:text-white">{upi}</span>
-          </div>
-          <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-            <span className="text-slate-400">UTR / Ref Number</span>
-            <span className="font-mono font-bold text-slate-900 dark:text-white">{receiptData.utr}</span>
-          </div>
-          <div className="flex justify-between py-1">
-            <span className="text-slate-400">Transaction Fee</span>
-            <span className="font-bold text-emerald-600">₹0.00 (Zero Fee)</span>
-          </div>
-        </div>
-
-        <Link
-          to="/customer/dashboard"
-          className="w-full py-3 rounded-2xl bg-[#0a2316] text-white hover:bg-emerald-950 font-black text-xs shadow-lg transition-transform active:scale-95 block text-center"
-        >
-          Back to Home
-        </Link>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
-      {/* Top Header */}
-      <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800">
-        <BackButton fallback="/customer/pay" />
-        <div>
-          <h1 className="text-base font-black text-slate-900 dark:text-white">Confirm UPI Pay</h1>
-          <p className="text-[11px] text-slate-500">Zero fee instant USDT settlement</p>
-        </div>
-      </div>
-
-      <form onSubmit={handlePay} className="space-y-3.5">
-        {/* Beneficiary Card */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 flex items-center justify-between shadow-2xs">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white flex items-center justify-center font-black text-base shadow-sm">
-              {upi.slice(0, 1).toUpperCase()}
-            </div>
-            <div>
-              <span className="text-xs font-black text-slate-900 dark:text-white block">
-                Verified Merchant
-              </span>
-              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                {upi}
-              </span>
-            </div>
-          </div>
-          <ShieldCheck className="w-5 h-5 text-emerald-500 shrink-0" />
-        </div>
-
-        {/* Amount Input */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-2 shadow-2xs">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-            Enter Amount (INR)
-          </span>
-          <div className="flex items-center gap-2">
-            <span className="text-2xl font-black text-slate-900 dark:text-white">₹</span>
-            <input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0"
-              required
-              className="w-full text-2xl font-black text-slate-900 dark:text-white bg-transparent focus:outline-none"
-            />
-          </div>
-
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-            <span className="text-slate-400">Equivalent in USDT</span>
-            <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
-              ≈ {usdtEquivalent} USDT
-            </span>
-          </div>
-        </div>
-
-        {/* Note */}
-        <div className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 shadow-2xs">
-          <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold block mb-1">
-            Note / Remark
-          </span>
-          <input
-            type="text"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Add payment remark"
-            className="w-full text-xs bg-transparent focus:outline-none text-slate-900 dark:text-white"
+          <label
+            htmlFor="order-utr"
+            className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block"
+          >
+            Bank reference (UTR)
+          </label>
+          <Input
+            id="order-utr"
+            value={utr}
+            onChange={(e) => setUtr(e.target.value)}
+            required
+            placeholder="UTR123456789"
+            className="h-11 rounded-xl font-mono"
           />
-        </div>
-
-        {/* Escrow Guarantee Pill */}
-        <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-500/20 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-          <span className="text-[11px]">
-            Protected by FundFusion Escrow. USDT is released only when the merchant confirms settlement.
-          </span>
-        </div>
-
-        <button
-          type="submit"
-          className="w-full py-3.5 rounded-2xl bg-[#0a2316] text-white hover:bg-emerald-950 font-black text-xs shadow-lg transition-transform active:scale-95 cursor-pointer flex items-center justify-center gap-2"
-        >
-          <span>Pay ₹{amount}.00 via USDT</span>
-          <ArrowRight className="w-4 h-4" />
-        </button>
-      </form>
-    </div>
-  )
-}
-
-/* =========================================================================
-   4. GIFT HUB (/customer/gift-cards)
-   ========================================================================= */
-export function GiftHub() {
-  const [selectedCategory, setSelectedCategory] = useState('ALL')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [boughtVoucher, setBoughtVoucher] = useState<{ brand: string; code: string; pin: string } | null>(null)
-  const [copiedCode, setCopiedCode] = useState(false)
-
-  const giftBrands = [
-    { id: 'amazon', name: 'Amazon Pay Gift Card', cat: 'SHOPPING', discount: '5% Back', emoji: '📦', min: '₹100', popular: true },
-    { id: 'flipkart', name: 'Flipkart Voucher', cat: 'SHOPPING', discount: '3% Back', emoji: '🛍️', min: '₹250', popular: true },
-    { id: 'googleplay', name: 'Google Play Recharge', cat: 'GAMING', discount: 'Instant', emoji: '▶️', min: '₹50', popular: true },
-    { id: 'apple', name: 'Apple App Store & iTunes', cat: 'ENTERTAINMENT', discount: 'Instant', emoji: '🍎', min: '₹200', popular: false },
-    { id: 'swiggy', name: 'Swiggy Money Voucher', cat: 'FOOD', discount: '4% Back', emoji: '🍔', min: '₹150', popular: true },
-    { id: 'zomato', name: 'Zomato Pro Gift Voucher', cat: 'FOOD', discount: '4% Back', emoji: '🍕', min: '₹150', popular: false },
-    { id: 'myntra', name: 'Myntra Fashion Card', cat: 'SHOPPING', discount: '6% Back', emoji: '👗', min: '₹500', popular: true },
-    { id: 'uber', name: 'Uber Rides & Eats Voucher', cat: 'TRAVEL', discount: 'Instant', emoji: '🚗', min: '₹200', popular: false },
-    { id: 'psn', name: 'Sony PlayStation Store', cat: 'GAMING', discount: 'Instant', emoji: '🎮', min: '₹500', popular: false },
-    { id: 'netflix', name: 'Netflix Subscription Card', cat: 'ENTERTAINMENT', discount: 'Instant', emoji: '🎬', min: '₹649', popular: false },
-  ]
-
-  const filteredBrands = giftBrands.filter((b) => {
-    const matchCat = selectedCategory === 'ALL' || b.cat === selectedCategory
-    const matchSearch = b.name.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchCat && matchSearch
-  })
-
-  const handleQuickBuy = (brandName: string) => {
-    const randCode = `VCH-${brandName.slice(0, 4).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`
-    const randPin = `${Math.floor(100000 + Math.random() * 900000)}`
-    setBoughtVoucher({ brand: brandName, code: randCode, pin: randPin })
-  }
-
-  return (
-    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
-      {/* Top Header */}
-      <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-        <div className="flex items-center gap-2.5">
-          <BackButton fallback="/customer/dashboard" />
-          <div>
-            <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
-              Gift Cards Mall
-            </h1>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">100+ Brands Delivered Instantly via USDT</p>
-          </div>
-        </div>
-
-        <Link
-          to="/customer/gift-cards/orders"
-          className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 hover:underline"
-        >
-          My Vouchers
-        </Link>
-      </div>
-
-      {/* Search Input */}
-      <div className="relative">
-        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search Amazon, Flipkart, Swiggy, Steam..."
-          className="w-full pl-10 pr-4 py-2.5 text-xs rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-900 dark:text-white placeholder:text-slate-400"
-        />
-      </div>
-
-      {/* Category Pills */}
-      <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
-        {['ALL', 'SHOPPING', 'FOOD', 'GAMING', 'ENTERTAINMENT', 'TRAVEL'].map((cat) => (
-          <button
-            key={cat}
-            type="button"
-            onClick={() => setSelectedCategory(cat)}
-            className={cn(
-              'px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer',
-              selectedCategory === cat
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
-            )}
-          >
-            {cat.charAt(0) + cat.slice(1).toLowerCase()}
-          </button>
-        ))}
-      </div>
-
-      {/* Brands Grid */}
-      <div className="grid grid-cols-2 gap-2.5">
-        {filteredBrands.map((b) => (
-          <div
-            key={b.id}
-            className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 flex flex-col justify-between space-y-3 hover:border-emerald-500/40 hover:shadow-xs transition-all shadow-2xs group"
-          >
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-2xl">{b.emoji}</span>
-                <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                  {b.discount}
-                </span>
-              </div>
-              <h3 className="text-xs font-black text-slate-900 dark:text-white leading-tight">
-                {b.name}
-              </h3>
-              <p className="text-[10px] text-slate-400">Min {b.min}</p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => handleQuickBuy(b.name)}
-              className="w-full py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-emerald-500 hover:text-white transition-colors cursor-pointer text-slate-800 dark:text-slate-200"
-            >
-              Buy Voucher
-            </button>
-          </div>
-        ))}
-      </div>
-
-      {/* Voucher Generated Modal */}
-      {boughtVoucher && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#111827] w-full max-w-[360px] rounded-[28px] p-5 shadow-2xl border border-slate-100 dark:border-slate-800 space-y-4 max-h-[85%] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-emerald-600 flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Voucher Activated</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => setBoughtVoucher(null)}
-                className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="text-center space-y-1">
-              <h3 className="text-base font-black text-slate-900 dark:text-white">
-                {boughtVoucher.brand}
-              </h3>
-              <p className="text-xs text-slate-400">Ready to redeem immediately</p>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-2">
-              <span className="text-[10px] text-slate-400 block uppercase font-bold">Voucher Code</span>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-mono font-black text-slate-900 dark:text-white">
-                  {boughtVoucher.code}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard?.writeText(boughtVoucher.code)
-                    setCopiedCode(true)
-                    setTimeout(() => setCopiedCode(false), 2000)
-                  }}
-                  className="p-1.5 text-xs text-emerald-600 font-bold hover:underline cursor-pointer"
-                >
-                  {copiedCode ? 'Copied!' : 'Copy Code'}
-                </button>
-              </div>
-
-              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-between text-xs">
-                <span className="text-slate-400">Security PIN</span>
-                <span className="font-mono font-black text-slate-900 dark:text-white">
-                  {boughtVoucher.pin}
-                </span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setBoughtVoucher(null)}
-              className="w-full py-2.5 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-bold text-xs"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-/* =========================================================================
-   5. GIFT BRAND & DETAIL (/customer/gift-cards/:brandId)
-   ========================================================================= */
-export function GiftBrand() {
-  const { brandId } = useParams()
-  const [code, setCode] = useState('')
-
-  const denominations = [
-    { inr: '250', usdt: '2.52' },
-    { inr: '500', usdt: '5.04' },
-    { inr: '1000', usdt: '10.09' },
-    { inr: '2000', usdt: '20.18' },
-  ]
-
-  return (
-    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
-      <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800">
-        <BackButton fallback="/customer/gift-cards" />
-        <div>
-          <h1 className="text-base font-black text-slate-900 dark:text-white capitalize">
-            {brandId?.replace('-', ' ') || 'Brand Voucher'}
-          </h1>
-          <p className="text-[11px] text-slate-500">Digital Gift Card Denominations</p>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        {denominations.map((d) => (
-          <div
-            key={d.inr}
-            className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 flex items-center justify-between shadow-2xs"
-          >
-            <div>
-              <span className="text-sm font-black text-slate-900 dark:text-white block font-mono">
-                ₹{d.inr}
-              </span>
-              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono">
-                {d.usdt} USDT
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setCode(`VCH-${Math.random().toString(36).slice(2, 8).toUpperCase()}`)
-              }}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-[#0a2316] text-white hover:bg-emerald-950 transition-colors cursor-pointer"
-            >
-              Buy with USDT
-            </button>
-          </div>
-        ))}
-      </div>
-
-      {code && (
-        <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-500/30 space-y-1 text-center animate-in zoom-in-95">
-          <span className="text-xs font-black text-emerald-600 block">Voucher Code Ready:</span>
-          <span className="text-sm font-mono font-black text-slate-900 dark:text-white block">{code}</span>
-        </div>
-      )}
-    </div>
-  )
-}
-
-/* =========================================================================
-   6. GIFT HISTORY (/customer/gift-cards/orders)
-   ========================================================================= */
-export function GiftHistory() {
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
-
-  const history = [
-    { id: '1', brand: 'Amazon Pay Gift Card', amount: '₹1,000', usdt: '10.92 USDT', code: 'AMZN-8921-9923', pin: '882910', date: 'Nov 10' },
-    { id: '2', brand: 'Swiggy Food Voucher', amount: '₹250', usdt: '2.73 USDT', code: 'SWIG-1120-4491', pin: '102948', date: 'Oct 29' },
-    { id: '3', brand: 'Google Play Code', amount: '₹500', usdt: '5.46 USDT', code: 'GPLY-9920-1102', pin: '002918', date: 'Oct 15' },
-  ]
-
-  return (
-    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
-      <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800">
-        <BackButton fallback="/customer/gift-cards" />
-        <div>
-          <h1 className="text-base font-black text-slate-900 dark:text-white">Purchased Vouchers</h1>
-          <p className="text-[11px] text-slate-500">Your digital gift codes & PINs</p>
-        </div>
-      </div>
-
-      <div className="space-y-2.5">
-        {history.map((h, idx) => (
-          <div
-            key={h.id}
-            className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-2 shadow-2xs"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-xs font-black text-slate-900 dark:text-white block">{h.brand}</span>
-                <span className="text-[10px] text-slate-400">{h.date}</span>
-              </div>
-              <div className="text-right">
-                <span className="text-xs font-black text-slate-900 dark:text-white block font-mono">{h.amount}</span>
-                <span className="text-[10px] text-emerald-600 font-mono">{h.usdt}</span>
-              </div>
-            </div>
-
-            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 flex items-center justify-between">
-              <div>
-                <span className="text-[10px] text-slate-400 block">Code:</span>
-                <span className="text-xs font-mono font-black text-slate-900 dark:text-white">{h.code}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard?.writeText(h.code)
-                  setCopiedIndex(idx)
-                  setTimeout(() => setCopiedIndex(null), 2000)
-                }}
-                className="text-xs font-bold text-emerald-600 hover:underline cursor-pointer"
-              >
-                {copiedIndex === idx ? 'Copied' : 'Copy'}
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-/* =========================================================================
-   7. UTILITY FLOW (/customer/utilities/:service)
-   ========================================================================= */
-export function UtilityFlow({ service }: { service: string }) {
-  const navigate = useNavigate()
-  const [operator, setOperator] = useState('Jio')
-  const [consumerId, setConsumerId] = useState('9876543210')
-  const [amount, setAmount] = useState('299')
-  const [receipt, setReceipt] = useState<string | null>(null)
-
-  const usdtVal = (parseFloat(amount || '0') / 91.5).toFixed(2)
-
-  const handlePay = (e: React.FormEvent) => {
-    e.preventDefault()
-    setReceipt(`BBPS-${Date.now().toString().slice(-8)}`)
-  }
-
-  return (
-    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
-      <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800">
-        <BackButton fallback="/customer/utilities" />
-        <div>
-          <h1 className="text-base font-black text-slate-900 dark:text-white uppercase">{service}</h1>
-          <p className="text-[11px] text-slate-500">BBPS Zero-Fee USDT Settlement</p>
-        </div>
-      </div>
-
-      {!receipt ? (
-        <form onSubmit={handlePay} className="space-y-3.5">
-          <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-3 shadow-2xs">
-            <div>
-              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">
-                Select Operator / Board
-              </span>
-              <div className="flex gap-2">
-                {['Jio', 'Airtel', 'Vi', 'BSNL'].map((op) => (
-                  <button
-                    key={op}
-                    type="button"
-                    onClick={() => setOperator(op)}
-                    className={cn(
-                      'flex-1 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer',
-                      operator === op
-                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 font-black'
-                        : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
-                    )}
-                  >
-                    {op}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">
-                Mobile Number / Consumer ID
-              </span>
-              <input
-                type="text"
-                value={consumerId}
-                onChange={(e) => setConsumerId(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs font-mono font-bold focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">
-                Recharge Amount (INR)
-              </span>
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-lg font-mono font-black focus:outline-none"
-              />
-            </div>
-
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between text-xs">
-              <span className="text-slate-400">USDT Required</span>
-              <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
-                ≈ {usdtVal} USDT
-              </span>
-            </div>
-          </div>
-
-          <button
+          <p className="text-[10px] text-slate-400">
+            Evidence only. Escrow releases when the recipient confirms the
+            money arrived, never on a reference alone.
+          </p>
+          <Button
             type="submit"
-            className="w-full py-3.5 rounded-2xl bg-[#0a2316] text-white hover:bg-emerald-950 font-black text-xs shadow-lg transition-transform active:scale-95 cursor-pointer"
+            disabled={busy}
+            className="w-full h-11 rounded-full font-semibold text-sm bg-slate-900 dark:bg-white text-white dark:text-slate-900"
           >
-            Pay with USDT Vault
-          </button>
+            {busy ? 'Submitting...' : 'Submit UTR'}
+          </Button>
         </form>
-      ) : (
-        <div className="p-5 rounded-[28px] bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 text-center space-y-3 shadow-2xs">
-          <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-500 mx-auto flex items-center justify-center">
-            <CheckCircle2 className="w-7 h-7" />
-          </div>
-          <h2 className="text-base font-black text-slate-900 dark:text-white">Recharge Successful!</h2>
-          <p className="text-xs text-slate-500 font-mono">Ref ID: {receipt}</p>
-          <button
+      )}
+
+      {action === 'CONFIRM_RECEIPT' && (
+        <div className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-2.5 shadow-2xs">
+          <p className="text-xs text-slate-600 dark:text-slate-300">
+            Confirm only once ₹{o.inrAmount} has actually arrived in your bank
+            account. This releases the escrow.
+          </p>
+          <Button
             type="button"
-            onClick={() => navigate('/customer/utilities')}
-            className="w-full py-2.5 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 text-xs font-bold"
+            disabled={busy}
+            onClick={() =>
+              void run(() =>
+                v1(`/p2p/orders/${o.orderId}/confirm`, {
+                  method: 'POST',
+                  idempotencyKey: newIdempotencyKey(),
+                }),
+              )
+            }
+            className="w-full h-11 rounded-full font-semibold text-sm bg-emerald-500 text-white"
           >
-            Back to Bills
-          </button>
+            {busy ? 'Confirming...' : 'Confirm receipt'}
+          </Button>
         </div>
       )}
+
+      {error && (
+        <p className="text-xs text-rose-500 font-medium bg-rose-500/10 p-2.5 rounded-xl border border-rose-500/20">
+          {error}
+        </p>
+      )}
+
+      {OPEN_STATES.includes(o.status) && o.status !== 'QUOTED' && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() =>
+            void run(() =>
+              v1(`/p2p/orders/${o.orderId}/dispute`, {
+                method: 'POST',
+                body: JSON.stringify({ reason: 'Raised from the order screen' }),
+              }),
+            )
+          }
+          className="w-full py-2.5 px-3 rounded-xl text-xs font-bold bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 hover:bg-rose-100 border border-rose-200/60 dark:border-rose-900/40 cursor-pointer text-center"
+        >
+          Raise a dispute
+        </button>
+      )}
+
+      <Link
+        to="/customer/support"
+        className="w-full py-2.5 rounded-xl text-xs font-bold bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center gap-1.5"
+      >
+        <HelpCircle className="w-4 h-4" />
+        <span>Need help with this order? Contact support</span>
+      </Link>
     </div>
   )
 }
 
-/* =========================================================================
-   8. NOTIFICATION CENTER (/customer/notifications)
-   ========================================================================= */
 export function NoticeCenter() {
   const [filter, setFilter] = useState<'ALL' | 'ORDERS' | 'SYSTEM'>('ALL')
   const { notifications, unreadCount, markAllAsRead, markAsRead } = useNotifications()
