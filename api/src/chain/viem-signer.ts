@@ -14,7 +14,7 @@ import {
 } from 'viem';
 import { bscTestnet } from 'viem/chains';
 import { Decimal } from '../money/money';
-import { depositAccount, gasAccount } from './derivation';
+import { depositAccount, gasAccount, hotAccount } from './derivation';
 import type { Signer } from './signer';
 
 const TRANSFER = parseAbiItem(
@@ -46,6 +46,7 @@ export interface SignerConfig {
 export class ViemSigner implements Signer {
   private readonly log = new Logger(ViemSigner.name);
   private readonly gas: PrivateKeyAccount;
+  private readonly hot: PrivateKeyAccount;
   private readonly publicClient: PublicClient;
 
   constructor(
@@ -54,6 +55,7 @@ export class ViemSigner implements Signer {
     private readonly request?: EIP1193RequestFn,
   ) {
     this.gas = gasAccount(config.seedPhrase);
+    this.hot = hotAccount(config.seedPhrase);
     this.publicClient = createPublicClient({
       chain: bscTestnet,
       transport: this.transport(),
@@ -62,6 +64,32 @@ export class ViemSigner implements Signer {
 
   gasWalletAddress(): string {
     return this.gas.address;
+  }
+
+  hotWalletAddress(): string {
+    return this.hot.address;
+  }
+
+  /**
+   * Paying a withdrawal out of the hot wallet (PRD §8.4). Unlike a sweep
+   * this needs no gas transaction first — the hot wallet holds BNB of its
+   * own, because it is the one address that is funded on purpose.
+   */
+  async payout(to: string, amount: string): Promise<string> {
+    this.assertPositive(amount, 'payout amount');
+
+    const hash = await this.wallet(this.hot).writeContract({
+      account: this.hot,
+      chain: bscTestnet,
+      address: this.config.tokenAddress as `0x${string}`,
+      abi: [TRANSFER],
+      functionName: 'transfer',
+      args: [to as `0x${string}`, parseUnits(amount, TOKEN_DECIMALS)],
+    });
+
+    await this.assertMined(hash, `payout of ${amount} USDT to ${to}`);
+    this.log.log(`Paid out ${amount} USDT to ${to}`);
+    return hash;
   }
 
   /**

@@ -200,6 +200,14 @@ export const PLATFORM_SETTINGS = {
     description:
       'How long a newly allowlisted address waits before it may be withdrawn to. The window in which the real owner sees the security email and intervenes (PRD §8.4).',
   },
+  'reconciliation.dustToleranceUsdt': {
+    kind: 'MONEY_USDT',
+    default: '0.01',
+    min: '0',
+    max: '100',
+    description:
+      'How far total ledger USDT may sit from on-chain custody before reconciliation alerts (PRD §13.1). Covers rounding dust, not a missing deposit.',
+  },
 } as const satisfies Record<string, SettingDefinition>;
 
 export type SettingKey = keyof typeof PLATFORM_SETTINGS;

@@ -3,12 +3,16 @@ import { DbService } from '../db/db.service';
 import { AccountService } from '../ledger/account.service';
 import { LedgerModule } from '../ledger/ledger.module';
 import { PostingService } from '../ledger/posting.service';
+import { AuditModule } from '../audit/audit.module';
+import { AuditService } from '../audit/audit.service';
+import { PayoutService } from '../wallet/v1/payout.service';
 import { PlatformSettingsService } from '../settings/platform-settings.service';
 import { SettingsModule } from '../settings/settings.module';
 import { chainConfigFrom, type ChainConfig } from './chain.config';
 import { hotAccount } from './derivation';
 import { DepositWatcherService } from './deposit-watcher.service';
 import { HdWalletService } from './hd-wallet.service';
+import { ReconciliationService } from './reconciliation.service';
 import { SweepService } from './sweep.service';
 import { ViemChainClient } from './viem-chain.client';
 import { ViemSigner } from './viem-signer';
@@ -24,6 +28,10 @@ export interface ChainServices {
   watcher: DepositWatcherService | null;
   /** Null until a token contract exists for a sweep to move. */
   sweeps: SweepService | null;
+  /** Null until a token contract exists to pay out. */
+  payouts: PayoutService | null;
+  /** Null until a token contract exists to reconcile against. */
+  reconciliation: ReconciliationService | null;
 }
 
 /**
@@ -84,7 +92,7 @@ export class ChainModule {
 
     return {
       module: ChainModule,
-      imports: [LedgerModule, SettingsModule],
+      imports: [LedgerModule, SettingsModule, AuditModule],
       providers: [
         { provide: CHAIN_CONFIG, useFactory: () => chainConfigFrom() },
         {
@@ -154,13 +162,83 @@ export class ChainModule {
           ],
         },
         {
+          provide: PayoutService,
+          useFactory: (
+            db: DbService,
+            client: ViemChainClient,
+            posting: PostingService,
+            audit: AuditService,
+            settings: PlatformSettingsService,
+            config: ChainConfig,
+          ): PayoutService | null =>
+            config.usdtAddress
+              ? new PayoutService(
+                  db.db,
+                  new ViemSigner({
+                    httpUrl: config.httpUrl,
+                    seedPhrase: process.env.BSC_HD_SEED ?? '',
+                    tokenAddress: config.usdtAddress,
+                  }),
+                  posting,
+                  audit,
+                  client,
+                  settings,
+                )
+              : null,
+          inject: [
+            DbService,
+            CHAIN_CLIENT,
+            PostingService,
+            AuditService,
+            PlatformSettingsService,
+            CHAIN_CONFIG,
+          ],
+        },
+        {
+          provide: ReconciliationService,
+          useFactory: (
+            db: DbService,
+            client: ViemChainClient,
+            settings: PlatformSettingsService,
+            config: ChainConfig,
+          ): ReconciliationService | null =>
+            config.usdtAddress
+              ? new ReconciliationService(db.db, client, settings, {
+                  tokenAddress: config.usdtAddress,
+                  networkCode: 'BSC_TESTNET',
+                  hotWalletAddress: hotAccount(process.env.BSC_HD_SEED ?? '')
+                    .address,
+                })
+              : null,
+          inject: [
+            DbService,
+            CHAIN_CLIENT,
+            PlatformSettingsService,
+            CHAIN_CONFIG,
+          ],
+        },
+        {
           provide: CHAIN_SERVICES,
           useFactory: (
             wallets: HdWalletService,
             watcher: DepositWatcherService | null,
             sweeps: SweepService | null,
-          ): ChainServices | null => ({ wallets, watcher, sweeps }),
-          inject: [HdWalletService, DepositWatcherService, SweepService],
+            payouts: PayoutService | null,
+            reconciliation: ReconciliationService | null,
+          ): ChainServices | null => ({
+            wallets,
+            watcher,
+            sweeps,
+            payouts,
+            reconciliation,
+          }),
+          inject: [
+            HdWalletService,
+            DepositWatcherService,
+            SweepService,
+            PayoutService,
+            ReconciliationService,
+          ],
         },
       ],
       exports: [
@@ -170,6 +248,8 @@ export class ChainModule {
         HdWalletService,
         DepositWatcherService,
         SweepService,
+        PayoutService,
+        ReconciliationService,
       ],
     };
   }

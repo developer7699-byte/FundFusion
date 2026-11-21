@@ -10,7 +10,7 @@ import {
 } from 'viem';
 import { generateMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
-import { depositAccount, gasAccount } from './derivation';
+import { depositAccount, gasAccount, hotAccount } from './derivation';
 import { ViemSigner } from './viem-signer';
 
 const TRANSFER = parseAbiItem(
@@ -155,6 +155,50 @@ describe('sending gas (PRD §8.3)', () => {
     const node = fakeNode({ receipts: ['reverted'] });
 
     await expect(signer(node).sendGas(HOT, '0.001')).rejects.toThrow(
+      /revert|fail/i,
+    );
+  });
+});
+
+describe('paying a withdrawal out of the hot wallet (PRD §8.4)', () => {
+  it('reports the hot wallet address derived from the seed', () => {
+    expect(signer(fakeNode()).hotWalletAddress()).toBe(
+      hotAccount(SEED).address,
+    );
+  });
+
+  /**
+   * A payout signed by any other key spends the wrong balance — a user's
+   * deposit address, or the gas wallet that funds every sweep.
+   */
+  it('signs the payout with the hot wallet key', async () => {
+    const node = fakeNode();
+
+    await signer(node).payout(HOT, '25');
+
+    await expect(
+      recoverTransactionAddress({ serializedTransaction: node.sent[0].raw }),
+    ).resolves.toBe(hotAccount(SEED).address);
+  });
+
+  it('transfers the amount to the destination', async () => {
+    const node = fakeNode();
+
+    await signer(node).payout(HOT, '25.5');
+
+    const { args } = decodeFunctionData({
+      abi: [TRANSFER],
+      data: decode(node.sent[0].raw).data!,
+    });
+    expect(args[0]).toBe(HOT);
+    expect(args[1]).toBe(parseUnits('25.5', 18));
+  });
+
+  /** A payout reported as sent but reverted is money the user never got. */
+  it('does not report success when the payout reverted', async () => {
+    const node = fakeNode({ receipts: ['reverted'] });
+
+    await expect(signer(node).payout(HOT, '25')).rejects.toThrow(
       /revert|fail/i,
     );
   });

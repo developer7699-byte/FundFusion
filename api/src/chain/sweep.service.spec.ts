@@ -55,6 +55,13 @@ class FakeSigner implements Signer {
     this.sent.push({ kind: 'USDT', to, amount });
     return Promise.resolve(`0x${'e'.repeat(64)}`);
   }
+  hotWalletAddress(): string {
+    return HOT;
+  }
+  payout(to: string, amount: string): Promise<string> {
+    this.sent.push({ kind: 'USDT', to, amount });
+    return Promise.resolve(`0x${'d'.repeat(64)}`);
+  }
 }
 
 let t: TestDb;
