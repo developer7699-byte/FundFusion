@@ -6,6 +6,8 @@ export interface JobTargets {
   scanDeposits(): Promise<void>;
   expireOrders(): Promise<void>;
   sweepDeposits(): Promise<void>;
+  /** PRD §13.1. Daily, because it reads every deposit address from the chain. */
+  reconcile(): Promise<void>;
 }
 
 export interface JobsConfig {
@@ -55,6 +57,17 @@ export class JobsService {
   @Cron(CronExpression.EVERY_5_MINUTES)
   sweepDeposits(): Promise<void> {
     return this.run('sweeps', () => this.targets.sweepDeposits());
+  }
+
+  /**
+   * PRD §13.1 and §13.3. Daily rather than often: it reads every deposit
+   * address from the chain, and §15 item 7 measures a clean run in days.
+   * The report itself logs the drift — this only has to make sure the
+   * question gets asked.
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_3AM)
+  reconcile(): Promise<void> {
+    return this.run('reconciliation', () => this.targets.reconcile());
   }
 
   private async run(name: string, work: () => Promise<void>): Promise<void> {

@@ -3,7 +3,7 @@ import { JobsService, type JobTargets } from './jobs.service';
 function targets(over: Partial<JobTargets> = {}): JobTargets & {
   calls: Record<string, number>;
 } {
-  const calls = { deposits: 0, orders: 0, sweeps: 0 };
+  const calls = { deposits: 0, orders: 0, sweeps: 0, reconcile: 0 };
   return {
     calls,
     scanDeposits: () => {
@@ -16,6 +16,10 @@ function targets(over: Partial<JobTargets> = {}): JobTargets & {
     },
     sweepDeposits: () => {
       calls.sweeps++;
+      return Promise.resolve();
+    },
+    reconcile: () => {
+      calls.reconcile++;
       return Promise.resolve();
     },
     ...over,
@@ -136,7 +140,73 @@ describe('scheduled work', () => {
     await jobs.scanDeposits();
     await jobs.expireOrders();
     await jobs.sweepDeposits();
+    await jobs.reconcile();
 
-    expect(t.calls).toEqual({ deposits: 0, orders: 0, sweeps: 0 });
+    expect(t.calls).toEqual({
+      deposits: 0,
+      orders: 0,
+      sweeps: 0,
+      reconcile: 0,
+    });
+  });
+});
+
+/**
+ * PRD §13.1. The one check whose two sides are produced by independent
+ * systems, and PRD §13.3 names drift as an alert — so the failure that
+ * matters here is a run that found drift and said nothing, which is
+ * indistinguishable from a clean run.
+ */
+describe('reconciliation', () => {
+  it('runs on its schedule', async () => {
+    const t = targets();
+    const jobs = new JobsService(t, { enabled: true });
+
+    await jobs.reconcile();
+
+    expect(t.calls.reconcile).toBe(1);
+  });
+
+  it('does nothing when jobs are disabled', async () => {
+    const t = targets();
+    const jobs = new JobsService(t, { enabled: false });
+
+    await jobs.reconcile();
+
+    expect(t.calls.reconcile).toBe(0);
+  });
+
+  it('logs rather than throwing when reconciliation fails', async () => {
+    const errors: string[] = [];
+    const jobs = new JobsService(
+      targets({
+        reconcile: () => Promise.reject(new Error('rpc went away')),
+      }),
+      { enabled: true },
+      { error: (m) => errors.push(m) },
+    );
+
+    await expect(jobs.reconcile()).resolves.toBeUndefined();
+    expect(errors.join()).toMatch(/reconcil/i);
+  });
+
+  it('does not overlap itself', async () => {
+    let running = 0;
+    let concurrent = 0;
+    const jobs = new JobsService(
+      targets({
+        reconcile: async () => {
+          running++;
+          concurrent = Math.max(concurrent, running);
+          await new Promise((r) => setTimeout(r, 20));
+          running--;
+        },
+      }),
+      { enabled: true },
+    );
+
+    await Promise.all([jobs.reconcile(), jobs.reconcile()]);
+
+    expect(concurrent).toBe(1);
   });
 });

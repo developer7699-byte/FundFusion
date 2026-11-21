@@ -27,6 +27,11 @@ import { JobsService, type JobTargets } from './jobs.service';
           sweepDeposits: async () => {
             if (chain?.sweeps) await chain.sweeps.sweepOnce();
           },
+          // PRD §13.1. The service logs the drift itself; a process with no
+          // chain has nothing to reconcile against and stays quiet.
+          reconcile: async () => {
+            if (chain?.reconciliation) await chain.reconciliation.check();
+          },
         };
         return new JobsService(targets, {
           // Off unless asked for, so a migration or a script never starts
