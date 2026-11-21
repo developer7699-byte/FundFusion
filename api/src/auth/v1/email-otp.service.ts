@@ -4,13 +4,18 @@ import {
   HttpStatus,
   Inject,
   Injectable,
+  Optional,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../db/schema';
 import { DRIZZLE } from '../../ledger/account.service';
-import { LoggingEmailSender, type EmailSender } from './email-sender';
+import {
+  EMAIL_SENDER,
+  LoggingEmailSender,
+  type EmailSender,
+} from './email-sender';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -33,6 +38,8 @@ export type OtpPurpose = 'REGISTER' | 'LOGIN' | 'RESET_PASSWORD' | 'ADMIN_2FA';
 export class EmailOtpService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Db,
+    @Optional()
+    @Inject(EMAIL_SENDER)
     private readonly mail: EmailSender = new LoggingEmailSender(),
   ) {}
 

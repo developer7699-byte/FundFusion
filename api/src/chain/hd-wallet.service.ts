@@ -80,7 +80,7 @@ export class HdWalletService {
    * same index, because that would hand them the same address.
    */
   async addressFor(userId: string): Promise<string> {
-    await this.assertVerifiedPhone(userId);
+    await this.assertMayHoldFunds(userId);
 
     const accountId = await this.accounts.ensureAccount(
       userId,
@@ -128,18 +128,31 @@ export class HdWalletService {
     });
   }
 
-  private async assertVerifiedPhone(userId: string): Promise<void> {
+  /**
+   * PRD §9.1 (revised 2026-11-21). Until the account is verified and has an
+   * authenticator it has no deposit address at all — not an unfunded one.
+   * The same two conditions `MoneyGateGuard` enforces on every other money
+   * route, because two different rules deciding who may hold money is how
+   * one of them gets forgotten.
+   */
+  private async assertMayHoldFunds(userId: string): Promise<void> {
     const [row] = await this.db
-      .select({ phoneVerifiedAt: schema.user.phoneVerifiedAt })
+      .select({
+        emailVerifiedAt: schema.user.emailVerifiedAt,
+        mfaEnrolledAt: schema.user.mfaEnrolledAt,
+      })
       .from(schema.user)
       .where(eq(schema.user.id, userId))
       .limit(1);
 
-    if (!row?.phoneVerifiedAt) {
-      // PRD §9.1: until the phone is verified the account has no deposit
-      // address at all — not an unfunded one.
+    if (!row?.emailVerifiedAt) {
       throw new ForbiddenException(
-        'Verify your phone number before receiving a deposit address.',
+        'Verify your email address before receiving a deposit address.',
+      );
+    }
+    if (!row.mfaEnrolledAt) {
+      throw new ForbiddenException(
+        'Set up your authenticator app before receiving a deposit address.',
       );
     }
   }

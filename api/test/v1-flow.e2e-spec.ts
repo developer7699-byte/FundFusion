@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { Pool } from 'pg';
 import { AppModule } from './../src/app.module';
+import { timeCounter, totpCode } from './../src/auth/v1/totp';
 
 /** Every v1 response is { success, data, meta }. */
 function data<T = Record<string, unknown>>(res: { body: unknown }): T {
@@ -21,13 +22,13 @@ describe('v1 flow (e2e)', () => {
   let http: App;
 
   const email = `flow${Date.now()}@example.test`;
-  const phone = `+9198${String(Date.now()).slice(-8)}`;
   const CODE = '246810';
 
   let accessToken: string;
   let refreshToken: string;
   let userId: string;
   let adminToken: string;
+  let mfaSecret: string;
 
   beforeAll(async () => {
     process.env.OTP_STATIC_DEV = CODE;
@@ -58,16 +59,21 @@ describe('v1 flow (e2e)', () => {
 
     // An administrator is an ordinary account holding SUPER_ADMIN. There is
     // no self-service route to that role, which is the point.
+    const adminEmail = `admin${Date.now()}@example.test`;
     const admin = await request(http)
       .post('/api/v1/auth/register')
       .send({
-        email: `admin${Date.now()}@example.test`,
+        email: adminEmail,
         password: 'Example!Admin1',
         displayName: 'Platform Admin',
       })
       .expect(201);
-    const adminBody = data<{ userId: string; accessToken: string }>(admin);
-    adminToken = adminBody.accessToken;
+    const adminBody = data<{ userId: string }>(admin);
+    const verified = await request(http)
+      .post('/api/v1/auth/register/verify')
+      .send({ email: adminEmail, code: CODE })
+      .expect(201);
+    adminToken = data<{ accessToken: string }>(verified).accessToken;
     await pool.query(
       `INSERT INTO user_role (user_id, role_id)
        SELECT $1, id FROM role WHERE name = 'SUPER_ADMIN'`,
@@ -80,54 +86,88 @@ describe('v1 flow (e2e)', () => {
     await app?.close();
   });
 
-  it('1. registers a customer', async () => {
+  // Registration starts an account; it does not open one. No session comes
+  // back until a code sent to the address does (PRD §9.1).
+  it('1. registers a customer without handing out a session', async () => {
     const res = await request(http)
       .post('/api/v1/auth/register')
       .send({ email, password: 'Example!Demo1', displayName: 'Flow Tester' })
       .expect(201);
-    const body = data<{
-      userId: string;
-      accessToken: string;
-      refreshToken: string;
-    }>(res);
-    expect(body.userId).toBeDefined();
+    const body = data<{ userId: string; otpRequired: boolean }>(res);
+    expect(body.otpRequired).toBe(true);
+    expect(JSON.stringify(res.body)).not.toContain('accessToken');
+    expect(JSON.stringify(res.body)).not.toContain(CODE);
     userId = body.userId;
-    accessToken = body.accessToken;
-    refreshToken = body.refreshToken;
   });
 
-  it('2. reports the phone as unverified', async () => {
+  it('2. the emailed code completes registration and issues a session', async () => {
+    const res = await request(http)
+      .post('/api/v1/auth/register/verify')
+      .send({ email, code: CODE })
+      .expect(201);
+    const body = data<{ accessToken: string; refreshToken: string }>(res);
+    accessToken = body.accessToken;
+    refreshToken = body.refreshToken;
+    expect(accessToken).toBeDefined();
+  });
+
+  it('2b. signing in needs the password and then a code', async () => {
+    const first = await request(http)
+      .post('/api/v1/auth/login')
+      .send({ email, password: 'Example!Demo1' })
+      .expect(201);
+    expect(data<{ otpRequired: boolean }>(first).otpRequired).toBe(true);
+    expect(JSON.stringify(first.body)).not.toContain('accessToken');
+
+    const second = await request(http)
+      .post('/api/v1/auth/login/verify')
+      .send({ email, code: CODE })
+      .expect(201);
+    expect(data<{ accessToken: string }>(second).accessToken).toBeDefined();
+  });
+
+  it('2c. a wrong password is refused without saying which half was wrong', async () => {
+    await request(http)
+      .post('/api/v1/auth/login')
+      .send({ email, password: 'not-the-password' })
+      .expect(401);
+  });
+
+  it('3. reports that money cannot move yet', async () => {
     const res = await request(http)
       .get('/api/v1/auth/me')
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
-    expect(data<{ phoneVerified: boolean }>(res).phoneVerified).toBe(false);
+    const me = data<{ emailVerified: boolean; canMoveMoney: boolean }>(res);
+    expect(me.emailVerified).toBe(true);
+    expect(me.canMoveMoney).toBe(false);
   });
 
-  // The financial gate: no deposit address, no balance, no orders until a
-  // phone is verified (PRD §9.1).
-  it('3. refuses a money operation before the phone is verified', async () => {
+  // The financial gate: no deposit address, no balance, no orders until an
+  // authenticator is enrolled (PRD §9.1, revised 2026-11-21).
+  it('3b. refuses a money operation before the authenticator is enrolled', async () => {
     const res = await request(http)
       .get('/api/v1/wallet/balances')
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(403);
-    expect(JSON.stringify(res.body)).toMatch(/verify your phone/i);
+    expect(JSON.stringify(res.body)).toMatch(/authenticator/i);
   });
 
-  it('4. issues an OTP without returning the code', async () => {
+  it('4. hands out a secret the authenticator app can scan', async () => {
     const res = await request(http)
-      .post('/api/v1/auth/otp/request')
+      .post('/api/v1/auth/mfa/begin')
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({ phone })
       .expect(201);
-    expect(JSON.stringify(res.body)).not.toContain(CODE);
+    const body = data<{ secret: string; uri: string }>(res);
+    expect(body.uri).toMatch(/^otpauth:\/\/totp\//);
+    mfaSecret = body.secret;
   });
 
-  it('5. verifies the phone with the static code', async () => {
+  it('5. enrols once a generated code proves the app holds the secret', async () => {
     await request(http)
-      .post('/api/v1/auth/otp/verify')
+      .post('/api/v1/auth/mfa/confirm')
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({ phone, code: CODE })
+      .send({ code: totpCode(mfaSecret, timeCounter(Date.now())) })
       .expect(201);
   });
 

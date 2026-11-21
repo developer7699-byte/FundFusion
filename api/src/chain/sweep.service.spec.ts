@@ -81,8 +81,13 @@ beforeEach(async () => {
     [assetId],
   );
   const userId = await seedUser(t.pool, 'depositor@example.test');
+  // The §9.1 gate: verified email plus an enrolled authenticator.
   await t.pool.query(
-    `UPDATE "user" SET phone = '+919812345678', phone_verified_at = now() WHERE id = $1`,
+    `UPDATE "user"
+        SET email_verified_at = now(),
+            mfa_secret = 'AAAAAAAAAAAAAAAA',
+            mfa_enrolled_at = now()
+      WHERE id = $1`,
     [userId],
   );
   accountId = await accounts.ensureAccount(userId, 'USDT');

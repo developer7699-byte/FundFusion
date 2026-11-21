@@ -10,12 +10,9 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { ok } from '../common/http';
 import { CurrentUser, type AuthUser } from '../auth/current-user';
-import { OtpService } from '../auth/v1/otp.service';
+import { MfaService } from '../auth/v1/mfa.service';
 import { SessionService } from '../auth/v1/session.service';
-import {
-  PhoneGateGuard,
-  RequiresVerifiedPhone,
-} from '../auth/v1/phone-gate.guard';
+import { MoneyGateGuard, RequiresMoneyGate } from '../auth/v1/money-gate.guard';
 import { AdminGuard, RequiresAdmin } from '../auth/v1/admin.guard';
 import { PlatformSettingsService } from '../settings/platform-settings.service';
 import type { SettingKey } from '../settings/platform-settings';
@@ -25,8 +22,9 @@ import type { CapabilityKey } from '../capability/capability.types';
 import {
   DenyCapabilityDto,
   ChangeSettingDto,
-  OtpRequestDto,
-  OtpVerifyDto,
+  EmailCodeDto,
+  LoginDto,
+  MfaCodeDto,
   RefreshDto,
   RegisterV1Dto,
 } from './v1.dto';
@@ -36,7 +34,7 @@ import {
 export class V1Controller {
   constructor(
     private readonly v1: V1Service,
-    private readonly otp: OtpService,
+    private readonly mfa: MfaService,
     private readonly sessions: SessionService,
     private readonly settings: PlatformSettingsService,
   ) {}
@@ -51,6 +49,41 @@ export class V1Controller {
     return ok(await this.v1.register(dto.email, dto.password, dto.displayName));
   }
 
+  /** The code sent at registration. Returns a session (PRD §9.1). */
+  @Post('auth/register/verify')
+  async verifyEmail(@Body() dto: EmailCodeDto) {
+    return ok(await this.v1.verifyEmail(dto.email, dto.code));
+  }
+
+  /** Step one: email and password. No session yet — a code goes out. */
+  @Post('auth/login')
+  async login(@Body() dto: LoginDto) {
+    return ok(await this.v1.login(dto.email, dto.password));
+  }
+
+  /** Step two: the emailed code becomes a session. */
+  @Post('auth/login/verify')
+  async loginVerify(@Body() dto: EmailCodeDto) {
+    return ok(await this.v1.loginVerify(dto.email, dto.code));
+  }
+
+  /**
+   * Enrolling the authenticator that gates every money operation. The secret
+   * is shown once, here, and never again.
+   */
+  @Post('auth/mfa/begin')
+  @UseGuards(V1AuthGuard)
+  async beginMfa(@CurrentUser() user: AuthUser) {
+    return ok(await this.mfa.beginEnrolment(user.sub));
+  }
+
+  @Post('auth/mfa/confirm')
+  @UseGuards(V1AuthGuard)
+  async confirmMfa(@CurrentUser() user: AuthUser, @Body() dto: MfaCodeDto) {
+    await this.mfa.confirmEnrolment(user.sub, dto.code);
+    return ok({ enrolled: true });
+  }
+
   @Post('auth/refresh')
   async refresh(@Body() dto: RefreshDto) {
     return ok(await this.sessions.rotate(dto.refreshToken));
@@ -62,25 +95,13 @@ export class V1Controller {
     return ok(await this.v1.me(user.sub));
   }
 
-  @Post('auth/otp/request')
-  @UseGuards(V1AuthGuard)
-  async requestOtp(@CurrentUser() user: AuthUser, @Body() dto: OtpRequestDto) {
-    return ok(await this.otp.request(user.sub, dto.phone));
-  }
-
-  @Post('auth/otp/verify')
-  @UseGuards(V1AuthGuard)
-  async verifyOtp(@CurrentUser() user: AuthUser, @Body() dto: OtpVerifyDto) {
-    return ok(await this.otp.verify(user.sub, dto.phone, dto.code));
-  }
-
   /**
-   * A money operation, gated on a verified phone (PRD §9.1). The guard — not
-   * this method — is what enforces it.
+   * A money operation, gated on an enrolled authenticator (PRD §9.1). The
+   * guard — not this method — is what enforces it.
    */
   @Get('wallet/balances')
-  @UseGuards(V1AuthGuard, PhoneGateGuard)
-  @RequiresVerifiedPhone()
+  @UseGuards(V1AuthGuard, MoneyGateGuard)
+  @RequiresMoneyGate()
   async balances(@CurrentUser() user: AuthUser) {
     return ok(await this.v1.walletBalances(user.sub));
   }

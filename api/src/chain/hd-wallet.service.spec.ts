@@ -33,17 +33,22 @@ beforeEach(async () => {
   seedPhrase = generateMnemonic(wordlist, 128);
   wallets = new HdWalletService(t.db, accounts, { seedPhrase });
   userId = await seedUser(t.pool, 'depositor@example.test');
-  await verifyPhone(userId, '+919812345678');
+  await openAccount(userId);
 });
 
 afterAll(async () => {
   await t.close();
 });
 
-async function verifyPhone(id: string, phone: string) {
+/** Verified email plus an enrolled authenticator — the gate from §9.1. */
+async function openAccount(id: string) {
   await t.pool.query(
-    `UPDATE "user" SET phone = $2, phone_verified_at = now() WHERE id = $1`,
-    [id, phone],
+    `UPDATE "user"
+        SET email_verified_at = now(),
+            mfa_secret = 'AAAAAAAAAAAAAAAA',
+            mfa_enrolled_at = now()
+      WHERE id = $1`,
+    [id],
   );
 }
 
@@ -63,7 +68,7 @@ describe('deposit addresses (PRD §8.1)', () => {
 
   it('gives two users different addresses', async () => {
     const other = await seedUser(t.pool, 'other@example.test');
-    await verifyPhone(other, '+919812345679');
+    await openAccount(other);
 
     expect(await wallets.addressFor(other)).not.toBe(
       await wallets.addressFor(userId),
@@ -85,7 +90,7 @@ describe('deposit addresses (PRD §8.1)', () => {
 
   it('allocates a distinct index to each address', async () => {
     const other = await seedUser(t.pool, 'other@example.test');
-    await verifyPhone(other, '+919812345679');
+    await openAccount(other);
     await wallets.addressFor(userId);
     await wallets.addressFor(other);
 
@@ -101,7 +106,7 @@ describe('deposit addresses (PRD §8.1)', () => {
     const others: string[] = [];
     for (let n = 0; n < 5; n++) {
       const id = await seedUser(t.pool, `rush${n}@example.test`);
-      await verifyPhone(id, `+9198123456${80 + n}`);
+      await openAccount(id);
       others.push(id);
     }
 
@@ -115,10 +120,20 @@ describe('deposit addresses (PRD §8.1)', () => {
 
 /** PRD §9.1: until a phone is verified the account has no deposit address. */
 describe('the financial gate', () => {
-  it('refuses an address for an unverified phone', async () => {
+  it('refuses an address for an unverified email', async () => {
     const stranger = await seedUser(t.pool, 'unverified@example.test');
 
-    await expect(wallets.addressFor(stranger)).rejects.toThrow(/phone/i);
+    await expect(wallets.addressFor(stranger)).rejects.toThrow(/email/i);
+  });
+
+  it('refuses an address until an authenticator is enrolled', async () => {
+    const half = await seedUser(t.pool, 'half@example.test');
+    await t.pool.query(
+      `UPDATE "user" SET email_verified_at = now() WHERE id = $1`,
+      [half],
+    );
+
+    await expect(wallets.addressFor(half)).rejects.toThrow(/authenticator/i);
   });
 });
 

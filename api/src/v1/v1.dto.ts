@@ -19,17 +19,25 @@ export class RegisterV1Dto {
   displayName!: string;
 }
 
-export class OtpRequestDto {
+export class LoginDto {
+  @IsEmail()
+  email!: string;
+
   @IsString()
   @IsNotEmpty()
-  phone!: string;
+  password!: string;
 }
 
-export class OtpVerifyDto {
+export class EmailCodeDto {
+  @IsEmail()
+  email!: string;
+
   @IsString()
   @IsNotEmpty()
-  phone!: string;
+  code!: string;
+}
 
+export class MfaCodeDto {
   @IsString()
   @IsNotEmpty()
   code!: string;

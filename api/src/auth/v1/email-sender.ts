@@ -4,6 +4,8 @@ import { Injectable, Logger } from '@nestjs/common';
  * Sending an email. Narrow on purpose: a provider swap (Resend is the pick in
  * `docs/DEPENDENCIES.md` §1.3) touches this file and nothing else.
  */
+export const EMAIL_SENDER = Symbol('EMAIL_SENDER');
+
 export interface EmailSender {
   send(to: string, subject: string, body: string): Promise<void>;
 }
