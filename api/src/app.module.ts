@@ -8,6 +8,7 @@ import { AuditModule } from './audit/audit.module';
 import { V1Module } from './v1/v1.module';
 import { P2pModule } from './p2p/p2p.module';
 import { SettingsModule } from './settings/settings.module';
+import { JobsModule } from './jobs/jobs.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { HealthController } from './health.controller';
@@ -26,6 +27,7 @@ import { OpsModule } from './ops/ops.module';
     V1Module,
     P2pModule,
     SettingsModule,
+    JobsModule,
     PrototypeModule,
     AuthModule,
     WalletModule,

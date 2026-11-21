@@ -32,10 +32,15 @@ describe('chain configuration (PRD §12)', () => {
     );
   });
 
-  it('refuses to start without a token address', () => {
-    expect(() =>
-      chainConfigFrom({ ...env, USDT_CONTRACT_ADDRESS: '' }),
-    ).toThrow(/USDT_CONTRACT_ADDRESS/);
+  /**
+   * There is no official Tether on BSC testnet, so the stand-in has to be
+   * deployed before there is an address to configure. A fresh environment
+   * legitimately has none.
+   */
+  it('allows a token address that does not exist yet', () => {
+    expect(
+      chainConfigFrom({ ...env, USDT_CONTRACT_ADDRESS: '' }).usdtAddress,
+    ).toBe('');
   });
 
   it('refuses a token address that is not an address', () => {

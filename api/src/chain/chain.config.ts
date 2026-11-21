@@ -8,7 +8,8 @@ export interface ChainConfig {
   /** The watcher subscribes here; PRD §8.2 requires it, so it is not optional. */
   wsUrl: string;
   chainId: number;
-  usdtAddress: `0x${string}`;
+  /** Empty until the stand-in token is deployed (DEPENDENCIES §2.4). */
+  usdtAddress: `0x${string}` | '';
 }
 
 function required(env: Record<string, string | undefined>, key: string) {
@@ -32,9 +33,9 @@ export function chainConfigFrom(
 ): ChainConfig {
   const httpUrl = required(env, 'BSC_RPC_HTTP_URL');
   const wsUrl = required(env, 'BSC_RPC_WS_URL');
-  const usdtAddress = required(env, 'USDT_CONTRACT_ADDRESS');
+  const usdtAddress = env.USDT_CONTRACT_ADDRESS?.trim() ?? '';
 
-  if (!isAddress(usdtAddress)) {
+  if (usdtAddress && !isAddress(usdtAddress)) {
     throw new Error(
       `USDT_CONTRACT_ADDRESS is not an address: "${usdtAddress}".`,
     );
@@ -50,5 +51,10 @@ export function chainConfigFrom(
     );
   }
 
-  return { httpUrl, wsUrl, chainId, usdtAddress };
+  return {
+    httpUrl,
+    wsUrl,
+    chainId,
+    usdtAddress: usdtAddress as `0x${string}` | '',
+  };
 }
