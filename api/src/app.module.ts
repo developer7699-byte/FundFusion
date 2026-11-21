@@ -14,6 +14,7 @@ import { AuthModule } from './auth/auth.module';
 import { HealthController } from './health.controller';
 import { PrototypeModule } from './prototype/prototype.module';
 import { WalletModule } from './wallet/wallet.module';
+import { ChainModule } from './chain/chain.module';
 import { WalletV1Module } from './wallet/v1/wallet-v1.module';
 import { OpsModule } from './ops/ops.module';
 
@@ -23,6 +24,7 @@ import { OpsModule } from './ops/ops.module';
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     DbModule,
     LedgerModule,
+    ChainModule.register(),
     CapabilityModule,
     AuditModule,
     V1Module,

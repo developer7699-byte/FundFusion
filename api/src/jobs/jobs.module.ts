@@ -1,10 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
-import {
-  CHAIN_SERVICES,
-  ChainModule,
-  type ChainServices,
-} from '../chain/chain.module';
+import { CHAIN_SERVICES, type ChainServices } from '../chain/chain.module';
 import { P2pModule } from '../p2p/p2p.module';
 import { TimeoutService } from '../p2p/timeout.service';
 import { JobsService, type JobTargets } from './jobs.service';
@@ -14,7 +10,7 @@ import { JobsService, type JobTargets } from './jobs.service';
  * something — and it is deliberately the only place that knows how often.
  */
 @Module({
-  imports: [ScheduleModule.forRoot(), ChainModule.register(), P2pModule],
+  imports: [ScheduleModule.forRoot(), P2pModule],
   providers: [
     {
       provide: JobsService,

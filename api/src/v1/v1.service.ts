@@ -15,6 +15,7 @@ import { SessionService } from '../auth/v1/session.service';
 import { AuditService } from '../audit/audit.service';
 import { EmailOtpService } from '../auth/v1/email-otp.service';
 import type { CapabilityKey } from '../capability/capability.types';
+import { BSC_TESTNET_NETWORK } from '../chain/hd-wallet.service';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -73,7 +74,7 @@ export class V1Service {
         .onConflictDoNothing();
     }
 
-    await this.db
+    const [asset] = await this.db
       .insert(schema.asset)
       .values({
         symbol: 'USDT',
@@ -81,7 +82,32 @@ export class V1Service {
         decimals: 18,
         kind: 'CRYPTO',
       })
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning({ id: schema.asset.id });
+
+    // The network the wallet derives addresses against (PRD §8.1). Without
+    // it a seeded environment looks complete and then fails at the first
+    // deposit address, which is the worst moment to discover it.
+    const assetId =
+      asset?.id ??
+      (
+        await this.db
+          .select({ id: schema.asset.id })
+          .from(schema.asset)
+          .where(eq(schema.asset.symbol, 'USDT'))
+          .limit(1)
+      )[0]?.id;
+
+    if (assetId) {
+      await this.db
+        .insert(schema.blockchainNetwork)
+        .values({
+          assetId,
+          code: BSC_TESTNET_NETWORK,
+          name: 'BSC Testnet',
+        })
+        .onConflictDoNothing();
+    }
 
     return { seeded: true };
   }

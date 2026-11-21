@@ -85,6 +85,7 @@ export class ChainModule {
       );
       return {
         module: ChainModule,
+        global: true,
         providers: [{ provide: CHAIN_SERVICES, useValue: null }],
         exports: [CHAIN_SERVICES],
       };
@@ -92,6 +93,10 @@ export class ChainModule {
 
     return {
       module: ChainModule,
+      // Global because two callers need it — the scheduler and the wallet's
+      // HTTP surface — and registering it twice would build two signers,
+      // each holding its own copy of the custody keys.
+      global: true,
       imports: [LedgerModule, SettingsModule, AuditModule],
       providers: [
         { provide: CHAIN_CONFIG, useFactory: () => chainConfigFrom() },

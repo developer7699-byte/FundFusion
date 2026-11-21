@@ -11,6 +11,7 @@ import { PostingService } from '../../ledger/posting.service';
 import { PlatformSettingsService } from '../../settings/platform-settings.service';
 import { SettingsModule } from '../../settings/settings.module';
 import { AllowlistService } from './allowlist.service';
+import { WalletV1Controller } from './wallet-v1.controller';
 import { WithdrawalService } from './withdrawal.service';
 
 /**
@@ -23,6 +24,7 @@ import { WithdrawalService } from './withdrawal.service';
  */
 @Module({
   imports: [LedgerModule, CapabilityModule, AuditModule, SettingsModule],
+  controllers: [WalletV1Controller],
   providers: [
     {
       provide: DRIZZLE,
