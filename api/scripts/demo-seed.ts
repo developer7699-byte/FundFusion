@@ -131,6 +131,16 @@ async function main() {
   if (!databaseUrl) throw new Error('DATABASE_URL is not set.');
   refuseIfNotLocal(databaseUrl);
 
+  // Without this the API mails a random code and this script has no way to
+  // read it, so the first verify fails with a flat "Invalid code".
+  if (!process.env.OTP_STATIC_DEV?.trim()) {
+    throw new Error(
+      'OTP_STATIC_DEV is not set, so the API is sending random sign-in codes ' +
+        'that this script cannot read. Set OTP_STATIC_DEV=246810 in api/.env ' +
+        'and restart the API.',
+    );
+  }
+
   const cfg = chainConfigFrom();
   const usdt = cfg.usdtAddress as `0x${string}`;
   if (!usdt) throw new Error('USDT_CONTRACT_ADDRESS is not set.');
