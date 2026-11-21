@@ -18,6 +18,7 @@ import { MockRateProvider } from '../rates/rate.provider';
 import { RateService } from '../rates/rate.service';
 import { fixedSettings } from '../settings/platform-settings';
 import { AuditService } from '../audit/audit.service';
+import { DefaultTrackerService } from './default-tracker.service';
 import { DisputeService } from './dispute.service';
 import { ResolutionService } from './resolution.service';
 
@@ -28,6 +29,7 @@ let posting: PostingService;
 let quotes: QuoteService;
 let orders: OrderService;
 let assignments: AssignmentService;
+let eligibility: EligibilityService;
 let disputes: DisputeService;
 let resolution: ResolutionService;
 let customerId: string;
@@ -57,7 +59,7 @@ function build(overrides: Record<string, string | number> = {}) {
     accounts,
     new AbandonmentService(t.db, settings),
   );
-  const eligibility = new EligibilityService(
+  eligibility = new EligibilityService(
     t.db,
     quotes,
     balances,
@@ -83,6 +85,7 @@ function build(overrides: Record<string, string | number> = {}) {
     accounts,
     audit,
     settings,
+    new DefaultTrackerService(t.db, audit, settings),
   );
   return capabilities;
 }
@@ -655,5 +658,38 @@ describe('REFUND_WITH_PENALTY — a verified merchant default (PRD §6.10)', () 
     expect((r.rows[0] as { penalty_amount: string }).penalty_amount).toBe(
       '10.000000000000000000',
     );
+  });
+});
+
+/** PRD §6.10: repeated defaults auto-pause the merchant. */
+describe('repeated defaults', () => {
+  it('pauses the desk once the threshold is reached', async () => {
+    build({ 'dispute.defaultsBeforePause': 2 });
+
+    for (const n of [1, 2]) {
+      const dispute = await disputedSell(`order-${n}`);
+      await resolution.resolve(dispute.id, adminId, REFUND, `r-${n}`);
+    }
+
+    const r = await t.pool.query(
+      `SELECT status FROM merchant_profile WHERE user_id = $1`,
+      [merchantId],
+    );
+    expect((r.rows[0] as { status: string }).status).toBe('INACTIVE');
+  });
+
+  it('leaves the desk active when the merchant was in the right', async () => {
+    build({ 'dispute.defaultsBeforePause': 2 });
+
+    for (const n of [1, 2]) {
+      const dispute = await disputedSell(`order-${n}`);
+      await resolution.resolve(dispute.id, adminId, RELEASE, `r-${n}`);
+    }
+
+    const r = await t.pool.query(
+      `SELECT status FROM merchant_profile WHERE user_id = $1`,
+      [merchantId],
+    );
+    expect((r.rows[0] as { status: string }).status).toBe('ACTIVE');
   });
 });

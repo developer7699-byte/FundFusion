@@ -32,6 +32,7 @@ import {
   fixedSettings,
   type SettingsReader,
 } from '../settings/platform-settings';
+import { DefaultTrackerService } from './default-tracker.service';
 import type { Dispute } from './dispute.service';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -52,6 +53,7 @@ interface Context {
   order: typeof schema.p2pOrder.$inferSelect;
   customerAccountId: string;
   merchantAccountId: string;
+  merchantUserId: string;
   /** What the merchant bonded on a sell; '0' on a buy, where they lock instead. */
   bondUsdt: string;
 }
@@ -98,6 +100,11 @@ export class ResolutionService {
     private readonly accounts: AccountService,
     private readonly audit: AuditService,
     private readonly settings: SettingsReader = fixedSettings(),
+    /**
+     * Optional, because a resolution is correct without it — the tracker
+     * decides whether a desk keeps trading, not whether the money moved.
+     */
+    private readonly defaults?: DefaultTrackerService,
   ) {}
 
   async resolve(
@@ -137,7 +144,13 @@ export class ResolutionService {
           )
           .limit(1);
 
-        if (posted) return dispute;
+        if (posted) {
+          return {
+            ...dispute,
+            merchantUserId: context.merchantUserId,
+            side: context.quote.side,
+          };
+        }
         throw new ConflictException(
           `That dispute is already resolved as ${dispute.outcome}. It cannot be resolved again.`,
         );
@@ -188,8 +201,23 @@ export class ResolutionService {
         })
         .where(eq(schema.p2pOrder.id, context.order.id));
 
-      return row;
+      return {
+        ...row,
+        merchantUserId: context.merchantUserId,
+        side: context.quote.side,
+      };
     });
+
+    // After the money, never before: a desk paused for a resolution that
+    // then failed to post would be paused for nothing.
+    if (this.defaults && resolved.merchantUserId) {
+      await this.defaults.record(
+        resolved.merchantUserId,
+        resolved.side,
+        decision.outcome,
+        disputeId,
+      );
+    }
 
     await this.audit.record({
       actorId: adminId,
@@ -475,6 +503,7 @@ export class ResolutionService {
       dispute,
       order,
       quote,
+      merchantUserId: assignment.userId,
       customerAccountId: await this.accounts.ensureAccount(
         order.customerId,
         'USDT',
