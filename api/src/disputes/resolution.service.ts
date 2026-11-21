@@ -13,10 +13,21 @@ import { AuditService } from '../audit/audit.service';
 import { AccountService, DRIZZLE } from '../ledger/account.service';
 import { PostingService } from '../ledger/posting.service';
 import type { PostingLine } from '../ledger/ledger.types';
-import { usdt, usdtString } from '../money/money';
+import {
+  Decimal,
+  payableUp as roundUp,
+  usdt,
+  usdtString,
+} from '../money/money';
 import { EligibilityService } from '../p2p/eligibility.service';
 import { QuoteService, type QuoteSnapshot } from '../p2p/quote.service';
-import { buyLegs, leg, nonZero, sellLegs } from '../p2p/settlement-legs';
+import {
+  buyLegs,
+  leg,
+  nonZero,
+  platformLeg,
+  sellLegs,
+} from '../p2p/settlement-legs';
 import {
   fixedSettings,
   type SettingsReader,
@@ -233,9 +244,161 @@ export class ResolutionService {
       return { ...this.refundLegs(context), penaltyAmount: null };
     }
 
-    throw new BadRequestException(
-      `The outcome ${decision.outcome} is not supported yet.`,
+    if (decision.outcome === 'SPLIT') {
+      return { ...this.splitLegs(context, decision), penaltyAmount: null };
+    }
+
+    return this.penaltyLegs(context);
+  }
+
+  /**
+   * PRD §6.10's partial split. The fee follows what actually moved — a split
+   * that pays 40 of 100 earns 40% of the quoted fee — and the remainder goes
+   * back, so the escrow is fully accounted for and nothing is stranded in
+   * LOCKED where no state machine can reach it again.
+   */
+  private splitLegs(context: Context, decision: Decision) {
+    const parties = {
+      customerAccountId: context.customerAccountId,
+      merchantAccountId: context.merchantAccountId,
+    };
+
+    if (decision.counterpartyAmount === undefined) {
+      throw new BadRequestException(
+        'A split needs the amount the counterparty receives.',
+      );
+    }
+    const toCounterparty = usdt(decision.counterpartyAmount);
+    if (!toCounterparty.isFinite() || toCounterparty.lte(0)) {
+      throw new BadRequestException(
+        'A split must pay the counterparty a positive amount; use REFUND to return everything.',
+      );
+    }
+
+    const quantity = usdt(context.quote.usdtAmount);
+    const fee = usdt(context.quote.platformFeeUsdt);
+    const bond = usdt(context.bondUsdt);
+
+    if (context.quote.side === 'SELL') {
+      if (toCounterparty.gt(quantity)) {
+        throw new BadRequestException(
+          `A split of ${toCounterparty.toFixed()} is larger than the ${quantity.toFixed()} escrow.`,
+        );
+      }
+      // The platform's cut rounds up, as a payable does (PRD §5.1); the
+      // merchant's credit is the complement, so the journal still balances.
+      const share = payableUp(fee.times(toCounterparty).div(quantity));
+      return {
+        escrowAccountId: parties.customerAccountId,
+        escrowAmount: usdtString(quantity),
+        lines: nonZero([
+          leg(parties.customerAccountId, 'LOCKED', 'DEBIT', quantity),
+          leg(
+            parties.merchantAccountId,
+            'AVAILABLE',
+            'CREDIT',
+            toCounterparty.minus(share),
+          ),
+          platformLeg('REVENUE', 'CREDIT', share),
+          leg(
+            parties.customerAccountId,
+            'AVAILABLE',
+            'CREDIT',
+            quantity.minus(toCounterparty),
+          ),
+          leg(parties.merchantAccountId, 'BONDED', 'DEBIT', bond),
+          leg(parties.merchantAccountId, 'AVAILABLE', 'CREDIT', bond),
+        ]),
+        counterpartyAmount: usdtString(toCounterparty),
+      };
+    }
+
+    const locked = quantity.plus(fee);
+    if (toCounterparty.gt(quantity)) {
+      throw new BadRequestException(
+        `A split of ${toCounterparty.toFixed()} is larger than the ${quantity.toFixed()} escrow.`,
+      );
+    }
+    const share = payableUp(fee.times(toCounterparty).div(quantity));
+    return {
+      escrowAccountId: parties.merchantAccountId,
+      escrowAmount: usdtString(locked),
+      lines: nonZero([
+        leg(parties.merchantAccountId, 'LOCKED', 'DEBIT', locked),
+        leg(parties.customerAccountId, 'AVAILABLE', 'CREDIT', toCounterparty),
+        platformLeg('REVENUE', 'CREDIT', share),
+        leg(
+          parties.merchantAccountId,
+          'AVAILABLE',
+          'CREDIT',
+          locked.minus(toCounterparty).minus(share),
+        ),
+      ]),
+      counterpartyAmount: usdtString(toCounterparty),
+    };
+  }
+
+  /**
+   * A verified default (PRD §6.10): the escrow returns in full, compensation
+   * is drawn from the defaulting party's bond, and **the remainder of the
+   * bond is released**. Full forfeiture is never used — a merchant whose
+   * bank had a genuine outage would lose everything, word would spread, and
+   * merchant supply would dry up.
+   *
+   * The compensation goes to the wronged party, not to the platform. A
+   * platform that earns from disputes has an incentive nobody should want it
+   * to have.
+   */
+  private async penaltyLegs(context: Context) {
+    const bond = usdt(context.bondUsdt);
+    if (bond.lte(0)) {
+      // PRD §6.11: a customer buying USDT has an empty wallet by definition
+      // and posts no bond, so there is nothing to draw compensation from.
+      throw new BadRequestException(
+        'There is no bond on this order to draw compensation from. A buying customer posts none (PRD §6.11); use REFUND or SPLIT.',
+      );
+    }
+
+    const bps = await this.settings.integer('dispute.penaltyBps');
+    const wanted = payableUp(
+      usdt(context.quote.usdtAmount).times(bps).div(10_000),
     );
+    // Capped at the bond, so the debit can never drive it negative.
+    const penalty = wanted.gt(bond) ? bond : wanted;
+
+    const parties = {
+      customerAccountId: context.customerAccountId,
+      merchantAccountId: context.merchantAccountId,
+    };
+    const refund = this.refundLegs(context);
+
+    return {
+      escrowAccountId: refund.escrowAccountId,
+      escrowAmount: refund.escrowAmount,
+      lines: nonZero([
+        leg(
+          parties.customerAccountId,
+          'LOCKED',
+          'DEBIT',
+          usdt(context.quote.usdtAmount),
+        ),
+        leg(
+          parties.customerAccountId,
+          'AVAILABLE',
+          'CREDIT',
+          usdt(context.quote.usdtAmount).plus(penalty),
+        ),
+        leg(parties.merchantAccountId, 'BONDED', 'DEBIT', bond),
+        leg(
+          parties.merchantAccountId,
+          'AVAILABLE',
+          'CREDIT',
+          bond.minus(penalty),
+        ),
+      ]),
+      counterpartyAmount: usdtString(usdt('0')),
+      penaltyAmount: usdtString(penalty),
+    };
   }
 
   /**
@@ -356,4 +519,9 @@ export class ResolutionService {
 
 function journalKey(idempotencyKey: string): string {
   return `dispute:${idempotencyKey}`;
+}
+
+/** A payable rounds up, so the platform is never short (PRD §5.1). */
+function payableUp(value: Decimal): Decimal {
+  return roundUp(value, 18).value;
 }

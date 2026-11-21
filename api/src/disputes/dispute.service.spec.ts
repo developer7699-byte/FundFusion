@@ -211,9 +211,9 @@ describe('opening a dispute (PRD §6.10)', () => {
     const order = await acceptedSell();
     const stranger = await seedUser(t.pool, 'stranger@example.test');
 
-    await expect(
-      disputes.open(order.id, stranger, 'curious'),
-    ).rejects.toThrow(/not yours|party/i);
+    await expect(disputes.open(order.id, stranger, 'curious')).rejects.toThrow(
+      /not yours|party/i,
+    );
   });
 
   /** Money has settled; nothing moves it again (PRD §6.6, terminal states). */

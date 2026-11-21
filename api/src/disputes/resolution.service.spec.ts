@@ -439,3 +439,221 @@ async function orderStatus(orderId: string): Promise<string> {
   ]);
   return (r.rows[0] as { status: string }).status;
 }
+
+describe('SPLIT — the escrow divides (PRD §6.10)', () => {
+  const split = (counterpartyAmount: string) => ({
+    outcome: 'SPLIT' as const,
+    reason: 'partial transfer evidenced',
+    counterpartyAmount,
+  });
+
+  it('pays the named amount to the merchant and returns the rest', async () => {
+    const dispute = await disputedSell();
+
+    await resolution.resolve(dispute.id, adminId, split('40'), 'r-1');
+
+    // 40 of the 100 was sold; the fee follows what moved (3% of 40 = 1.20).
+    expect(await balances.balance(merchantAccount, 'AVAILABLE')).toBe(
+      '538.800000000000000000',
+    );
+    expect(await balances.balance(customerAccount, 'AVAILABLE')).toBe(
+      '460.000000000000000000',
+    );
+  });
+
+  /** Review Focus #3 — the parts must sum to the escrow exactly. */
+  it('leaves nothing stranded in LOCKED', async () => {
+    const dispute = await disputedSell();
+
+    await resolution.resolve(dispute.id, adminId, split('40'), 'r-1');
+
+    expect(await balances.balance(customerAccount, 'LOCKED')).toBe(
+      '0.000000000000000000',
+    );
+  });
+
+  it('takes a fee proportional to what was actually sold', async () => {
+    const dispute = await disputedSell();
+
+    await resolution.resolve(dispute.id, adminId, split('40'), 'r-1');
+
+    expect(await revenue()).toBe('1.200000000000000000');
+  });
+
+  it('refuses a split larger than the escrow', async () => {
+    const dispute = await disputedSell();
+
+    await expect(
+      resolution.resolve(dispute.id, adminId, split('101'), 'r-1'),
+    ).rejects.toThrow(/escrow|larger/i);
+  });
+
+  it('refuses a split of zero', async () => {
+    const dispute = await disputedSell();
+
+    await expect(
+      resolution.resolve(dispute.id, adminId, split('0'), 'r-1'),
+    ).rejects.toThrow(/positive|amount/i);
+  });
+
+  it('refuses a split with no amount given', async () => {
+    const dispute = await disputedSell();
+
+    await expect(
+      resolution.resolve(
+        dispute.id,
+        adminId,
+        { outcome: 'SPLIT', reason: 'partial' },
+        'r-1',
+      ),
+    ).rejects.toThrow(/amount/i);
+  });
+
+  it('releases the bond, as every resolution does', async () => {
+    const dispute = await disputedSell();
+
+    await resolution.resolve(dispute.id, adminId, split('40'), 'r-1');
+
+    expect(await balances.balance(merchantAccount, 'BONDED')).toBe(
+      '0.000000000000000000',
+    );
+  });
+
+  it('leaves every journal balanced', async () => {
+    const dispute = await disputedSell();
+
+    await resolution.resolve(dispute.id, adminId, split('33.333333'), 'r-1');
+
+    const bad = await t.pool.query(
+      `SELECT transaction_id FROM ledger_entry GROUP BY transaction_id
+        HAVING SUM(CASE WHEN direction='CREDIT' THEN amount ELSE -amount END) <> 0`,
+    );
+    expect(bad.rowCount).toBe(0);
+  });
+});
+
+describe('REFUND_WITH_PENALTY — a verified merchant default (PRD §6.10)', () => {
+  const PENALTY = {
+    outcome: 'REFUND_WITH_PENALTY' as const,
+    reason: 'merchant confirmed they never sent the transfer',
+  };
+
+  it('refunds the customer in full and compensates from the bond', async () => {
+    const dispute = await disputedSell();
+
+    await resolution.resolve(dispute.id, adminId, PENALTY, 'r-1');
+
+    // The escrow back, plus 10% of the 100 order drawn from the bond.
+    expect(await balances.balance(customerAccount, 'AVAILABLE')).toBe(
+      '510.000000000000000000',
+    );
+  });
+
+  /**
+   * Never full forfeiture. A merchant whose bank had a genuine outage would
+   * lose their whole bond, word would spread, and supply would dry up.
+   */
+  it('releases the remainder of the bond to the merchant', async () => {
+    const dispute = await disputedSell();
+
+    await resolution.resolve(dispute.id, adminId, PENALTY, 'r-1');
+
+    expect(await balances.balance(merchantAccount, 'AVAILABLE')).toBe(
+      '490.000000000000000000',
+    );
+    expect(await balances.balance(merchantAccount, 'BONDED')).toBe(
+      '0.000000000000000000',
+    );
+  });
+
+  /** Compensation goes to the wronged party. A platform that earns from
+   * disputes has an incentive nobody should want it to have. */
+  it('pays the compensation to the customer, not to platform revenue', async () => {
+    const dispute = await disputedSell();
+
+    await resolution.resolve(dispute.id, adminId, PENALTY, 'r-1');
+
+    expect(await revenue()).toBe('0.000000000000000000');
+  });
+
+  it('draws compensation at the configured rate', async () => {
+    build({ 'dispute.penaltyBps': 2500 });
+    const dispute = await disputedSell();
+
+    await resolution.resolve(dispute.id, adminId, PENALTY, 'r-1');
+
+    expect(await balances.balance(customerAccount, 'AVAILABLE')).toBe(
+      '525.000000000000000000',
+    );
+  });
+
+  it('caps the penalty at the bond when the rate would exceed it', async () => {
+    build({ 'dispute.penaltyBps': 5000, 'eligibility.bufferBps': 0 });
+    const dispute = await disputedSell();
+    await t.pool.query(
+      `UPDATE merchant_profile SET status = 'ACTIVE' WHERE user_id = $1`,
+      [merchantId],
+    );
+
+    await resolution.resolve(dispute.id, adminId, PENALTY, 'r-1');
+
+    // The bond is 100; a 50% penalty is 50, which it can cover.
+    expect(await balances.balance(merchantAccount, 'BONDED')).toBe(
+      '0.000000000000000000',
+    );
+    expect(await balances.balance(customerAccount, 'AVAILABLE')).toBe(
+      '550.000000000000000000',
+    );
+  });
+
+  /**
+   * Review Focus #2. PRD §6.11: a customer buying USDT has an empty wallet
+   * by definition and cannot post a bond, so there is nothing to draw from.
+   */
+  it('refuses a penalty where the defaulting party posted no bond', async () => {
+    const dispute = await disputedBuy();
+
+    await expect(
+      resolution.resolve(dispute.id, adminId, PENALTY, 'r-1'),
+    ).rejects.toThrow(/bond/i);
+  });
+
+  it('moves no money when the penalty is refused', async () => {
+    const dispute = await disputedBuy();
+
+    await expect(
+      resolution.resolve(dispute.id, adminId, PENALTY, 'r-1'),
+    ).rejects.toThrow();
+    expect(await balances.balance(merchantAccount, 'LOCKED')).toBe(
+      '100.000000000000000000',
+    );
+  });
+
+  it('never drives the bond negative', async () => {
+    const dispute = await disputedSell();
+
+    await resolution.resolve(dispute.id, adminId, PENALTY, 'r-1');
+
+    const negative = await t.pool.query(
+      `SELECT account_id FROM ledger_entry
+        WHERE account_id IS NOT NULL
+        GROUP BY account_id, account_type
+       HAVING SUM(CASE WHEN direction='CREDIT' THEN amount ELSE -amount END) < 0`,
+    );
+    expect(negative.rowCount).toBe(0);
+  });
+
+  it('records the penalty it drew', async () => {
+    const dispute = await disputedSell();
+
+    await resolution.resolve(dispute.id, adminId, PENALTY, 'r-1');
+
+    const r = await t.pool.query(
+      `SELECT penalty_amount FROM dispute WHERE id = $1`,
+      [dispute.id],
+    );
+    expect((r.rows[0] as { penalty_amount: string }).penalty_amount).toBe(
+      '10.000000000000000000',
+    );
+  });
+});
