@@ -229,3 +229,51 @@ describe('what a merchant may accept (PRD §6.7)', () => {
     expect(offered.map((o) => o.orderId)).toEqual([first.id, second.id]);
   });
 });
+
+describe('reading one order (PRD §13.5)', () => {
+  it('shows the customer their own order with its snapshot', async () => {
+    const order = await sellOrder();
+
+    const detail = await feed.detail(order.id, customerId);
+
+    expect(detail.orderId).toBe(order.id);
+    expect(detail.status).toBe('AWAITING_MERCHANT');
+    expect(detail.usdtAmount).toBe('100.000000000000000000');
+    expect(detail.role).toBe('CUSTOMER');
+  });
+
+  it('shows the assigned merchant the same order', async () => {
+    const order = await sellOrder();
+    await assignments.accept(order.id, merchantId, 'a-1');
+
+    const detail = await feed.detail(order.id, merchantId);
+
+    expect(detail.role).toBe('MERCHANT');
+    expect(detail.status).toBe('ACCEPTED');
+  });
+
+  /** An order id is not a capability. */
+  it('refuses a stranger', async () => {
+    const order = await sellOrder();
+    const stranger = await seedUser(t.pool, 'stranger@example.test');
+
+    await expect(feed.detail(order.id, stranger)).rejects.toThrow(
+      /not yours|forbidden/i,
+    );
+  });
+
+  it('refuses a merchant who did not win the order', async () => {
+    const order = await sellOrder();
+    const other = await seedMerchant(t.pool, 'other@example.test');
+
+    await expect(feed.detail(order.id, other.userId)).rejects.toThrow(
+      /not yours|forbidden/i,
+    );
+  });
+
+  it('refuses an order that does not exist', async () => {
+    await expect(
+      feed.detail('00000000-0000-0000-0000-000000000000', customerId),
+    ).rejects.toThrow(/does not exist/i);
+  });
+});

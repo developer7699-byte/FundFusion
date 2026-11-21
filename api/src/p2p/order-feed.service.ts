@@ -1,4 +1,9 @@
-import { Inject, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { and, asc, eq, isNull, ne, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema';
@@ -24,6 +29,23 @@ export interface FeedOrder {
   expiresAt: Date;
   /** What this merchant would bond or lock to take it (PRD §6.5). */
   obligationUsdt: string;
+}
+
+/** One order as a party to it sees it, snapshot included. */
+export interface OrderDetail {
+  orderId: string;
+  status: string;
+  side: 'BUY' | 'SELL';
+  usdtAmount: string;
+  inrAmount: string;
+  customerRate: string;
+  platformFeeUsdt: string;
+  /** Which side of this order the caller is on. */
+  role: 'CUSTOMER' | 'MERCHANT';
+  merchantUserId: string | null;
+  utr: string | null;
+  broadcastAt: Date | null;
+  updatedAt: Date;
 }
 
 /**
@@ -112,5 +134,59 @@ export class OrderFeedService {
       }
     }
     return offered;
+  }
+
+  /**
+   * One order, for a party to it. An order id is not a capability (PRD
+   * §13.5): the customer who placed it and the merchant who won it can read
+   * it, and nobody else — including merchants who lost the race for it.
+   */
+  async detail(orderId: string, userId: string): Promise<OrderDetail> {
+    const [row] = await this.db
+      .select({
+        order: schema.p2pOrder,
+        quote: schema.p2pQuote,
+        assignment: schema.merchantAssignment,
+      })
+      .from(schema.p2pOrder)
+      .innerJoin(
+        schema.p2pQuote,
+        eq(schema.p2pQuote.id, schema.p2pOrder.quoteId),
+      )
+      .leftJoin(
+        schema.merchantAssignment,
+        eq(schema.merchantAssignment.orderId, schema.p2pOrder.id),
+      )
+      .where(eq(schema.p2pOrder.id, orderId))
+      .limit(1);
+
+    if (!row) throw new NotFoundException('That order does not exist.');
+
+    const isCustomer = row.order.customerId === userId;
+    const isMerchant = row.assignment?.userId === userId;
+    if (!isCustomer && !isMerchant) {
+      throw new ForbiddenException('That order is not yours.');
+    }
+
+    const [proof] = await this.db
+      .select({ utr: schema.paymentProof.utr })
+      .from(schema.paymentProof)
+      .where(eq(schema.paymentProof.orderId, orderId))
+      .limit(1);
+
+    return {
+      orderId: row.order.id,
+      status: row.order.status,
+      side: row.quote.side,
+      usdtAmount: row.quote.usdtAmount,
+      inrAmount: row.quote.inrAmount,
+      customerRate: row.quote.customerRate,
+      platformFeeUsdt: row.quote.platformFeeUsdt,
+      role: isCustomer ? 'CUSTOMER' : 'MERCHANT',
+      merchantUserId: row.assignment?.userId ?? null,
+      utr: proof?.utr ?? null,
+      broadcastAt: row.order.broadcastAt,
+      updatedAt: row.order.updatedAt,
+    };
   }
 }

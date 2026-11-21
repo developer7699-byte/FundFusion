@@ -15,6 +15,7 @@ import { AbandonmentService } from './abandonment.service';
 import { AssignmentService } from './assignment.service';
 import { EligibilityService } from './eligibility.service';
 import { OrderFeedService } from './order-feed.service';
+import { P2pController } from './p2p.controller';
 import { OrderService } from './order.service';
 import { QuoteService } from './quote.service';
 import { SettlementService } from './settlement.service';
@@ -26,6 +27,7 @@ import { TimeoutService } from './timeout.service';
  */
 @Module({
   imports: [RateModule, LedgerModule, CapabilityModule, SettingsModule],
+  controllers: [P2pController],
   providers: [
     {
       provide: DRIZZLE,
