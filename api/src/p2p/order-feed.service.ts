@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, asc, eq, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, ne, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema';
 import { DRIZZLE } from '../ledger/account.service';
@@ -16,6 +16,9 @@ import { EligibilityService } from './eligibility.service';
 import { QuoteService } from './quote.service';
 
 type Db = NodePgDatabase<typeof schema>;
+
+/** A page size that protects the server from a question nobody meant to ask. */
+const MAX_ROWS = 200;
 
 /** One row of the merchant feed. Every money field is a string (PRD §5.1). */
 export interface FeedOrder {
@@ -134,6 +137,60 @@ export class OrderFeedService {
       }
     }
     return offered;
+  }
+
+  /**
+   * Every order this user is a party to, newest movement first — the list
+   * behind an orders screen (PRD §13.5).
+   *
+   * Scoped in the WHERE clause rather than filtered afterwards, for the same
+   * reason `detail` refuses a stranger: an order id is not a capability, and
+   * a list is the easiest place to leak one.
+   */
+  async minePaged(userId: string, limit = 50): Promise<OrderDetail[]> {
+    const rows = await this.db
+      .select({
+        order: schema.p2pOrder,
+        quote: schema.p2pQuote,
+        assignment: schema.merchantAssignment,
+        utr: schema.paymentProof.utr,
+      })
+      .from(schema.p2pOrder)
+      .innerJoin(
+        schema.p2pQuote,
+        eq(schema.p2pQuote.id, schema.p2pOrder.quoteId),
+      )
+      .leftJoin(
+        schema.merchantAssignment,
+        eq(schema.merchantAssignment.orderId, schema.p2pOrder.id),
+      )
+      .leftJoin(
+        schema.paymentProof,
+        eq(schema.paymentProof.orderId, schema.p2pOrder.id),
+      )
+      .where(
+        or(
+          eq(schema.p2pOrder.customerId, userId),
+          eq(schema.merchantAssignment.userId, userId),
+        ),
+      )
+      .orderBy(desc(schema.p2pOrder.updatedAt))
+      .limit(Math.min(Math.max(1, Math.floor(limit)), MAX_ROWS));
+
+    return rows.map((row) => ({
+      orderId: row.order.id,
+      status: row.order.status,
+      side: row.quote.side,
+      usdtAmount: row.quote.usdtAmount,
+      inrAmount: row.quote.inrAmount,
+      customerRate: row.quote.customerRate,
+      platformFeeUsdt: row.quote.platformFeeUsdt,
+      role: row.order.customerId === userId ? 'CUSTOMER' : 'MERCHANT',
+      merchantUserId: row.assignment?.userId ?? null,
+      utr: row.utr ?? null,
+      broadcastAt: row.order.broadcastAt,
+      updatedAt: row.order.updatedAt,
+    }));
   }
 
   /**

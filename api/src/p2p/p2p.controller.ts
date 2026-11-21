@@ -56,6 +56,12 @@ export class P2pController {
     return ok(await this.orders.confirm(dto.quoteId, user.sub, idempotencyKey));
   }
 
+  /** Every order this caller is a party to — the orders screen. */
+  @Get('orders')
+  async myOrders(@CurrentUser() user: AuthUser) {
+    return ok(await this.feed.minePaged(user.sub));
+  }
+
   @Get('orders/:id')
   async order(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return ok(await this.feed.detail(id, user.sub));

@@ -292,6 +292,18 @@ describe('p2p over http (e2e)', () => {
     await asUser(other, 'get', `/api/v1/p2p/orders/${orderId}`).expect(403);
   });
 
+  it('lists the order for its customer and for nobody else', async () => {
+    const mine = await asUser(customer, 'get', '/api/v1/p2p/orders').expect(
+      200,
+    );
+    expect(data<{ orderId: string }[]>(mine).map((o) => o.orderId)).toContain(
+      orderId,
+    );
+
+    const theirs = await asUser(other, 'get', '/api/v1/p2p/orders').expect(200);
+    expect(data<{ orderId: string }[]>(theirs)).toEqual([]);
+  });
+
   it('gives exactly one winner when two merchants accept at once', async () => {
     const [a, b] = await Promise.all([
       asUser(merchant, 'post', `/api/v1/p2p/orders/${orderId}/accept`)

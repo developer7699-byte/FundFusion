@@ -277,3 +277,31 @@ describe('reading one order (PRD §13.5)', () => {
     ).rejects.toThrow(/does not exist/i);
   });
 });
+
+describe('the orders I am party to (PRD §13.5)', () => {
+  it('lists orders where I am the customer', async () => {
+    const order = await sellOrder();
+
+    const mine = await feed.minePaged(customerId);
+
+    expect(mine.map((o) => o.orderId)).toEqual([order.id]);
+    expect(mine[0].role).toBe('CUSTOMER');
+  });
+
+  it('lists orders where I am the assigned merchant', async () => {
+    const order = await sellOrder();
+    await assignments.accept(order.id, merchantId, 'accept-1');
+
+    const mine = await feed.minePaged(merchantId);
+
+    expect(mine.map((o) => o.orderId)).toEqual([order.id]);
+    expect(mine[0].role).toBe('MERCHANT');
+  });
+
+  it('never lists an order I am not party to', async () => {
+    await sellOrder();
+    const stranger = await seedUser(t.pool, 'stranger@example.test');
+
+    expect(await feed.minePaged(stranger)).toEqual([]);
+  });
+});
