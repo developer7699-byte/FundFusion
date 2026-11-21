@@ -14,6 +14,30 @@ const GONE: [string, string][] = [
   ['post', '/api/gift-cards/orders'],
   ['post', '/api/utilities/orders'],
   ['get', '/api/utilities/history'],
+
+  // M4.6: the prototype surface the v1 API replaced. Its wallet kept balances
+  // in memory and credited them on request, and its auth minted sessions for
+  // a different account system entirely — two of each is how one of them gets
+  // forgotten.
+  ['get', '/api/wallet'],
+  ['post', '/api/wallet/deposits'],
+  ['post', '/api/wallet/send'],
+  ['post', '/api/wallet/withdrawals'],
+  ['post', '/api/wallet/quotes'],
+  ['get', '/api/customer/overview'],
+  ['post', '/api/auth/login'],
+  ['post', '/api/auth/register'],
+  ['post', '/api/auth/otp/request'],
+  ['get', '/api/auth/me'],
+  ['get', '/api/orders'],
+  ['post', '/api/orders'],
+  ['post', '/api/upi/parse'],
+  ['get', '/api/merchant/dashboard'],
+  ['get', '/api/merchant/available-orders'],
+  ['get', '/api/admin/overview'],
+  ['get', '/api/admin/users'],
+  ['get', '/api/admin/ledger'],
+  ['get', '/api/admin/audit-logs'],
 ];
 
 describe('Removed out-of-scope routes (e2e)', () => {

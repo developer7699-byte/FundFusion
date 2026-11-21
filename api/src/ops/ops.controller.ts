@@ -1,6 +1,5 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
 import { CurrentUser, type AuthUser } from '../auth/current-user';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -8,69 +7,20 @@ import { RolesGuard } from '../auth/roles.guard';
 import { ok } from '../common/http';
 import { OpsService } from './ops.service';
 
-class CreateOrderDto {
-  @IsString()
-  kind!: 'SELL' | 'UPI_PAY';
-  @IsOptional()
-  @IsString()
-  usdtAmount?: string;
-  @IsOptional()
-  @IsString()
-  inrAmount?: string;
-  @IsOptional()
-  @IsString()
-  upiId?: string;
-  @IsOptional()
-  @IsString()
-  beneficiary?: string;
-}
-
+/**
+ * What is left of the prototype surface: notifications and support tickets.
+ *
+ * Its orders, its merchant desk and its admin reads were replaced by the v1
+ * engine in M4.6 and deleted, because two surfaces answering the same
+ * question is how one of them quietly becomes wrong. Notifications arrive
+ * with M6; until then these routes are the only ones serving those screens.
+ */
 @ApiTags('ops')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller()
 export class OpsController {
   constructor(private readonly ops: OpsService) {}
-
-  @Roles('CUSTOMER', 'ADMIN')
-  @Get('orders')
-  mine(@CurrentUser() user: AuthUser) {
-    return ok(this.ops.customerOrders(user.sub));
-  }
-
-  @Roles('CUSTOMER', 'MERCHANT', 'ADMIN')
-  @Get('orders/:id')
-  one(@Param('id') id: string) {
-    return ok(this.ops.order(id));
-  }
-
-  @Roles('CUSTOMER')
-  @Post('orders')
-  create(@CurrentUser() user: AuthUser, @Body() dto: CreateOrderDto) {
-    return ok(this.ops.createOrder(user.sub, dto));
-  }
-
-  @Roles('CUSTOMER')
-  @Post('orders/:id/cancel')
-  cancel(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return ok(this.ops.cancel(user.sub, id));
-  }
-
-  @Roles('CUSTOMER')
-  @Post('orders/:id/dispute')
-  dispute(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Body() body: { reason: string },
-  ) {
-    return ok(this.ops.dispute(user.sub, id, body.reason ?? 'Mock dispute'));
-  }
-
-  @Roles('CUSTOMER')
-  @Post('upi/parse')
-  parse(@Body() body: { payload: string }) {
-    return ok(this.ops.parseUpi(body.payload ?? ''));
-  }
 
   @Roles('CUSTOMER', 'MERCHANT', 'ADMIN')
   @Get('notifications')
@@ -115,117 +65,5 @@ export class OpsController {
     @Body() body: { body: string },
   ) {
     return ok(this.ops.replyTicket(user.sub, id, body.body));
-  }
-
-  @Roles('MERCHANT', 'ADMIN')
-  @Get('merchant/dashboard')
-  merchDash(@CurrentUser() user: AuthUser) {
-    return ok(
-      this.ops.merchantDesk(
-        user.roles.includes('ADMIN') ? 'user-merchant' : user.sub,
-      ),
-    );
-  }
-
-  @Roles('MERCHANT', 'ADMIN')
-  @Get('merchant/available-orders')
-  available() {
-    return ok(this.ops.merchantAvailable());
-  }
-
-  @Roles('MERCHANT', 'ADMIN')
-  @Get('merchant/orders')
-  merchOrders(@CurrentUser() user: AuthUser) {
-    return ok(
-      this.ops.merchantOrders(
-        user.roles.includes('ADMIN') ? 'user-merchant' : user.sub,
-      ),
-    );
-  }
-
-  @Roles('MERCHANT')
-  @Post('merchant/orders/:id/accept')
-  accept(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return ok(this.ops.accept(user.sub, id));
-  }
-
-  @Roles('MERCHANT')
-  @Post('merchant/orders/:id/utr')
-  utr(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Body() body: { utr: string; note?: string },
-  ) {
-    return ok(this.ops.submitUtr(user.sub, id, body.utr, body.note));
-  }
-
-  @Roles('MERCHANT')
-  @Post('merchant/orders/:id/complete')
-  merchComplete(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return ok(this.ops.complete(user.sub, id, 'MERCHANT'));
-  }
-
-  @Roles('ADMIN')
-  @Get('admin/overview')
-  admin() {
-    return ok(this.ops.adminOverview());
-  }
-
-  @Roles('ADMIN')
-  @Get('admin/users')
-  users() {
-    return ok(this.ops.users());
-  }
-
-  @Roles('ADMIN')
-  @Post('admin/users/:id/status')
-  status(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Body() body: { status: 'ACTIVE' | 'SUSPENDED' },
-  ) {
-    return ok(this.ops.setUserStatus(user.sub, id, body.status));
-  }
-
-  @Roles('ADMIN')
-  @Get('admin/orders')
-  allOrders() {
-    return ok(this.ops.allOrders());
-  }
-
-  @Roles('ADMIN')
-  @Get('admin/ledger')
-  ledger() {
-    return ok(this.ops.ledgerRows());
-  }
-
-  @Roles('ADMIN')
-  @Get('admin/audit-logs')
-  audit() {
-    return ok(this.ops.audits());
-  }
-
-  @Roles('ADMIN')
-  @Get('admin/disputes')
-  disputes() {
-    return ok(this.ops.disputes());
-  }
-
-  @Roles('ADMIN')
-  @Post('admin/orders/:id/complete')
-  adminComplete(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return ok(this.ops.complete(user.sub, id, 'ADMIN'));
-  }
-
-  @Roles('ADMIN')
-  @Post('admin/orders/:id/refund')
-  refund(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return ok(this.ops.refund(user.sub, id));
-  }
-
-  @Roles('ADMIN')
-  @Get('admin/settings')
-  settings() {
-    return ok(this.ops.settings());
   }
 }
