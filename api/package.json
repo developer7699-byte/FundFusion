@@ -25,7 +25,8 @@
     "db:push": "drizzle-kit push",
     "chain:deploy-token": "ts-node -P tsconfig.json scripts/deploy-test-token.ts",
     "chain:roundtrip": "ts-node -P tsconfig.json scripts/m3-roundtrip.ts",
-    "spine:roundtrip": "ts-node -P tsconfig.json scripts/m45-spine.ts"
+    "spine:roundtrip": "ts-node -P tsconfig.json scripts/m45-spine.ts",
+    "disputes:exercise": "ts-node -P tsconfig.json scripts/m5-disputes.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
