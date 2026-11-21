@@ -393,16 +393,38 @@ threshold sits — they defeat the patient attacker who withdraws just under it:
 
 ### 9.1 Sign-in and verification
 
-Sign-in accepts **Google OAuth, email, or phone**. Google is the only OAuth
-provider in v1; Apple sign-in exists to satisfy iOS app review, and native apps
-are out of scope.
+> **Revised 2026-11-21, by the client.** Identity is **email only**, and the
+> financial gate moves from a verified phone to an enrolled authenticator.
+> Phone sign-in and SMS OTP are out of v1. The previous text is kept below the
+> rule for the reasoning it carried.
 
-**Phone OTP is the financial gate.** Until a phone is verified an account has no
-deposit address, no balance, and cannot place orders. One verified phone equals
-exactly one account, enforced by a unique constraint — this is what stops one
-person farming accounts to self-trade.
+**Sign-in is email and password, then a one-time code sent to that email.**
+Both are required every time. Google OAuth remains as a seam but is not the
+primary path; phone sign-in is gone.
 
-A verified email may be used for recovery only after confirmation.
+**An enrolled TOTP authenticator is the financial gate.** Until a user has
+enrolled Google Authenticator (or any RFC 6238 app) the account has no deposit
+address, no balance, and cannot place orders. Browsing needs a verified email;
+moving money needs the authenticator.
+
+A withdrawal additionally requires a **fresh** authenticator code on the
+withdrawal itself (§8.4). The session is never sufficient.
+
+**What this gives up, deliberately.** The replaced rule was "one verified phone
+equals exactly one account, enforced by a unique constraint — this is what
+stops one person farming accounts to self-trade." An email address is close to
+free to create, and an authenticator is free to enrol, so **neither replaces
+that property**: a determined person can hold many accounts and trade with
+themselves. The abuse that protects against is self-dealing on the P2P engine,
+which is the one place this platform's incentives can be gamed. A replacement
+control is an open question (`questions/data.js`, q38); candidates are KYC
+above a volume threshold, device binding, or manual review of new merchants.
+
+**What it buys.** TRAI DLT registration — ₹5,900 and 7–10 working days, and a
+hard blocker on every real user because OTP cannot reach DND-registered numbers
+without a transactional alpha header — is no longer on the critical path
+(`docs/DEPENDENCIES.md` §5.2.1). Email OTP needs a domain and DNS records, both
+of which are needed anyway.
 
 ### 9.2 Roles
 

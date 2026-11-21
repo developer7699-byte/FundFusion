@@ -572,3 +572,24 @@ round({
     }
   ]
 });
+
+round({
+  id: "identity-r1",
+  title: "Email-only identity — what replaces the one-phone-one-account rule?",
+  settled: false,
+  qs: [
+    {
+      id: "q38",
+      t: "With phone verification gone, what stops one person running many accounts and trading with themselves?",
+      ctx: "Identity moved to email on 2026-11-21, with an authenticator as the financial gate. That removes TRAI DLT registration from the critical path, which is a real win. But PRD §9.1's phone rule was not only an auth step: 'one verified phone equals exactly one account, enforced by a unique constraint — this is what stops one person farming accounts to self-trade.' An email is close to free to create and an authenticator is free to enrol, so neither carries that property. Self-dealing on the P2P engine is the one place this platform's incentives can be gamed: a person on both sides of an order moves their own money, collects whatever incentives exist, and generates volume that looks like traction. v1 has no incentive programme, which is why this is a question rather than an emergency.",
+      o: [
+        "A — KYC above a threshold. Below a small lifetime volume anyone may trade; above it, a KYC vendor verifies a real person. The vendor is needed for FIU-IND registration anyway (DEPENDENCIES §5.2.3), so this is work that was coming regardless.",
+        "B — Manual review of merchants only. Customers stay cheap to create; merchants — the side that must bond USDT — are approved by a human. Self-dealing needs both sides, so gating one side breaks it.",
+        "C — Accept it for v1. No incentive programme exists, so self-trading costs the farmer fees and gains them nothing. Revisit before any referral or rewards scheme.",
+        "D — Device binding. Tie accounts to a device fingerprint and refuse several accounts per device."
+      ],
+      r: 1,
+      why: "B, with C as the honest fallback. Self-dealing needs a merchant on one side, and merchants already post a bond and already need approval — so the control costs nothing new and breaks the loop at its narrowest point. A is the strongest answer and you will need the vendor anyway, but it taxes every customer at exactly the moment you are trying to acquire them. D sounds cheap and is not: fingerprints are defeated by a second browser profile, and they misfire on shared and office machines, so you pay in support tickets for a control that stops nobody determined."
+    }
+  ]
+});
