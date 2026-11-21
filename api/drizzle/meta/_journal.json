@@ -92,6 +92,13 @@
       "when": 1795230652712,
       "tag": "0012_complex_stryfe",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1795239783137,
+      "tag": "0013_thick_zemo",
+      "breakpoints": true
     }
   ]
 }

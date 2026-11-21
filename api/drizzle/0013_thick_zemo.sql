@@ -1,0 +1,1 @@
+ALTER TABLE "user" ADD COLUMN "mfa_last_counter" bigint;

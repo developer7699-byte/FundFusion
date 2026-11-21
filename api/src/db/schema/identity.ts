@@ -1,5 +1,6 @@
 import { relations } from 'drizzle-orm';
 import {
+  bigint,
   boolean,
   integer,
   pgTable,
@@ -31,9 +32,19 @@ export const user = pgTable('user', {
    * has no deposit address, no balance, and cannot place orders.
    */
   phoneVerifiedAt: timestamp('phone_verified_at', { withTimezone: true }),
-  /** PRD §9.4: MFA is mandatory on every admin account. */
+  /**
+   * PRD §9.1 (revised 2026-11-21): an enrolled authenticator is the financial
+   * gate for everyone, and §9.4 keeps it mandatory for admins.
+   */
   mfaSecret: text('mfa_secret'),
   mfaEnrolledAt: timestamp('mfa_enrolled_at', { withTimezone: true }),
+  /**
+   * The last 30-second window a code was accepted in. A code stays valid for
+   * its whole window, so without this the same six digits authorise several
+   * withdrawals — which is exactly what "a fresh OTP on the withdrawal
+   * itself" (§8.4) exists to prevent.
+   */
+  mfaLastCounter: bigint('mfa_last_counter', { mode: 'bigint' }),
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
   failedLoginCount: integer('failed_login_count').notNull().default(0),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
