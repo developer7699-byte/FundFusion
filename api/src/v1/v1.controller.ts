@@ -14,6 +14,8 @@ import { MfaService } from '../auth/v1/mfa.service';
 import { SessionService } from '../auth/v1/session.service';
 import { MoneyGateGuard, RequiresMoneyGate } from '../auth/v1/money-gate.guard';
 import { AdminGuard, RequiresAdmin } from '../auth/v1/admin.guard';
+import { RequiresStaff, StaffGuard } from '../auth/v1/staff.guard';
+import { AdminReadService } from './admin-read.service';
 import { PlatformSettingsService } from '../settings/platform-settings.service';
 import type { SettingKey } from '../settings/platform-settings';
 import { V1AuthGuard } from './v1-auth.guard';
@@ -37,6 +39,7 @@ export class V1Controller {
     private readonly mfa: MfaService,
     private readonly sessions: SessionService,
     private readonly settings: PlatformSettingsService,
+    private readonly adminRead: AdminReadService,
   ) {}
 
   @Post('admin/seed')
@@ -158,6 +161,38 @@ export class V1Controller {
       reason: dto.reason,
     });
     return ok(await this.settings.all());
+  }
+
+  /**
+   * The read surface. PRD §9.2: SUPPORT reads everything and moves no money,
+   * so these admit both staff roles while every route that writes does not.
+   */
+  @Get('admin/overview')
+  @UseGuards(V1AuthGuard, StaffGuard)
+  @RequiresStaff()
+  async overview() {
+    return ok(await this.adminRead.overview());
+  }
+
+  @Get('admin/users')
+  @UseGuards(V1AuthGuard, StaffGuard)
+  @RequiresStaff()
+  async users() {
+    return ok(await this.adminRead.users());
+  }
+
+  @Get('admin/orders')
+  @UseGuards(V1AuthGuard, StaffGuard)
+  @RequiresStaff()
+  async adminOrders() {
+    return ok(await this.adminRead.orders());
+  }
+
+  @Get('admin/ledger')
+  @UseGuards(V1AuthGuard, StaffGuard)
+  @RequiresStaff()
+  async adminLedger() {
+    return ok(await this.adminRead.ledger());
   }
 
   @Get('admin/audit')

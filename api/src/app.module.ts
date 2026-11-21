@@ -15,6 +15,7 @@ import { HealthController } from './health.controller';
 import { PrototypeModule } from './prototype/prototype.module';
 import { WalletModule } from './wallet/wallet.module';
 import { ChainModule } from './chain/chain.module';
+import { DisputesModule } from './disputes/disputes.module';
 import { WalletV1Module } from './wallet/v1/wallet-v1.module';
 import { OpsModule } from './ops/ops.module';
 
@@ -29,6 +30,7 @@ import { OpsModule } from './ops/ops.module';
     AuditModule,
     V1Module,
     P2pModule,
+    DisputesModule,
     SettingsModule,
     JobsModule,
     PrototypeModule,

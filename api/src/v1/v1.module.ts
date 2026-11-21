@@ -10,6 +10,8 @@ import { MfaService } from '../auth/v1/mfa.service';
 import { SessionService } from '../auth/v1/session.service';
 import { MoneyGateGuard } from '../auth/v1/money-gate.guard';
 import { AdminGuard } from '../auth/v1/admin.guard';
+import { StaffGuard } from '../auth/v1/staff.guard';
+import { AdminReadService } from './admin-read.service';
 import { SettingsModule } from '../settings/settings.module';
 import { V1Controller } from './v1.controller';
 import { V1Service } from './v1.service';
@@ -34,6 +36,8 @@ import { V1Service } from './v1.service';
     SessionService,
     MoneyGateGuard,
     AdminGuard,
+    StaffGuard,
+    AdminReadService,
   ],
 })
 export class V1Module {}
