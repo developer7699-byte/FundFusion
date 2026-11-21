@@ -160,6 +160,22 @@ describe('p2p over http (e2e)', () => {
   let quoteId: string;
   let orderId: string;
 
+  it('opens a merchant desk for a user who has none, and reads it back', async () => {
+    const fresh = await signUp('freshdesk');
+
+    await asUser(fresh, 'post', '/api/v1/p2p/merchant/desk')
+      .send({ deskName: 'Fresh Desk' })
+      .expect(201);
+
+    const res = await asUser(fresh, 'get', '/api/v1/p2p/merchant/desk').expect(
+      200,
+    );
+    expect(data<{ deskName: string; status: string }>(res)).toMatchObject({
+      deskName: 'Fresh Desk',
+      status: 'ACTIVE',
+    });
+  });
+
   it('prices a quote and returns every amount as a string', async () => {
     const res = await asUser(customer, 'post', '/api/v1/p2p/quotes')
       .send({ side: 'SELL', usdtAmount: '100' })

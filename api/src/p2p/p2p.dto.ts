@@ -39,3 +39,10 @@ export class SubmitUtrDto {
   @MaxLength(64)
   utr!: string;
 }
+
+export class OpenDeskDto {
+  @ApiProperty({ example: 'Bandra Desk' })
+  @IsString()
+  @MaxLength(80)
+  deskName!: string;
+}

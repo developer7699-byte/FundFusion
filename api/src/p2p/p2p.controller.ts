@@ -8,7 +8,13 @@ import { V1AuthGuard } from '../v1/v1-auth.guard';
 import { AssignmentService } from './assignment.service';
 import { OrderFeedService } from './order-feed.service';
 import { OrderService } from './order.service';
-import { ConfirmOrderDto, CreateQuoteDto, SubmitUtrDto } from './p2p.dto';
+import { MerchantService } from './merchant.service';
+import {
+  ConfirmOrderDto,
+  CreateQuoteDto,
+  OpenDeskDto,
+  SubmitUtrDto,
+} from './p2p.dto';
 import { QuoteService } from './quote.service';
 import { SettlementService } from './settlement.service';
 
@@ -32,7 +38,23 @@ export class P2pController {
     private readonly assignments: AssignmentService,
     private readonly settlement: SettlementService,
     private readonly feed: OrderFeedService,
+    private readonly merchants: MerchantService,
   ) {}
+
+  /**
+   * Becoming a merchant. On the gated controller like every other route
+   * here, so an account without an authenticator cannot open a desk it
+   * could never bond against (PRD §9.1).
+   */
+  @Post('merchant/desk')
+  async openDesk(@CurrentUser() user: AuthUser, @Body() dto: OpenDeskDto) {
+    return ok(await this.merchants.open(user.sub, dto.deskName));
+  }
+
+  @Get('merchant/desk')
+  async desk(@CurrentUser() user: AuthUser) {
+    return ok(await this.merchants.profile(user.sub));
+  }
 
   /** A price, snapshotted. Everything downstream settles against this row. */
   @Post('quotes')

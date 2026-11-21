@@ -14,6 +14,7 @@ import { CapabilityService } from '../capability/capability.service';
 import { AbandonmentService } from './abandonment.service';
 import { AssignmentService } from './assignment.service';
 import { EligibilityService } from './eligibility.service';
+import { MerchantService } from './merchant.service';
 import { OrderFeedService } from './order-feed.service';
 import { P2pController } from './p2p.controller';
 import { P2pGateway } from './p2p.gateway';
@@ -106,6 +107,12 @@ import { TimeoutService } from './timeout.service';
       ],
     },
     {
+      provide: MerchantService,
+      useFactory: (db: DbService, capabilities: CapabilityService) =>
+        new MerchantService(db.db, capabilities),
+      inject: [DbService, CapabilityService],
+    },
+    {
       provide: OrderFeedService,
       useFactory: (
         db: DbService,
@@ -187,6 +194,7 @@ import { TimeoutService } from './timeout.service';
     QuoteService,
     OrderService,
     OrderFeedService,
+    MerchantService,
     EligibilityService,
     AssignmentService,
     SettlementService,
