@@ -10,6 +10,7 @@ import { LedgerModule } from '../../ledger/ledger.module';
 import { PostingService } from '../../ledger/posting.service';
 import { PlatformSettingsService } from '../../settings/platform-settings.service';
 import { SettingsModule } from '../../settings/settings.module';
+import { ActivityService } from './activity.service';
 import { AllowlistService } from './allowlist.service';
 import { WalletV1Controller } from './wallet-v1.controller';
 import { WithdrawalService } from './withdrawal.service';
@@ -34,6 +35,11 @@ import { WithdrawalService } from './withdrawal.service';
     {
       provide: MfaService,
       useFactory: (db: DbService) => new MfaService(db.db),
+      inject: [DbService],
+    },
+    {
+      provide: ActivityService,
+      useFactory: (db: DbService) => new ActivityService(db.db),
       inject: [DbService],
     },
     {
@@ -80,6 +86,6 @@ import { WithdrawalService } from './withdrawal.service';
       ],
     },
   ],
-  exports: [AllowlistService, WithdrawalService],
+  exports: [AllowlistService, WithdrawalService, ActivityService],
 })
 export class WalletV1Module {}

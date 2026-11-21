@@ -147,6 +147,51 @@ describeChain('wallet v1 (e2e)', () => {
     );
   });
 
+  it('summarises the wallet in one request, with balances and the address', async () => {
+    const res = await request(http)
+      .get('/api/v1/wallet/summary')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const body = data<{
+      balances: Record<string, string>;
+      address: string | null;
+      network: string;
+    }>(res);
+    expect(body.address).toMatch(/^0x[0-9a-fA-F]{40}$/);
+    expect(body.balances.AVAILABLE).toBe('0.000000000000000000');
+    expect(body.balances.LOCKED).toBe('0.000000000000000000');
+  });
+
+  it('lists an empty activity feed for a wallet that has never moved', async () => {
+    const res = await request(http)
+      .get('/api/v1/wallet/activity')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(data<unknown[]>(res)).toEqual([]);
+  });
+
+  it('refuses the activity feed before an authenticator is enrolled', async () => {
+    const stranger = `stranger${Date.now()}@example.test`;
+    await request(http)
+      .post('/api/v1/auth/register')
+      .send({ email: stranger, password: 'Password123!', displayName: 'S' })
+      .expect(201);
+    const verified = await request(http)
+      .post('/api/v1/auth/register/verify')
+      .send({ email: stranger, code: CODE })
+      .expect(201);
+
+    await request(http)
+      .get('/api/v1/wallet/activity')
+      .set(
+        'Authorization',
+        `Bearer ${data<{ accessToken: string }>(verified).accessToken}`,
+      )
+      .expect(403);
+  });
+
   it('refuses an allowlist addition with a bad authenticator code', async () => {
     await request(http)
       .post('/api/v1/wallet/allowlist')

@@ -17,7 +17,10 @@ import { CHAIN_SERVICES, type ChainServices } from '../../chain/chain.module';
 import { BSC_TESTNET_NETWORK } from '../../chain/hd-wallet.service';
 import { IdempotencyKey } from '../../common/idempotency.decorator';
 import { ok } from '../../common/http';
+import { AccountService } from '../../ledger/account.service';
+import { BalanceService } from '../../ledger/balance.service';
 import { V1AuthGuard } from '../../v1/v1-auth.guard';
+import { ActivityService } from './activity.service';
 import { AllowlistService } from './allowlist.service';
 import { AddAllowlistAddressDto, RequestWithdrawalDto } from './wallet-v1.dto';
 import { WithdrawalService } from './withdrawal.service';
@@ -39,8 +42,38 @@ export class WalletV1Controller {
   constructor(
     private readonly allowlist: AllowlistService,
     private readonly withdrawals: WithdrawalService,
+    private readonly activity: ActivityService,
+    private readonly accounts: AccountService,
+    private readonly balances: BalanceService,
     @Inject(CHAIN_SERVICES) private readonly chain: ChainServices | null,
   ) {}
+
+  /**
+   * Everything a dashboard opens with, in one request: the derived balances
+   * and the address to deposit to.
+   *
+   * The address is null, rather than a 503, on a process with no chain
+   * configuration. The balances are real either way, and failing the whole
+   * dashboard because this server cannot issue an address would hide money
+   * the ledger is certain about behind a deployment detail.
+   */
+  @Get('summary')
+  async summary(@CurrentUser() user: AuthUser) {
+    const accountId = await this.accounts.ensureAccount(user.sub, 'USDT');
+    return ok({
+      balances: await this.balances.balances(accountId),
+      address: this.chain
+        ? await this.chain.wallets.addressFor(user.sub)
+        : null,
+      network: BSC_TESTNET_NETWORK,
+    });
+  }
+
+  /** This user's own journal entries, newest first (PRD §5 rule 1). */
+  @Get('activity')
+  async activityFeed(@CurrentUser() user: AuthUser) {
+    return ok(await this.activity.forUser(user.sub));
+  }
 
   @Get('address')
   async address(@CurrentUser() user: AuthUser) {
