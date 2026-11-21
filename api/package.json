@@ -32,9 +32,11 @@
     "@nestjs/core": "^11.0.1",
     "@nestjs/jwt": "^12.0.2",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/platform-socket.io": "^11.2.11",
     "@nestjs/schedule": "^12.0.4",
     "@nestjs/swagger": "^11.4.7",
     "@nestjs/throttler": "^6.7.1",
+    "@nestjs/websockets": "^11.2.11",
     "@scure/bip32": "^1.7.0",
     "@scure/bip39": "^1.6.0",
     "bcrypt": "^6.0.0",
@@ -45,6 +47,7 @@
     "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "socket.io": "^4.8.4",
     "viem": "^2.58.2"
   },
   "devDependencies": {
@@ -58,6 +61,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.0",
     "@types/pg": "^8.23.1",
+    "@types/socket.io": "^3.0.1",
     "@types/supertest": "^7.0.0",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9.18.0",

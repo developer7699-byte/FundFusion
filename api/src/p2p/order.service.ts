@@ -12,6 +12,7 @@ import { AccountService, DRIZZLE } from '../ledger/account.service';
 import { PostingService } from '../ledger/posting.service';
 import { canTransition, type OrderState } from './order.state';
 import { AbandonmentService } from './abandonment.service';
+import type { OrderBroadcaster } from './p2p.gateway';
 import { QuoteService, type QuoteSnapshot } from './quote.service';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -26,6 +27,12 @@ export class OrderService {
     private readonly posting: PostingService,
     private readonly accounts: AccountService,
     private readonly abandonment: AbandonmentService,
+    /**
+     * Optional, because the engine is correct without anyone listening — a
+     * merchant who hears nothing still sees the order the moment they ask
+     * for the feed. The broadcast is how they hear it sooner (PRD §11).
+     */
+    private readonly broadcaster?: OrderBroadcaster,
   ) {}
 
   /**
@@ -77,9 +84,36 @@ export class OrderService {
     }
 
     // One instant, recorded once, for every merchant who will see it.
-    return this.advance(order, 'AWAITING_MERCHANT', {
+    const broadcast = await this.advance(order, 'AWAITING_MERCHANT', {
       broadcastAt: new Date(),
     });
+
+    // After the row, so nothing is announced that is not yet true — and
+    // only here, which is the path a replay already returned from.
+    this.announce(broadcast, quote);
+    return broadcast;
+  }
+
+  /**
+   * Tell every merchant at once (PRD §11). A failure here must not undo a
+   * confirmed order: the order exists, the money is locked, and the feed is
+   * the authority a merchant reads anyway.
+   */
+  private announce(order: Order, quote: QuoteSnapshot): void {
+    if (!this.broadcaster) return;
+    try {
+      this.broadcaster.broadcast({
+        orderId: order.id,
+        side: quote.side,
+        usdtAmount: quote.usdtAmount,
+        inrAmount: quote.inrAmount,
+        customerRate: quote.customerRate,
+        platformFeeUsdt: quote.platformFeeUsdt,
+        broadcastAt: order.broadcastAt!,
+      });
+    } catch {
+      // Nothing above this depends on the announcement having been heard.
+    }
   }
 
   /**

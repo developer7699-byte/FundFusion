@@ -279,3 +279,79 @@ describe('collisions', () => {
     ).rejects.toThrow(/different quote/i);
   });
 });
+
+/**
+ * PRD §11. The broadcast happens where the order reaches the merchants, so
+ * every caller gets it — not only the HTTP one.
+ */
+describe('announcing a new order', () => {
+  it('announces once when the order reaches the merchants', async () => {
+    const announced: { orderId: string }[] = [];
+    const withBroadcast = new OrderService(
+      t.db,
+      quotes,
+      posting,
+      accounts,
+      new AbandonmentService(t.db),
+      { broadcast: (o) => announced.push(o) },
+    );
+    await fund('100');
+    const quote = await quotes.create({
+      userId: customerId,
+      side: 'SELL',
+      usdtAmount: '100',
+    });
+
+    const order = await withBroadcast.confirm(quote.id, customerId, 'b-1');
+
+    expect(announced).toHaveLength(1);
+    expect(announced[0].orderId).toBe(order.id);
+  });
+
+  /** A retry moved no money the first time it replayed, and moves no news. */
+  it('announces nothing when the confirmation is a replay', async () => {
+    const announced: { orderId: string }[] = [];
+    const withBroadcast = new OrderService(
+      t.db,
+      quotes,
+      posting,
+      accounts,
+      new AbandonmentService(t.db),
+      { broadcast: (o) => announced.push(o) },
+    );
+    await fund('100');
+    const quote = await quotes.create({
+      userId: customerId,
+      side: 'SELL',
+      usdtAmount: '100',
+    });
+    await withBroadcast.confirm(quote.id, customerId, 'b-1');
+
+    await withBroadcast.confirm(quote.id, customerId, 'b-1');
+
+    expect(announced).toHaveLength(1);
+  });
+
+  it('carries the quote snapshot, not a recomputed price', async () => {
+    const announced: { customerRate: string; inrAmount: string }[] = [];
+    const withBroadcast = new OrderService(
+      t.db,
+      quotes,
+      posting,
+      accounts,
+      new AbandonmentService(t.db),
+      { broadcast: (o) => announced.push(o) },
+    );
+    await fund('100');
+    const quote = await quotes.create({
+      userId: customerId,
+      side: 'SELL',
+      usdtAmount: '100',
+    });
+
+    await withBroadcast.confirm(quote.id, customerId, 'b-1');
+
+    expect(announced[0].customerRate).toBe(quote.customerRate);
+    expect(announced[0].inrAmount).toBe(quote.inrAmount);
+  });
+});

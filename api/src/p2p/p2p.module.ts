@@ -16,6 +16,7 @@ import { AssignmentService } from './assignment.service';
 import { EligibilityService } from './eligibility.service';
 import { OrderFeedService } from './order-feed.service';
 import { P2pController } from './p2p.controller';
+import { P2pGateway } from './p2p.gateway';
 import { OrderService } from './order.service';
 import { QuoteService } from './quote.service';
 import { SettlementService } from './settlement.service';
@@ -49,6 +50,7 @@ import { TimeoutService } from './timeout.service';
         new AbandonmentService(db.db, settings),
       inject: [DbService, PlatformSettingsService],
     },
+    P2pGateway,
     {
       provide: OrderService,
       useFactory: (
@@ -57,13 +59,23 @@ import { TimeoutService } from './timeout.service';
         posting: PostingService,
         accounts: AccountService,
         abandonment: AbandonmentService,
-      ) => new OrderService(db.db, quotes, posting, accounts, abandonment),
+        gateway: P2pGateway,
+      ) =>
+        new OrderService(
+          db.db,
+          quotes,
+          posting,
+          accounts,
+          abandonment,
+          gateway,
+        ),
       inject: [
         DbService,
         QuoteService,
         PostingService,
         AccountService,
         AbandonmentService,
+        P2pGateway,
       ],
     },
     {
@@ -169,6 +181,7 @@ import { TimeoutService } from './timeout.service';
     },
   ],
   exports: [
+    P2pGateway,
     AbandonmentService,
     TimeoutService,
     QuoteService,
