@@ -26,7 +26,7 @@ const ENROLLED = { ...UNENROLLED, canMoveMoney: true }
 
 /** Answers every v1 route the auth flow touches. */
 function stubApi(me: unknown) {
-  const fetchMock = vi.fn((url: string) => {
+  const fetchMock = vi.fn((url: string, _init?: RequestInit) => {
     const path = String(url)
     if (path.endsWith('/auth/register'))
       return jsonResponse({ success: true, data: { otpRequired: true } })
