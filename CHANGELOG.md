@@ -63,6 +63,7 @@ v1 rebuild begins. See `docs/PRD.md`; milestone M0 of §14.
 - Health and authentication APIs (prototype JWT + mock OTP)
 - Simulated demo seed users (customer / merchant / admin)
 
+
 ### Notes
 
 - All balances, quotes, and payments remain simulated.
