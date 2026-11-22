@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import {
   Copy,
   Check,
@@ -14,7 +14,7 @@ import { ParkedAction } from '@/components/ui/ParkedAction'
 import {} from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { newIdempotencyKey, v1 } from '@/lib/api'
+import { ApiError, newIdempotencyKey, v1 } from '@/lib/api'
 import { cn, usdt2dp } from '@/lib/utils'
 
 /** `GET /v1/wallet/summary`. Every figure is a string (PRD §5.1). */
@@ -743,6 +743,204 @@ interface Quote {
   expiresAt: string
 }
 
+/** One of the customer's INR payout destinations (`/v1/wallet/payment-methods`). */
+interface PayoutMethod {
+  id: string
+  type: 'BANK' | 'UPI'
+  label: string
+  holderName: string
+  isDefault: boolean
+}
+
+/** Where the rupees go, frozen onto the order (PRD §6.3/§6.4). */
+interface Payee {
+  type: 'BANK' | 'UPI'
+  holderName: string
+  accountNumber: string | null
+  ifsc: string | null
+  upiVpa: string | null
+}
+
+/** `GET /v1/p2p/orders/:id`, as far as the customer's buy/sell screen reads it. */
+interface PlacedOrder {
+  orderId: string
+  status: string
+  side: 'BUY' | 'SELL'
+  usdtAmount: string
+  inrAmount: string
+  role: 'CUSTOMER' | 'MERCHANT'
+  utr: string | null
+  payeeInstruction: Payee | null
+}
+
+/**
+ * The one thing the customer may do right now (PRD §6.8). On a buy they pay,
+ * so they submit evidence once a merchant has accepted; on a sell they
+ * receive, so they confirm once the merchant says it was paid. Every other
+ * state is waiting.
+ */
+function customerAction(o: PlacedOrder): 'SUBMIT_UTR' | 'CONFIRM_RECEIPT' | null {
+  if (o.side === 'BUY' && o.status === 'ACCEPTED') return 'SUBMIT_UTR'
+  if (o.side === 'SELL' && o.status === 'PAYMENT_SUBMITTED') return 'CONFIRM_RECEIPT'
+  return null
+}
+
+function PlacedOrderPanel({
+  orderId,
+  onChanged,
+}: {
+  orderId: string
+  onChanged: () => Promise<void>
+}) {
+  const qc = useQueryClient()
+  const [utr, setUtr] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const q = useQuery({
+    queryKey: ['order', orderId],
+    queryFn: () => v1<PlacedOrder>(`/p2p/orders/${orderId}`),
+    retry: false,
+  })
+
+  if (q.isLoading) return <Skeleton className="h-32 rounded-3xl" />
+  if (q.error) return <p className="text-xs text-rose-500 font-medium">{q.error.message}</p>
+  const o = q.data
+  if (!o) return null
+
+  const action = customerAction(o)
+  const payee = o.payeeInstruction
+
+  const run = async (work: () => Promise<unknown>) => {
+    setError('')
+    setBusy(true)
+    try {
+      await work()
+      await qc.invalidateQueries({ queryKey: ['order', orderId] })
+      await onChanged()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'That was refused.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="rounded-[28px] bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 p-5 space-y-3 shadow-xs">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-black text-slate-900 dark:text-white">
+          {o.side} order
+        </span>
+        <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+          {o.status.replace(/_/g, ' ')}
+        </span>
+      </div>
+      <p className="text-[11px] text-slate-500 font-mono break-all">
+        {o.usdtAmount} USDT · ₹{o.inrAmount}
+      </p>
+
+      {o.side === 'BUY' && (
+        <div className="text-xs text-slate-600 dark:text-slate-300 space-y-1">
+          {payee ? (
+            <>
+              <p className="font-bold">Pay ₹{o.inrAmount} to</p>
+              <p>{payee.holderName}</p>
+              {payee.type === 'UPI' ? (
+                <p className="font-mono">{payee.upiVpa}</p>
+              ) : (
+                <p className="font-mono">
+                  {payee.accountNumber} · {payee.ifsc}
+                </p>
+              )}
+            </>
+          ) : (
+            <p>The merchant's payment details appear here once they accept.</p>
+          )}
+        </div>
+      )}
+
+      {action === 'SUBMIT_UTR' && (
+        <form
+          className="space-y-2.5"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void run(() =>
+              v1(`/p2p/orders/${o.orderId}/utr`, {
+                method: 'POST',
+                body: JSON.stringify({ utr }),
+              }).then(() => setUtr('')),
+            )
+          }}
+        >
+          <label
+            htmlFor="placed-utr"
+            className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block"
+          >
+            Bank reference (UTR)
+          </label>
+          <Input
+            id="placed-utr"
+            value={utr}
+            onChange={(e) => setUtr(e.target.value)}
+            required
+            placeholder="UTR123456789"
+            className="h-11 rounded-xl font-mono"
+          />
+          <Button
+            type="submit"
+            disabled={busy}
+            className="w-full h-11 rounded-full font-semibold text-sm bg-slate-900 dark:bg-white text-white dark:text-slate-900"
+          >
+            {busy ? 'Submitting...' : 'Submit UTR'}
+          </Button>
+        </form>
+      )}
+
+      {action === 'CONFIRM_RECEIPT' && (
+        <div className="space-y-2.5">
+          <p className="text-xs text-slate-600 dark:text-slate-300">
+            Confirm only once ₹{o.inrAmount} has actually arrived in your bank
+            account. This releases the escrow.
+          </p>
+          <Button
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              void run(() =>
+                v1(`/p2p/orders/${o.orderId}/confirm`, {
+                  method: 'POST',
+                  idempotencyKey: newIdempotencyKey(),
+                }),
+              )
+            }
+            className="w-full h-11 rounded-full font-semibold text-sm bg-emerald-500 text-white"
+          >
+            {busy ? 'Confirming...' : 'Confirm receipt'}
+          </Button>
+        </div>
+      )}
+
+      {action === null && (
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={busy}
+          onClick={() => void run(async () => undefined)}
+          className="w-full h-10 rounded-full text-xs font-semibold"
+        >
+          Refresh status
+        </Button>
+      )}
+
+      {error && (
+        <p className="text-xs text-rose-500 font-medium bg-rose-500/10 p-2.5 rounded-xl border border-rose-500/20">
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
 /**
  * Buying and selling (PRD §6.2, §7).
  *
@@ -754,11 +952,22 @@ interface Quote {
  */
 export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
   const qc = useQueryClient()
-  const navigate = useNavigate()
   const [amount, setAmount] = useState('')
   const [quote, setQuote] = useState<Quote | null>(null)
+  const [placedId, setPlacedId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  // One key per quote: a retry of the same confirmation (a dropped connection,
+  // a double tap) is the same request, so it can never become a second order.
+  const orderKey = useRef<string | null>(null)
+
+  // Only a sell receives rupees, so only a sell needs somewhere to send them.
+  const methods = useQuery({
+    queryKey: ['payment-methods'],
+    queryFn: () => v1<PayoutMethod[]>('/wallet/payment-methods'),
+    enabled: side === 'SELL',
+  })
+  const [chosen, setChosen] = useState('')
 
   if (side === 'CONVERT') {
     return (
@@ -769,11 +978,25 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
             Convert
           </h1>
         </div>
-        <p className="p-8 text-center text-xs text-slate-400 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
-          v1 settles USDT against rupees only. Use Buy or Sell.
-        </p>
+        <ParkedAction
+          label="Convert"
+          labelClassName="text-sm font-semibold"
+          className="w-full h-11 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500"
+        />
       </div>
     )
+  }
+
+  const list = methods.data ?? []
+  const payoutId =
+    side === 'SELL'
+      ? (list.find((m) => m.id === chosen) ?? list.find((m) => m.isDefault) ?? list[0])?.id
+      : undefined
+  const missingMethod = side === 'SELL' && methods.isSuccess && !payoutId
+
+  const afterChange = async () => {
+    await qc.invalidateQueries({ queryKey: ['wallet'] })
+    await qc.invalidateQueries({ queryKey: ['orders'] })
   }
 
   const priced = async (e: React.FormEvent) => {
@@ -782,12 +1005,13 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
     setBusy(true)
     try {
       // The side the customer typed is the authoritative one (PRD §6.2).
-      setQuote(
-        await v1<Quote>('/p2p/quotes', {
-          method: 'POST',
-          body: JSON.stringify({ side, usdtAmount: amount }),
-        }),
-      )
+      const got = await v1<Quote>('/p2p/quotes', {
+        method: 'POST',
+        body: JSON.stringify({ side, usdtAmount: amount }),
+      })
+      orderKey.current = newIdempotencyKey()
+      setPlacedId(null)
+      setQuote(got)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No price is available.')
     } finally {
@@ -796,22 +1020,33 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
   }
 
   const confirm = async () => {
-    if (!quote) return
+    if (!quote || !orderKey.current) return
+    // The API would answer 422 NO_PAYMENT_METHOD. Say so before asking.
+    if (side === 'SELL' && !payoutId) return
     setError('')
     setBusy(true)
     try {
       const order = await v1<{ id: string }>('/p2p/orders', {
         method: 'POST',
-        idempotencyKey: newIdempotencyKey(),
-        body: JSON.stringify({ quoteId: quote.id }),
+        idempotencyKey: orderKey.current,
+        body: JSON.stringify(
+          payoutId
+            ? { quoteId: quote.id, paymentMethodId: payoutId }
+            : { quoteId: quote.id },
+        ),
       })
-      await qc.invalidateQueries({ queryKey: ['wallet'] })
-      await qc.invalidateQueries({ queryKey: ['orders'] })
-      navigate(`/customer/orders/${order.id}`)
+      await afterChange()
+      setQuote(null)
+      orderKey.current = null
+      setPlacedId(order.id)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'That order was refused.')
-      // The quote is spent either way; a second confirm would only repeat it.
-      setQuote(null)
+      // A refusal spends the quote. A dropped connection does not tell us
+      // whether the order landed, so the quote and its key stay for a retry.
+      if (err instanceof ApiError) {
+        setQuote(null)
+        orderKey.current = null
+      }
     } finally {
       setBusy(false)
     }
@@ -881,10 +1116,40 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
             ))}
           </dl>
 
+          {side === 'SELL' && list.length > 1 && (
+            <div className="space-y-1">
+              <label htmlFor="payout-method" className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                Receive rupees in
+              </label>
+              <select
+                id="payout-method"
+                value={payoutId ?? ''}
+                onChange={(e) => setChosen(e.target.value)}
+                className="w-full h-10 rounded-xl bg-slate-900 border border-slate-700 text-xs px-2"
+              >
+                {list.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label} · {m.holderName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {missingMethod && (
+            <p className="text-xs text-amber-300">
+              You need somewhere to receive the rupees.{' '}
+              <Link to="/customer/payment-methods" className="underline font-bold">
+                Add a payment method
+              </Link>{' '}
+              to sell.
+            </p>
+          )}
+
           <Button
             type="button"
             onClick={() => void confirm()}
-            disabled={busy}
+            disabled={busy || missingMethod || (side === 'SELL' && !payoutId)}
             className="w-full h-11 rounded-full font-semibold text-sm bg-emerald-500 text-white"
           >
             {busy ? 'Confirming...' : 'Confirm at this price'}
@@ -897,6 +1162,8 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
           {error}
         </p>
       )}
+
+      {placedId && <PlacedOrderPanel orderId={placedId} onChanged={afterChange} />}
     </div>
   )
 }
