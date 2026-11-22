@@ -163,7 +163,13 @@ describe('signing in against the v1 API (PRD §9.1)', () => {
       // A second begin (or anything else) must not look like success.
       return jsonResponse({ success: false, error: { code: 'UNEXPECTED', message: path } }, 409)
     }) as never)
-    await user.type(screen.getByLabelText(/authenticator code/i), '123456')
+    const otp = '123456'
+    for (let i = 0; i < otp.length; i++) {
+      await user.type(
+        screen.getByLabelText(new RegExp(`code digit ${i + 1}`, 'i')),
+        otp[i],
+      )
+    }
     await user.click(screen.getByRole('button', { name: /confirm/i }))
 
     await waitFor(() => expect(window.location.pathname).toBe('/customer/dashboard'))

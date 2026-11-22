@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, Copy, ShieldCheck } from 'lucide-react'
+import { Check, Copy } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { PLATFORM_NAME } from '@/lib/brand'
 import { homeFor, useAuth } from '@/lib/auth'
 import { AuthLayout } from './pages'
@@ -40,6 +39,36 @@ export function MfaEnrollPage() {
   // confirm would POST /auth/mfa/begin against an already-enrolled account.
   const begin = useRef(beginMfa)
   begin.current = beginMfa
+
+  const boxes = useRef<(HTMLInputElement | null)[]>([])
+  const digitAt = (i: number) => code[i] ?? ''
+  const writeDigits = (chars: string[]) =>
+    setCode(chars.join('').replace(/\D/g, '').slice(0, 6))
+
+  const onDigit = (i: number, raw: string) => {
+    const d = raw.replace(/\D/g, '')
+    const arr = Array.from({ length: 6 }, (_, k) => code[k] ?? '')
+    if (d === '') {
+      arr[i] = ''
+      writeDigits(arr)
+      return
+    }
+    for (let k = 0; k < d.length && i + k < 6; k++) arr[i + k] = d[k]
+    writeDigits(arr)
+    boxes.current[Math.min(i + d.length, 5)]?.focus()
+  }
+
+  const onDigitKey = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !code[i] && i > 0) {
+      e.preventDefault()
+      const arr = Array.from({ length: 6 }, (_, k) => code[k] ?? '')
+      arr[i - 1] = ''
+      writeDigits(arr)
+      boxes.current[i - 1]?.focus()
+    }
+    if (e.key === 'ArrowLeft' && i > 0) boxes.current[i - 1]?.focus()
+    if (e.key === 'ArrowRight' && i < 5) boxes.current[i + 1]?.focus()
+  }
 
   useEffect(() => {
     let live = true
@@ -130,27 +159,39 @@ export function MfaEnrollPage() {
           }}
         >
           <div className="space-y-1.5">
-            <label
-              htmlFor="authenticator-code"
-              className="text-xs font-medium text-slate-600 dark:text-slate-300"
+            <span
+              id="authenticator-code-label"
+              className="block text-xs font-medium text-slate-600 dark:text-slate-300"
             >
               Authenticator code
-            </label>
-            <div className="relative">
-              <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
-              <Input
-                id="authenticator-code"
-                name="code"
-                required
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                autoFocus
-                maxLength={6}
-                placeholder="000000"
-                className="pl-10 h-12 rounded-xl bg-slate-50 dark:bg-[#0c101d] border-slate-200 dark:border-slate-800 text-center text-lg tracking-[0.5em] font-mono"
-              />
+            </span>
+            <div
+              role="group"
+              aria-labelledby="authenticator-code-label"
+              className="flex justify-between gap-2"
+              onPaste={(e) => {
+                e.preventDefault()
+                onDigit(0, e.clipboardData.getData('text'))
+              }}
+            >
+              {Array.from({ length: 6 }, (_, i) => (
+                <input
+                  key={i}
+                  ref={(el) => {
+                    boxes.current[i] = el
+                  }}
+                  value={digitAt(i)}
+                  onChange={(e) => onDigit(i, e.target.value)}
+                  onKeyDown={(e) => onDigitKey(i, e)}
+                  onFocus={(e) => e.target.select()}
+                  inputMode="numeric"
+                  autoComplete={i === 0 ? 'one-time-code' : 'off'}
+                  autoFocus={i === 0}
+                  maxLength={1}
+                  aria-label={`Authenticator code digit ${i + 1}`}
+                  className="h-12 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 text-center text-lg font-mono text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-800 dark:bg-[#0c101d] dark:text-white"
+                />
+              ))}
             </div>
           </div>
 
