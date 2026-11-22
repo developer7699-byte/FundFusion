@@ -143,7 +143,10 @@ describe('signing in against the v1 API (PRD §9.1)', () => {
     fetchMock.mockImplementation(((url: string) => {
       const path = String(url)
       if (path.endsWith('/auth/me')) return jsonResponse({ success: true, data: ENROLLED })
-      return jsonResponse({ success: true, data: { enrolled: true } })
+      if (path.endsWith('/auth/mfa/confirm'))
+        return jsonResponse({ success: true, data: { enrolled: true } })
+      // A second begin (or anything else) must not look like success.
+      return jsonResponse({ success: false, error: { code: 'UNEXPECTED', message: path } }, 409)
     }) as never)
     await user.type(screen.getByLabelText(/authenticator code/i), '123456')
     await user.click(screen.getByRole('button', { name: /confirm/i }))
@@ -153,6 +156,7 @@ describe('signing in against the v1 API (PRD §9.1)', () => {
     const begin = calls.findIndex(([u]) => u.endsWith('/auth/mfa/begin'))
     const confirm = calls.findIndex(([u]) => u.endsWith('/auth/mfa/confirm'))
     expect(begin).toBeGreaterThanOrEqual(0)
+    expect(calls.filter(([u]) => u.endsWith('/auth/mfa/begin'))).toHaveLength(1)
     expect(confirm).toBeGreaterThan(begin)
     expect(JSON.parse(String((calls[confirm][1] as RequestInit).body))).toEqual({ code: '123456' })
   })

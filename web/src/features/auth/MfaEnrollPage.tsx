@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ShieldCheck } from 'lucide-react'
 
@@ -21,9 +21,15 @@ export function MfaEnrollPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // The context's functions change identity whenever the user does, so the
+  // latest is held in a ref and begin runs exactly once. Re-running it after
+  // confirm would POST /auth/mfa/begin against an already-enrolled account.
+  const begin = useRef(beginMfa)
+  begin.current = beginMfa
+
   useEffect(() => {
     let live = true
-    beginMfa()
+    begin.current()
       .then((s) => live && setSecret(s))
       .catch((e: unknown) =>
         live && setError(e instanceof Error ? e.message : 'Enrolment could not start.'),
@@ -31,7 +37,7 @@ export function MfaEnrollPage() {
     return () => {
       live = false
     }
-  }, [beginMfa])
+  }, [])
 
   return (
     <AuthLayout
