@@ -48,9 +48,9 @@ code from it; being signed in is never enough (PRD §9.1).
 |---|---|---|
 | 1 | `/register` | Email, password, display name → `POST /v1/auth/register` |
 | 2 | `/verify-otp` | The emailed code → a session |
-| 3 | `/enrol-authenticator` | Secret shown **once**, then confirmed. Until this is done every money screen redirects here rather than collecting a 403 |
+| 3 | `/customer/mfa/enroll` | Secret shown **once**, then confirmed. Until this is done every money screen redirects here rather than collecting a 403 |
 | 4 | `/customer/wallet/deposit` | The real derived address. Credited after 15 confirmations by the watcher — there is no button that credits a balance |
-| 4b | `/customer/wallet/payment-methods` | Add a bank or UPI payee via `POST /v1/wallet/payment-methods`. A sell cannot confirm without one — the customer receives the rupees, so the engine binds their payee and refuses `422 NO_PAYMENT_METHOD` otherwise (PRD §6.3) |
+| 4b | `/customer/payment-methods` | Add a bank or UPI payee via `POST /v1/wallet/payment-methods`. A sell cannot confirm without one — the customer receives the rupees, so the engine binds their payee and refuses `422 NO_PAYMENT_METHOD` otherwise (PRD §6.3) |
 | 5 | `/customer/sell` | Amount → `POST /v1/p2p/quotes` → the snapshot → `POST /v1/p2p/orders` with a fresh `Idempotency-Key`. The customer's chosen (or default) payee is frozen onto the order |
 | 6 | `/merchant/available-orders` | The live feed with each obligation. Refetched on the `order.broadcast` socket event. First accept wins; the loser is shown the engine's 409 |
 | 7 | `/customer/orders/:id` | The one action this state allows — submit a UTR on a buy, confirm receipt on a sell — and nothing else |
