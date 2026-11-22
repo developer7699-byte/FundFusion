@@ -131,15 +131,19 @@ const detail = (token: string, id: string) =>
   call<OrderDetail>(`/p2p/orders/${id}`, { token });
 
 /** Drive one order from the feed to COMPLETED on the merchant side. */
-async function drive(token: string, offered: FeedOrder): Promise<string> {
+async function drive(
+  token: string,
+  offered: FeedOrder,
+  resume = false,
+): Promise<string> {
   const id = offered.orderId;
   console.log(
     `${offered.side} ${id}: ${offered.usdtAmount} USDT for INR ${offered.inrAmount}, obligation ${offered.obligationUsdt}`,
   );
 
-  // A crashed earlier run may already have accepted it: resume, don't re-accept.
-  const current = await detail(token, id);
-  if (current.status === 'AWAITING_MERCHANT') {
+  // A feed item is offered, so it has no assignee yet and detail() would 403
+  // for this merchant. Accept straight away; only a resume skips this.
+  if (!resume) {
     await call(`/p2p/orders/${id}/accept`, {
       method: 'POST',
       token,
@@ -147,7 +151,7 @@ async function drive(token: string, offered: FeedOrder): Promise<string> {
     });
     console.log('  accepted');
   } else {
-    console.log(`  already ${current.status}, resuming`);
+    console.log('  resuming an order this desk already accepted');
   }
 
   const deadline = Date.now() + GIVE_UP_MS;
@@ -202,26 +206,22 @@ async function main() {
   console.log(
     only ? `waiting for order ${only}` : 'serving the feed (Ctrl-C to stop)',
   );
-  if (only) {
-    // An accepted order has left the feed, so resume it straight from detail.
-    const existing = await detail(token, only).catch(() => null);
-    if (existing && existing.status !== 'AWAITING_MERCHANT') {
-      const status = await drive(token, {
-        orderId: only,
-        side: existing.side,
-        usdtAmount: existing.usdtAmount,
-        inrAmount: existing.inrAmount,
-        obligationUsdt: '-',
-      });
-      console.log(`  ${only} ${status}`);
-      if (status !== 'COMPLETED') process.exit(1);
-      return;
-    }
-  }
   const handled = new Set<string>();
   const waitDeadline = Date.now() + GIVE_UP_MS;
+  let lastDetailError = 'no reason returned';
   for (;;) {
-    const feed = await call<FeedOrder[]>('/p2p/merchant/feed', { token });
+    let feed: FeedOrder[] = [];
+    try {
+      feed = await call<FeedOrder[]>('/p2p/merchant/feed', { token });
+    } catch (err) {
+      // A transient feed failure must not stop the operator loop.
+      console.error(
+        `feed read failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      if (only && Date.now() > waitDeadline) process.exit(1);
+      await sleep(POLL_MS);
+      continue;
+    }
     for (const offered of feed) {
       if (handled.has(offered.orderId)) continue;
       if (only && offered.orderId !== only) continue;
@@ -241,9 +241,35 @@ async function main() {
         // Serve mode: one bad order must not stop the operator loop.
       }
     }
-    if (only && Date.now() > waitDeadline) {
-      console.error(`Order ${only} never appeared in the feed.`);
-      process.exit(1);
+    if (only && !handled.has(only)) {
+      // Not in the feed: if this desk already accepted it (a crashed earlier
+      // run) it is the assignee, so detail() authorises and we can resume.
+      try {
+        const existing = await detail(token, only);
+        handled.add(only);
+        const status = await drive(
+          token,
+          {
+            orderId: only,
+            side: existing.side,
+            usdtAmount: existing.usdtAmount,
+            inrAmount: existing.inrAmount,
+            obligationUsdt: '-',
+          },
+          true,
+        );
+        console.log(`  ${only} ${status}`);
+        if (status !== 'COMPLETED') process.exit(1);
+        return;
+      } catch (err) {
+        lastDetailError = err instanceof Error ? err.message : String(err);
+      }
+      if (Date.now() > waitDeadline) {
+        console.error(
+          `Order ${only} is not in the feed and cannot be resumed: ${lastDetailError}`,
+        );
+        process.exit(1);
+      }
     }
     await sleep(POLL_MS);
   }
