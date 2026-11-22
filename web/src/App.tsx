@@ -15,9 +15,6 @@ import {
   DepositFlow,
   QuoteFlow,
   ReceiveFlow,
-  SendFlow,
-  TransactionDetailFlow,
-  TransactionsFlow,
   WalletHome,
   WithdrawFlow,
 } from '@/features/customer/wallet-flows'
@@ -43,15 +40,12 @@ import { MerchantLayout } from '@/layouts/MerchantLayout'
 import { DeskLayout, adminLinks } from '@/layouts/DeskLayout'
 import { useAuth } from '@/lib/auth'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PaymentMethodsPage } from '@/features/customer/PaymentMethodsPage'
 import { CustomerProfilePage } from '@/features/customer/CustomerProfilePage'
-import { RequestMoneyPage } from '@/features/customer/RequestMoneyPage'
 import {
   AccountLive,
-  NoticeCenter,
   OrderDetail,
   OrdersList,
-  SupportDesk,
-  TicketDetail,
 } from '@/features/customer/ops-pages'
 import {
   MerchantAvailable,
@@ -166,21 +160,15 @@ export function App() {
                 <Route path="wallet" element={<WalletHome />} />
                 <Route path="wallet/deposit" element={<DepositFlow />} />
                 <Route path="wallet/withdraw" element={<WithdrawFlow />} />
-                <Route path="wallet/send" element={<SendFlow />} />
                 <Route path="wallet/receive" element={<ReceiveFlow />} />
                 <Route path="wallet/addresses" element={<AddressesFlow />} />
                 <Route path="buy" element={<QuoteFlow side="BUY" />} />
                 <Route path="sell" element={<QuoteFlow side="SELL" />} />
-                <Route path="convert" element={<QuoteFlow side="CONVERT" />} />
-                <Route path="request" element={<RequestMoneyPage />} />
+                <Route path="payment-methods" element={<PaymentMethodsPage />} />
                 <Route path="orders" element={<OrdersList />} />
                 <Route path="orders/:orderId" element={<OrderDetail />} />
-                <Route path="transactions" element={<TransactionsFlow />} />
-                <Route path="transactions/:transactionId" element={<TransactionDetailFlow />} />
               </Route>
-              <Route path="notifications" element={<NoticeCenter />} />
-              <Route path="support" element={<SupportDesk />} />
-              <Route path="support/:ticketId" element={<TicketDetail />} />
+              <Route path="mfa/enroll" element={<EnrolAuthenticatorPage />} />
               <Route path="profile" element={<CustomerProfilePage />} />
               <Route path="settings" element={<AccountLive title="Settings" />} />
               <Route path="security" element={<AccountLive title="Security" />} />

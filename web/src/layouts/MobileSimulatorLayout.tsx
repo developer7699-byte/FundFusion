@@ -36,6 +36,7 @@ import { cn } from '@/lib/utils'
 import { useNotifications } from '@/lib/notifications'
 import { useLanguage } from '@/lib/language'
 import { useMerchantStore } from '@/lib/merchant-store'
+import { ParkedAction } from '@/components/ui/ParkedAction'
 
 // Global scroll position memory across tabs and routes within this session
 const scrollMemory = new Map<string, number>()
@@ -169,8 +170,8 @@ export function MobileSimulatorLayout({
   const customerNav = [
     { to: '/customer/dashboard', label: t('nav.home'), icon: LayoutGrid },
     { to: '/customer/dashboard?tab=leaderboard', label: t('nav.leaderboard'), icon: Trophy },
-    { to: '/customer/pay/scan', label: '', icon: QrCode, isCenter: true },
-    { to: '/customer/transactions', label: t('nav.transactions'), icon: ReceiptText },
+    { to: '/customer/pay/scan', label: '', icon: QrCode, isCenter: true, parked: true },
+    { to: '/customer/transactions', label: t('nav.transactions'), icon: ReceiptText, parked: true },
     { to: '/customer/dashboard?tab=menu', label: t('nav.menu'), icon: Menu },
   ]
 
@@ -182,7 +183,8 @@ export function MobileSimulatorLayout({
     { to: '/merchant/profile', label: t('merchantNav.profile'), icon: User },
   ]
 
-  const bottomNav = isMerchant ? merchantNav : customerNav
+  const bottomNav: Array<{ to: string; label: string; icon: typeof Home; isCenter?: boolean; parked?: boolean }> =
+    isMerchant ? merchantNav : customerNav
 
   return (
     <div className="min-h-screen bg-[#edf2f9] text-slate-900 flex flex-col items-center justify-center font-sans selection:bg-indigo-500 selection:text-white relative overflow-hidden p-0 sm:p-4 md:p-6">
@@ -298,39 +300,24 @@ export function MobileSimulatorLayout({
                   </button>
 
                   {/* Scan QR Icon */}
-                  <NavLink
-                    to="/customer/pay/scan"
-                    className="p-1.5 sm:p-2 rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors"
-                    title={t('header.scan')}
-                    aria-label="Scan QR Code"
-                  >
+                  <ParkedAction label="Scan QR code" className="p-1.5 sm:p-2 rounded-full text-slate-700 dark:text-slate-300">
                     <QrCode className="w-5 h-5 stroke-[2]" />
-                  </NavLink>
+                  </ParkedAction>
 
                   {/* Help / Support Icon */}
-                  <NavLink
-                    to="/customer/support"
-                    className="p-1.5 sm:p-2 rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors"
-                    title={t('header.help')}
-                    aria-label="Help and Support"
-                  >
+                  <ParkedAction label="Help and support" className="p-1.5 sm:p-2 rounded-full text-slate-700 dark:text-slate-300">
                     <HelpCircle className="w-5 h-5 stroke-[2]" />
-                  </NavLink>
+                  </ParkedAction>
 
                   {/* Notification Bell with Dynamic Badge Count */}
-                  <NavLink
-                    to="/customer/notifications"
-                    className="p-1.5 sm:p-2 rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors relative"
-                    title={t('header.notifications')}
-                    aria-label="View notifications"
-                  >
+                  <ParkedAction label="Notifications" className="p-1.5 sm:p-2 rounded-full text-slate-700 dark:text-slate-300 relative">
                     <Bell className="w-5 h-5 stroke-[2]" />
                     {unreadCount > 0 && (
                       <span className="absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center ring-2 ring-white dark:ring-[#0b1020] shadow-xs animate-in zoom-in-75 duration-200">
                         {unreadCount > 9 ? '9+' : unreadCount}
                       </span>
                     )}
-                  </NavLink>
+                  </ParkedAction>
                 </div>
               </header>
             ) : (
@@ -437,6 +424,33 @@ export function MobileSimulatorLayout({
                   item.to.includes('?')
                     ? location.pathname + location.search === item.to
                     : location.pathname === item.to
+
+                if (item.parked && item.isCenter) {
+                  return (
+                    <ParkedAction
+                      key={item.to}
+                      label="Scan & Pay"
+                      className="-mt-7 flex flex-col items-center z-40"
+                    >
+                      <div className="w-14 h-14 rounded-full bg-[#0a2316] dark:bg-[#07301f] text-white flex items-center justify-center shadow-xl border-[3.5px] border-white dark:border-[#0c1122]">
+                        <item.icon className="w-6 h-6 stroke-[2.2] text-white" />
+                      </div>
+                    </ParkedAction>
+                  )
+                }
+
+                if (item.parked) {
+                  return (
+                    <ParkedAction
+                      key={item.to}
+                      label={item.label}
+                      className="flex flex-col items-center gap-0.5 py-1 px-2 text-[10px] font-bold text-slate-400 dark:text-slate-500"
+                      labelClassName="tracking-tight"
+                    >
+                      <item.icon className="w-5 h-5" />
+                    </ParkedAction>
+                  )
+                }
 
                 if (item.isCenter) {
                   return (

@@ -22,19 +22,15 @@ const SEARCH_CATALOG: SearchItem[] = [
   { id: 'wallet', title: 'Wallet', category: 'Wallet', meta: 'Available and locked USDT', link: '/customer/wallet' },
   { id: 'deposit', title: 'Deposit USDT', category: 'Wallet', meta: 'BEP-20 deposit address', link: '/customer/wallet/deposit' },
   { id: 'withdraw', title: 'Withdraw USDT', category: 'Wallet', meta: 'To an allowlisted address', link: '/customer/wallet/withdraw' },
-  { id: 'send', title: 'Send USDT', category: 'Wallet', meta: 'Transfer to another user', link: '/customer/wallet/send' },
   { id: 'receive', title: 'Receive USDT', category: 'Wallet', meta: 'Show your deposit address', link: '/customer/wallet/receive' },
   { id: 'addresses', title: 'Saved addresses', category: 'Wallet', meta: 'Withdrawal allowlist', link: '/customer/wallet/addresses' },
 
   // Trade
   { id: 'buy', title: 'Buy USDT', category: 'Trade', meta: 'Pay rupees to a merchant', link: '/customer/buy' },
   { id: 'sell', title: 'Sell USDT', category: 'Trade', meta: 'Receive rupees from a merchant', link: '/customer/sell' },
-  { id: 'request', title: 'Request money', category: 'Trade', meta: 'Generate a payment request', link: '/customer/request' },
 
   // Activity
   { id: 'orders', title: 'Orders', category: 'Activity', meta: 'Open and settled orders', link: '/customer/orders' },
-  { id: 'transactions', title: 'Transactions', category: 'Activity', meta: 'Full ledger history', link: '/customer/transactions' },
-  { id: 'support', title: 'Support', category: 'Activity', meta: 'Tickets and disputes', link: '/customer/support' },
 ]
 
 export function SearchTokenModal({ isOpen, onClose }: SearchTokenModalProps) {
