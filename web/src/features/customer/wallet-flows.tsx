@@ -378,19 +378,26 @@ export function WithdrawFlow() {
   const [receipt, setReceipt] = useState<{ id: string } | null>(null)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  // One key per logical attempt (PRD §5 rule 2): resubmitting the same
+  // address and amount after a failure reuses it, so a request that did land
+  // cannot become a second withdrawal. Changing either starts a new attempt.
+  const attempt = useRef<{ fingerprint: string; key: string } | null>(null)
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setSubmitting(true)
     try {
+      const fingerprint = `${address}|${amount}`
+      if (attempt.current?.fingerprint !== fingerprint) {
+        attempt.current = { fingerprint, key: newIdempotencyKey() }
+      }
       const row = await v1<{ id: string }>('/wallet/withdrawals', {
         method: 'POST',
-        // A retry of this request must not become a second withdrawal
-        // (PRD §5 rule 2).
-        idempotencyKey: newIdempotencyKey(),
+        idempotencyKey: attempt.current.key,
         body: JSON.stringify({ address, amount, code }),
       })
+      attempt.current = null
       setReceipt(row)
       await qc.invalidateQueries({ queryKey: ['wallet'] })
     } catch (err) {
@@ -487,7 +494,7 @@ export function WithdrawFlow() {
               />
               {summary.data && (
                 <p className="text-[10px] text-slate-400 font-mono break-all">
-                  Available: {summary.data.balances.AVAILABLE} USDT
+                  Available: {usdt2dp(summary.data.balances.AVAILABLE)} USDT
                 </p>
               )}
             </div>
@@ -567,14 +574,53 @@ export function ReceiveFlow() {
   return <AddressScreen title="Receive USDT" />
 }
 
-export function AddressesFlow() {
-  const [copiedId, setCopiedId] = useState<string | null>(null)
+interface AllowlistRow {
+  address: string
+  label: string | null
+  usableAt: string
+}
 
-  const addresses = [
-    { id: 'addr-1', label: 'Primary TRC20 Vault', network: 'TRC20 (Tron)', address: 'TLvM8vPq7uN9eX2xK92bA8m1pQ4rT9vW', isDefault: true },
-    { id: 'addr-2', label: 'Secondary BEP20 Vault', network: 'BEP20 (BNB)', address: '0x71C889e2F1d46788B2c99aF0394A723eF10', isDefault: false },
-    { id: 'addr-3', label: 'Cold Storage Vault', network: 'ERC20 (ETH)', address: '0x992Bcd12E8a8b191c77F142A9e89d02E1B', isDefault: false },
-  ]
+/**
+ * The withdrawal allowlist (PRD §6.3). Adding an address needs a fresh
+ * authenticator code, and the server holds it in a cooldown before it can
+ * receive a withdrawal; `usableAt` says when that ends.
+ */
+export function AddressesFlow() {
+  const qc = useQueryClient()
+  const [copied, setCopied] = useState<string | null>(null)
+  const [address, setAddress] = useState('')
+  const [label, setLabel] = useState('')
+  const [code, setCode] = useState('')
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const list = useQuery({
+    queryKey: ['wallet', 'allowlist'],
+    queryFn: () => v1<AllowlistRow[]>('/wallet/allowlist'),
+    retry: false,
+  })
+
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setSubmitting(true)
+    try {
+      await v1('/wallet/allowlist', {
+        method: 'POST',
+        body: JSON.stringify({ address, code, label }),
+      })
+      setAddress('')
+      setLabel('')
+      setCode('')
+      await qc.invalidateQueries({ queryKey: ['wallet', 'allowlist'] })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'That address was refused.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const field = 'text-[10px] font-bold text-slate-400 uppercase tracking-wider block'
 
   return (
     <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
@@ -582,42 +628,106 @@ export function AddressesFlow() {
         <BackButton fallback="/customer/wallet" />
         <div>
           <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
-            Whitelisted Addresses
+            Withdrawal addresses
           </h1>
-          <p className="text-[11px] text-slate-500">Your verified crypto vault endpoints</p>
+          <p className="text-[11px] text-slate-500">
+            Withdrawals only go to addresses on this list
+          </p>
         </div>
       </div>
 
       <div className="space-y-2.5">
-        {addresses.map((a) => (
+        {list.isLoading && <Skeleton className="h-20 rounded-2xl" />}
+        {list.isError && (
+          <p className="text-xs text-rose-500 font-medium">
+            {list.error instanceof Error ? list.error.message : 'Could not load addresses.'}
+          </p>
+        )}
+        {list.data?.length === 0 && (
+          <p className="text-xs text-slate-500">No addresses yet.</p>
+        )}
+        {list.data?.map((a) => (
           <div
-            key={a.id}
+            key={a.address}
             className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-2 shadow-2xs"
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-slate-900 dark:text-white">{a.label}</span>
-              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                {a.network}
+              <span className="text-xs font-black text-slate-900 dark:text-white">
+                {a.label || 'Unnamed'}
+              </span>
+              <span className="text-[10px] text-slate-500">
+                {new Date(a.usableAt).getTime() > Date.now()
+                  ? `Usable from ${new Date(a.usableAt).toLocaleString()}`
+                  : 'Ready'}
               </span>
             </div>
-
             <div className="p-2.5 bg-slate-50 dark:bg-slate-900 rounded-xl font-mono text-[11px] text-slate-600 dark:text-slate-300 break-all flex items-center justify-between">
               <span>{a.address}</span>
               <button
                 type="button"
                 onClick={() => {
                   navigator.clipboard?.writeText(a.address)
-                  setCopiedId(a.id)
-                  setTimeout(() => setCopiedId(null), 2000)
+                  setCopied(a.address)
+                  setTimeout(() => setCopied(null), 2000)
                 }}
                 className="ml-2 text-xs font-bold text-emerald-600 hover:underline shrink-0 cursor-pointer"
               >
-                {copiedId === a.id ? 'Copied' : 'Copy'}
+                {copied === a.address ? 'Copied' : 'Copy'}
               </button>
             </div>
           </div>
         ))}
       </div>
+
+      <form onSubmit={add} className="space-y-3.5">
+        <div className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-3 shadow-2xs">
+          <div className="space-y-1.5">
+            <label htmlFor="allow-address" className={field}>Address</label>
+            <Input
+              id="allow-address"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              required
+              placeholder="0x..."
+              className="h-11 rounded-xl font-mono text-xs"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="allow-label" className={field}>Label</label>
+            <Input
+              id="allow-label"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Cold storage"
+              className="h-11 rounded-xl"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="allow-code" className={field}>Authenticator code</label>
+            <Input
+              id="allow-code"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              required
+              inputMode="numeric"
+              placeholder="000000"
+              className="h-11 rounded-xl font-mono tracking-widest"
+            />
+          </div>
+        </div>
+        {error && (
+          <p className="text-xs text-rose-500 font-medium bg-rose-500/10 p-2.5 rounded-xl border border-rose-500/20">
+            {error}
+          </p>
+        )}
+        <Button
+          type="submit"
+          disabled={submitting}
+          className="w-full h-11 rounded-full font-semibold text-sm bg-slate-900 dark:bg-white text-white dark:text-slate-900"
+        >
+          {submitting ? 'Adding...' : 'Add address'}
+        </Button>
+      </form>
     </div>
   )
 }

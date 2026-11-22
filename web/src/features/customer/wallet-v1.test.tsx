@@ -3,8 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { AppProviders } from '@/app/providers'
-import { TOKEN_KEY } from '@/lib/api'
-import { DepositFlow, ReceiveFlow, SendFlow, WalletHome, WithdrawFlow } from './wallet-flows'
+import { REFRESH_KEY, TOKEN_KEY } from '@/lib/api'
+import { AddressesFlow, DepositFlow, ReceiveFlow, SendFlow, WalletHome, WithdrawFlow } from './wallet-flows'
 import { CustomerDashboard } from './CustomerDashboard'
 import * as assetsCard from './components/TotalAssetsCard'
 
@@ -45,10 +45,12 @@ interface Routes {
   address?: () => Promise<Response>
   activity?: () => Promise<Response>
   withdrawal?: () => Promise<Response>
+  allowlist?: (init?: RequestInit) => Promise<Response>
+  refresh?: () => Promise<Response>
 }
 
 function stubApi(routes: Routes = {}) {
-  const fetchMock = vi.fn((url: string) => {
+  const fetchMock = vi.fn((url: string, init?: RequestInit) => {
     const path = String(url)
     if (path.endsWith('/auth/me')) return jsonResponse({ success: true, data: ME })
     if (path.endsWith('/wallet/summary'))
@@ -64,7 +66,12 @@ function stubApi(routes: Routes = {}) {
     if (path.endsWith('/wallet/activity'))
       return routes.activity?.() ?? jsonResponse({ success: true, data: [] })
     if (path.endsWith('/wallet/allowlist'))
-      return jsonResponse({ success: true, data: [] })
+      return routes.allowlist?.(init) ?? jsonResponse({ success: true, data: [] })
+    if (path.endsWith('/auth/refresh'))
+      return (
+        routes.refresh?.() ??
+        jsonResponse({ success: true, data: { accessToken: 'n', refreshToken: 'r2' } })
+      )
     if (path.endsWith('/wallet/withdrawals'))
       return routes.withdrawal?.() ?? jsonResponse({ success: true, data: { id: 'w1' } })
     return jsonResponse({ success: true, data: {} })
@@ -270,5 +277,119 @@ describe('the wallet screens on the v1 API (PRD §5.1, §8)', () => {
     // AppProviders' own session probe is the only call; Send adds none.
     const paths = fetchMock.mock.calls.map((c) => String(c[0]))
     expect(paths.filter((p) => !p.endsWith('/auth/me'))).toEqual([])
+  })
+
+  const ADDR = '0x570ec515914CC54da8Ebc50c6AC69f0330727455'
+
+  it('lists the real allowlist and posts {address, code, label} to add', async () => {
+    const posts: unknown[] = []
+    const fetchMock = stubApi({
+      allowlist: (init) => {
+        if (init?.method === 'POST') {
+          posts.push(JSON.parse(String(init.body)))
+          return jsonResponse({ success: true, data: { address: ADDR } })
+        }
+        return jsonResponse({
+          success: true,
+          data: [{ address: ADDR, label: 'Cold', usableAt: '2026-11-22T00:00:00Z' }],
+        })
+      },
+    })
+    const user = userEvent.setup()
+    show(<AddressesFlow />)
+
+    expect(await screen.findByText(ADDR)).toBeInTheDocument()
+    expect(screen.queryByText(/TLvM8vPq7uN9eX2xK92bA8m1pQ4rT9vW/)).toBeNull()
+
+    await user.type(screen.getByLabelText(/^address$/i), '0xabc0000000000000000000000000000000000001')
+    await user.type(screen.getByLabelText(/label/i), 'Hot')
+    await user.type(screen.getByLabelText(/authenticator code/i), '654321')
+    await user.click(screen.getByRole('button', { name: /add address/i }))
+
+    await waitFor(() =>
+      expect(posts).toEqual([
+        { address: '0xabc0000000000000000000000000000000000001', code: '654321', label: 'Hot' },
+      ]),
+    )
+    expect(fetchMock).toHaveBeenCalled()
+  })
+
+  it('posts the full-precision amount, address, code and an Idempotency-Key', async () => {
+    const fetchMock = stubApi()
+    const user = userEvent.setup()
+    show(<WithdrawFlow />)
+
+    await user.type(await screen.findByLabelText(/destination address/i), ADDR)
+    await user.type(screen.getByLabelText(/amount/i), '10.123456789012345678')
+    await user.type(screen.getByLabelText(/authenticator code/i), '123456')
+    await user.click(screen.getByRole('button', { name: /request withdrawal/i }))
+
+    await screen.findByText(/withdrawal requested/i)
+    const call = fetchMock.mock.calls.find((c) => String(c[0]).endsWith('/wallet/withdrawals'))!
+    const init = call[1] as RequestInit
+    expect(JSON.parse(String(init.body))).toEqual({
+      address: ADDR,
+      amount: '10.123456789012345678',
+      code: '123456',
+    })
+    expect(new Headers(init.headers).get('Idempotency-Key')).toMatch(/\S{8,}/)
+  })
+
+  it('reuses the same Idempotency-Key when a 401 refresh retries the withdrawal', async () => {
+    localStorage.setItem(REFRESH_KEY, 'r1')
+    let attempts = 0
+    const fetchMock = stubApi({
+      withdrawal: () =>
+        attempts++ === 0
+          ? jsonResponse({ success: false, error: { code: 'TOKEN_INVALID', message: 'expired' } }, 401)
+          : jsonResponse({ success: true, data: { id: 'w1' } }),
+    })
+    const user = userEvent.setup()
+    show(<WithdrawFlow />)
+
+    await user.type(await screen.findByLabelText(/destination address/i), ADDR)
+    await user.type(screen.getByLabelText(/amount/i), '10')
+    await user.type(screen.getByLabelText(/authenticator code/i), '123456')
+    await user.click(screen.getByRole('button', { name: /request withdrawal/i }))
+
+    await screen.findByText(/withdrawal requested/i)
+    const keys = fetchMock.mock.calls
+      .filter((c) => String(c[0]).endsWith('/wallet/withdrawals'))
+      .map((c) => new Headers((c[1] as RequestInit).headers).get('Idempotency-Key'))
+    expect(keys).toHaveLength(2)
+    expect(keys[0]).toBeTruthy()
+    expect(keys[1]).toBe(keys[0])
+  })
+
+  it('reuses the key when the same withdrawal is resubmitted after a failure', async () => {
+    let attempts = 0
+    const fetchMock = stubApi({
+      withdrawal: () =>
+        attempts++ === 0
+          ? jsonResponse({ success: false, error: { code: 'ERROR', message: 'boom' } }, 500)
+          : jsonResponse({ success: true, data: { id: 'w1' } }),
+    })
+    const user = userEvent.setup()
+    show(<WithdrawFlow />)
+
+    await user.type(await screen.findByLabelText(/destination address/i), ADDR)
+    await user.type(screen.getByLabelText(/amount/i), '10')
+    await user.type(screen.getByLabelText(/authenticator code/i), '123456')
+    await user.click(screen.getByRole('button', { name: /request withdrawal/i }))
+    await screen.findByText('boom')
+    await user.click(screen.getByRole('button', { name: /request withdrawal/i }))
+
+    await screen.findByText(/withdrawal requested/i)
+    const keys = fetchMock.mock.calls
+      .filter((c) => String(c[0]).endsWith('/wallet/withdrawals'))
+      .map((c) => new Headers((c[1] as RequestInit).headers).get('Idempotency-Key'))
+    expect(keys).toHaveLength(2)
+    expect(keys[1]).toBe(keys[0])
+  })
+
+  it('shows the available balance at 2dp on the withdraw screen', async () => {
+    stubApi()
+    show(<WithdrawFlow />)
+    expect(await screen.findByText(/Available: 1,234\.57/)).toBeInTheDocument()
   })
 })
