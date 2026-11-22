@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShieldCheck } from 'lucide-react'
+import { Check, Copy, ShieldCheck } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 
 import { Button } from '@/components/ui/button'
@@ -23,6 +23,17 @@ export function MfaEnrollPage() {
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const copyKey = async () => {
+    try {
+      await navigator.clipboard?.writeText(secret)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // clipboard unavailable (e.g. insecure context) — the key stays visible to type
+    }
+  }
 
   // The context's functions change identity whenever the user does, so the
   // latest is held in a ref and begin runs exactly once. Re-running it after
@@ -77,9 +88,25 @@ export function MfaEnrollPage() {
             <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center">
               Can’t scan? Enter this setup key manually
             </p>
-            <p className="mt-1.5 font-mono text-sm tracking-widest break-all text-center text-slate-900 dark:text-white">
-              {secret || 'Preparing…'}
-            </p>
+            <div className="mt-1.5 flex items-center justify-center gap-2">
+              <p className="font-mono text-sm tracking-widest break-all text-slate-900 dark:text-white">
+                {secret || 'Preparing…'}
+              </p>
+              {secret && (
+                <button
+                  type="button"
+                  onClick={copyKey}
+                  aria-label={copied ? 'Setup key copied' : 'Copy setup key'}
+                  className="shrink-0 rounded-md p-1.5 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800"
+                >
+                  {copied ? (
+                    <Check className="h-4 w-4 text-emerald-500" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </button>
+              )}
+            </div>
             <p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400 text-center">
               Save it now — it is not shown again.
             </p>
