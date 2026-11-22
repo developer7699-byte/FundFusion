@@ -706,15 +706,6 @@ export function CustomerProfilePage() {
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
                   Verify your primary bank account to unlock <b>$50,000 / day</b> P2P limits & zero-fee withdrawals.
                 </p>
-                <button
-                  onClick={() => {
-                    setActiveModal(null)
-                    navigate('/customer/verification')
-                  }}
-                  className="w-full mt-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all"
-                >
-                  Verify Bank Account Now
-                </button>
               </div>
             </div>
           </div>

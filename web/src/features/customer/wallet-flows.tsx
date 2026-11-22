@@ -147,20 +147,13 @@ export function WalletHome() {
           <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white">
             Recent Ledger History
           </h3>
-          <Link
-            to="/customer/transactions"
-            className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
-          >
-            All Activity →
-          </Link>
         </div>
 
         <div className="divide-y divide-slate-100 dark:divide-slate-800">
           {(activity.data ?? []).slice(0, 5).map((row) => (
-            <Link
+            <div
               key={row.id}
-              to={`/customer/transactions/${row.id}`}
-              className="py-2.5 flex items-center justify-between group cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl px-1.5 transition-colors"
+              className="py-2.5 flex items-center justify-between rounded-xl px-1.5"
             >
               <div>
                 <span className="text-xs font-black text-slate-900 dark:text-white block group-hover:text-emerald-500 transition-colors">
@@ -180,7 +173,7 @@ export function WalletHome() {
                   {row.bucket}
                 </span>
               </div>
-            </Link>
+            </div>
           ))}
           {activity.data?.length === 0 && (
             <p className="py-3 text-xs text-slate-400">Nothing has moved yet.</p>

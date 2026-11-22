@@ -170,8 +170,8 @@ export function MobileSimulatorLayout({
   const customerNav = [
     { to: '/customer/dashboard', label: t('nav.home'), icon: LayoutGrid },
     { to: '/customer/dashboard?tab=leaderboard', label: t('nav.leaderboard'), icon: Trophy },
-    { to: '/customer/pay/scan', label: '', icon: QrCode, isCenter: true, parked: true },
-    { to: '/customer/transactions', label: t('nav.transactions'), icon: ReceiptText, parked: true },
+    { id: 'scan', label: '', icon: QrCode, isCenter: true, parked: true },
+    { id: 'transactions', label: t('nav.transactions'), icon: ReceiptText, parked: true },
     { to: '/customer/dashboard?tab=menu', label: t('nav.menu'), icon: Menu },
   ]
 
@@ -183,7 +183,7 @@ export function MobileSimulatorLayout({
     { to: '/merchant/profile', label: t('merchantNav.profile'), icon: User },
   ]
 
-  const bottomNav: Array<{ to: string; label: string; icon: typeof Home; isCenter?: boolean; parked?: boolean }> =
+  const bottomNav: Array<{ id?: string; to?: string; label: string; icon: typeof Home; isCenter?: boolean; parked?: boolean }> =
     isMerchant ? merchantNav : customerNav
 
   return (
@@ -420,15 +420,10 @@ export function MobileSimulatorLayout({
           !location.pathname.includes('/deposit') && (
             <div className="bg-white/95 dark:bg-[#0c1122]/95 backdrop-blur-xl border-t border-slate-100 dark:border-slate-800/90 px-3 py-2 grid grid-cols-5 items-center justify-items-center z-30 shrink-0 relative w-full shadow-lg">
               {bottomNav.map((item) => {
-                const isNavActive =
-                  item.to.includes('?')
-                    ? location.pathname + location.search === item.to
-                    : location.pathname === item.to
-
-                if (item.parked && item.isCenter) {
-                  return (
+                if (item.parked) {
+                  return item.isCenter ? (
                     <ParkedAction
-                      key={item.to}
+                      key={item.id}
                       label="Scan & Pay"
                       className="-mt-7 flex flex-col items-center z-40"
                     >
@@ -436,13 +431,9 @@ export function MobileSimulatorLayout({
                         <item.icon className="w-6 h-6 stroke-[2.2] text-white" />
                       </div>
                     </ParkedAction>
-                  )
-                }
-
-                if (item.parked) {
-                  return (
+                  ) : (
                     <ParkedAction
-                      key={item.to}
+                      key={item.id}
                       label={item.label}
                       className="flex flex-col items-center gap-0.5 py-1 px-2 text-[10px] font-bold text-slate-400 dark:text-slate-500"
                       labelClassName="tracking-tight"
@@ -452,11 +443,17 @@ export function MobileSimulatorLayout({
                   )
                 }
 
+                const to = item.to!
+                const isNavActive =
+                  to.includes('?')
+                    ? location.pathname + location.search === to
+                    : location.pathname === to
+
                 if (item.isCenter) {
                   return (
                     <NavLink
-                      key={item.to}
-                      to={item.to}
+                      key={to}
+                      to={to}
                       className="-mt-7 flex flex-col items-center group cursor-pointer z-40"
                       title={isMerchant ? 'Available Orders' : 'Scan & Pay'}
                     >
@@ -469,8 +466,8 @@ export function MobileSimulatorLayout({
 
                 return (
                   <NavLink
-                    key={item.to}
-                    to={item.to}
+                    key={to}
+                    to={to}
                     className={cn(
                       'flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl text-[10px] font-bold transition-all duration-200 relative select-none',
                       isNavActive

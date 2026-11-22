@@ -65,6 +65,10 @@ const GONE = [
   '/customer/referrals',
   '/customer/rewards',
   '/customer/verification',
+  '/customer/wallet/send',
+  '/customer/transactions',
+  '/customer/notifications',
+  '/customer/support',
 ]
 
 const KEPT = [
