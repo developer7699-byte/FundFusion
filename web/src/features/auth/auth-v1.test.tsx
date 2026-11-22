@@ -95,6 +95,21 @@ describe('signing in against the v1 API (PRD §9.1)', () => {
     expect(screen.getByText(/not shown again/i)).toBeInTheDocument()
   })
 
+  it('lets a stuck unenrolled user leave the gate via "Use a different account"', async () => {
+    localStorage.setItem(TOKEN_KEY, 'a-token')
+    localStorage.setItem(REFRESH_KEY, 'r-token')
+    stubApi(UNENROLLED)
+    const user = userEvent.setup()
+    renderAt('/mfa/enroll')
+
+    await screen.findByRole('heading', { name: /authenticator/i })
+    await user.click(screen.getByRole('button', { name: /use a different account/i }))
+
+    await waitFor(() => expect(window.location.pathname).toBe('/login'))
+    expect(localStorage.getItem(TOKEN_KEY)).toBeNull()
+    expect(localStorage.getItem(REFRESH_KEY)).toBeNull()
+  })
+
   it('keeps the session across a reload', async () => {
     localStorage.setItem(TOKEN_KEY, 'a-token')
     localStorage.setItem(REFRESH_KEY, 'r-token')
