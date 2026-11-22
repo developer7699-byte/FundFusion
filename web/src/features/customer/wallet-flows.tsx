@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   Copy,
   Check,
@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ApiError, newIdempotencyKey, v1 } from '@/lib/api'
 import { cn, usdt2dp } from '@/lib/utils'
+import { actionFor } from './order-actions'
 
 /** `GET /v1/wallet/summary`. Every figure is a string (PRD §5.1). */
 export interface WalletSummary {
@@ -120,8 +121,9 @@ export function WalletHome() {
         </div>
       </div>
 
-      {/* 3 Wallet Quick Actions */}
-      <div className="grid grid-cols-3 gap-2 pt-1 text-center">
+      {/* Wallet quick actions. Send has no v1 endpoint (PRD §3), so it keeps
+          its place as an inert parked tile. */}
+      <div className="grid grid-cols-4 gap-2 pt-1 text-center">
         {[
           { label: 'Deposit', to: '/customer/wallet/deposit', icon: '↓', bg: 'bg-[#22c55e] text-white' },
           { label: 'Withdraw', to: '/customer/wallet/withdraw', icon: '↑', bg: 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' },
@@ -140,6 +142,15 @@ export function WalletHome() {
             </span>
           </Link>
         ))}
+        <ParkedAction
+          label="Send"
+          className="flex flex-col items-center gap-1.5"
+          labelClassName="text-xs font-bold text-slate-700 dark:text-slate-300"
+        >
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-base shadow-sm bg-blue-600 text-white">
+            ↗
+          </div>
+        </ParkedAction>
       </div>
 
       {/* Recent Activity */}
@@ -540,36 +551,6 @@ export function WithdrawFlow() {
   )
 }
 
-/**
- * v1 has no route that sends USDT between two accounts on this platform.
- * PRD §3 lists it as a goal, so the screen stays and says where it is rather
- * than quietly becoming a withdrawal, which moves money somewhere else
- * entirely.
- */
-export function SendFlow() {
-  return (
-    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
-      <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800">
-        <BackButton fallback="/customer/wallet" />
-        <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
-          Send USDT
-        </h1>
-      </div>
-      <div className="rounded-[28px] bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 p-5 space-y-3 text-center shadow-xs">
-        <p className="text-sm text-slate-600 dark:text-slate-300">
-          Sending to another account on this platform is not part of this
-          release.
-        </p>
-        <ParkedAction
-          label="Send USDT"
-          className="w-full h-11 rounded-full font-semibold bg-slate-900 dark:bg-white text-white dark:text-slate-900"
-          labelClassName=""
-        />
-      </div>
-    </div>
-  )
-}
-
 export function ReceiveFlow() {
   return <AddressScreen title="Receive USDT" />
 }
@@ -774,18 +755,6 @@ interface PlacedOrder {
 }
 
 /**
- * The one thing the customer may do right now (PRD §6.8). On a buy they pay,
- * so they submit evidence once a merchant has accepted; on a sell they
- * receive, so they confirm once the merchant says it was paid. Every other
- * state is waiting.
- */
-function customerAction(o: PlacedOrder): 'SUBMIT_UTR' | 'CONFIRM_RECEIPT' | null {
-  if (o.side === 'BUY' && o.status === 'ACCEPTED') return 'SUBMIT_UTR'
-  if (o.side === 'SELL' && o.status === 'PAYMENT_SUBMITTED') return 'CONFIRM_RECEIPT'
-  return null
-}
-
-/**
  * Whether the server definitively refused, so the same request can never
  * succeed later. A 5xx, a timeout or a dropped connection says nothing about
  * whether the work landed, so those keep their idempotency key for a replay.
@@ -828,7 +797,7 @@ function PlacedOrderPanel({
   const o = q.data
   if (!o) return null
 
-  const action = customerAction(o)
+  const action = actionFor(o.status, o.side, 'CUSTOMER')
   const payee = o.payeeInstruction
 
   const run = async (work: () => Promise<unknown>) => {
@@ -1197,200 +1166,6 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
       )}
 
       {placedId && <PlacedOrderPanel orderId={placedId} onChanged={afterChange} />}
-    </div>
-  )
-}
-
-export function TransactionsFlow() {
-  const q = useActivity()
-  const [filterType, setFilterType] = useState('ALL')
-
-  // The prototype padded this list with BILL_PAY, GIFT_CARD and RECHARGE rows
-  // it invented in the browser — categories PRD §3 removed from v1 entirely.
-  const rows = q.data ?? []
-  const filtered =
-    filterType === 'ALL' ? rows : rows.filter((r) => r.kind === filterType)
-
-  return (
-    <div className="space-y-4 max-w-lg mx-auto w-full pb-2">
-      {/* Header */}
-      <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-        <div className="flex items-center gap-2.5">
-          <BackButton fallback="/customer/dashboard" />
-          <div>
-            <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
-              Transactions
-            </h1>
-            <p className="text-[11px] text-slate-500">All ledger orders & escrow activity</p>
-          </div>
-        </div>
-
-        <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-          {filtered.length} Records
-        </span>
-      </div>
-
-      {/* Filter Chips Bar */}
-      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-        {['ALL', 'DEPOSIT', 'WITHDRAWAL', 'ESCROW', 'SETTLEMENT', 'DISPUTE'].map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setFilterType(tab)}
-            className={cn(
-              'px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer',
-              filterType === tab
-                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'
-            )}
-          >
-            {tab === 'ALL' ? 'All Transactions' : tab}
-          </button>
-        ))}
-      </div>
-
-      {/* Transaction List Cards */}
-      <div className="space-y-2">
-        {filtered.length === 0 ? (
-          <div className="p-8 text-center text-xs text-slate-400 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
-            No transactions found for this category.
-          </div>
-        ) : (
-          filtered.map((item) => {
-            const isPositive = item.direction === 'CREDIT'
-
-            return (
-              <Link
-                key={item.id}
-                to={`/customer/transactions/${item.id}`}
-                className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 flex items-center justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-all shadow-xs group cursor-pointer"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className={cn(
-                      'w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-sm shrink-0',
-                      isPositive
-                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                        : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
-                    )}
-                  >
-                    {isPositive ? '↓' : '↑'}
-                  </div>
-
-                  <div className="min-w-0">
-                    <span className="text-xs font-black text-slate-900 dark:text-white block group-hover:text-emerald-500 transition-colors truncate">
-                      {item.kind.replace('_', ' ')}
-                    </span>
-                    <span className="text-[10px] text-slate-400 block font-mono">
-                      {new Date(item.at).toLocaleDateString([], {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="text-right shrink-0">
-                  <span
-                    className={cn(
-                      'text-xs font-black font-mono block',
-                      isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-white'
-                    )}
-                  >
-                    {isPositive ? '+' : '−'}{item.amount} {item.assetSymbol}
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    {item.bucket}
-                  </span>
-                </div>
-              </Link>
-            )
-          })
-        )}
-      </div>
-    </div>
-  )
-}
-
-export function TransactionDetailFlow() {
-  const { transactionId } = useParams()
-  const q = useActivity()
-  const row = q.data?.find((r) => r.id === transactionId)
-
-  if (q.isLoading) return <Skeleton className="h-40 rounded-3xl" />
-  if (q.error) return <p className="text-rose-500 font-bold p-4">{q.error.message}</p>
-  if (!row) {
-    return (
-      <div className="space-y-4 max-w-lg mx-auto w-full pb-2">
-        <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800">
-          <BackButton fallback="/customer/transactions" />
-          <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
-            Transaction
-          </h1>
-        </div>
-        <p className="p-8 text-center text-xs text-slate-400 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
-          No entry with that id is yours.
-        </p>
-      </div>
-    )
-  }
-  return (
-    <div className="space-y-4 max-w-lg mx-auto w-full pb-6">
-      <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800">
-        <Link
-          to="/customer/transactions"
-          className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 transition-colors cursor-pointer"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-        </Link>
-        <h1 className="text-base font-black text-slate-900 dark:text-white">Transaction Details</h1>
-      </div>
-
-      <div className="rounded-[28px] bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 p-5 space-y-4 text-center shadow-xs">
-        <div className="w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-black text-xl mx-auto">
-          ✓
-        </div>
-
-        <div>
-          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-500/10 px-2.5 py-0.5 rounded-full">
-            {row.bucket}
-          </span>
-          <h2 className="text-2xl font-black text-slate-900 dark:text-white mt-2 font-mono break-all">
-            {row.direction === 'DEBIT' ? '−' : '+'}
-            {row.amount} {row.assetSymbol}
-          </h2>
-        </div>
-
-        <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-left text-xs space-y-2">
-          <div className="flex justify-between">
-            <span className="text-slate-500">Transaction ID:</span>
-            <span className="font-mono font-bold text-slate-800 dark:text-slate-200 break-all">{transactionId}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">Type:</span>
-            <span className="font-bold text-slate-800 dark:text-slate-200">{row.kind}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">Timestamp:</span>
-            <span className="font-mono text-slate-700 dark:text-slate-300">{new Date(row.at).toLocaleString()}</span>
-          </div>
-          <div className="flex justify-between gap-3">
-            <span className="text-slate-500 shrink-0">Journal memo:</span>
-            <span className="text-right text-slate-700 dark:text-slate-300 break-all">{row.memo}</span>
-          </div>
-        </div>
-
-        <Link
-          to="/customer/transactions"
-          className="block w-full py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold"
-        >
-          Back to Transactions
-        </Link>
-      </div>
     </div>
   )
 }

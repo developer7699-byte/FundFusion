@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { AppProviders } from '@/app/providers'
 import { REFRESH_KEY, TOKEN_KEY } from '@/lib/api'
-import { AddressesFlow, DepositFlow, ReceiveFlow, SendFlow, WalletHome, WithdrawFlow } from './wallet-flows'
+import { AddressesFlow, DepositFlow, ReceiveFlow, WalletHome, WithdrawFlow } from './wallet-flows'
 import { CustomerDashboard } from './CustomerDashboard'
 import * as assetsCard from './components/TotalAssetsCard'
 
@@ -264,19 +264,20 @@ describe('the wallet screens on the v1 API (PRD §5.1, §8)', () => {
     ).toBeInTheDocument()
   }, 15_000)
 
-  it('Send is a parked action and makes no API call', async () => {
+  it('Send on the wallet home is a parked action and makes no API call', async () => {
     const fetchMock = stubApi()
     const user = userEvent.setup()
-    show(<SendFlow />)
+    show(<WalletHome />)
+    await screen.findByText(/1,234\.57/)
 
-    const btn = screen.getByRole('button', { name: /send usdt/i })
+    const btn = screen.getByRole('button', { name: /send/i })
     expect(btn).toHaveAttribute('aria-disabled', 'true')
     await user.click(btn)
     expect(await screen.findByText(/not available yet/i)).toBeInTheDocument()
-    expect(screen.queryByRole('link')).toBeNull()
-    // AppProviders' own session probe is the only call; Send adds none.
+    expect(screen.queryByRole('link', { name: /send/i })).toBeNull()
+    // Send adds no call beyond what the wallet home itself reads.
     const paths = fetchMock.mock.calls.map((c) => String(c[0]))
-    expect(paths.filter((p) => !p.endsWith('/auth/me'))).toEqual([])
+    expect(paths.filter((p) => /send|transfer/i.test(p))).toEqual([])
   })
 
   const ADDR = '0x570ec515914CC54da8Ebc50c6AC69f0330727455'

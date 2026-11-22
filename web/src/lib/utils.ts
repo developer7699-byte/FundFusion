@@ -5,18 +5,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function inr(value: string | number) {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 2,
-  }).format(Number(value))
-}
-
-export function usdt(value: string | number) {
-  return `${Number(value).toLocaleString('en-IN', { maximumFractionDigits: 4 })} USDT`
-}
-
 /**
  * A USDT ledger string at 2dp for display (PRD §5.1).
  *
@@ -29,7 +17,7 @@ export function usdt2dp(value: string | undefined): string {
   const [, sign, whole, frac = ''] = m
   const padded = (frac + '00').slice(0, 3)
   let cents = BigInt(whole) * 100n + BigInt(padded.slice(0, 2))
-  if (Number(padded[2] ?? '0') >= 5) cents += 1n
+  if ((padded[2] ?? '0') >= '5') cents += 1n
   const units = cents / 100n
   const rest = (cents % 100n).toString().padStart(2, '0')
   const out = `${new Intl.NumberFormat('en-IN').format(units)}.${rest}`

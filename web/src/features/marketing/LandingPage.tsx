@@ -545,7 +545,7 @@ export function LandingPage() {
         title="Scan a QR. Preview the beneficiary. Confirm once."
         body="Upload or camera-scan a mock QR, or type a UPI ID. Conversion is quoted before funds lock. The prototype parser is labelled so it is never mistaken for a live PSP."
         points={['Mock QR parser', 'Escrow lock simulation', 'Seller matching']}
-        cta={['/customer/pay', 'Try pay flow']}
+        cta={['/customer/sell', 'Open sell desk']}
       >
         <QRScanPreview />
       </Split>
@@ -1844,9 +1844,9 @@ function OneDeskShowcase() {
                 </div>
 
                 <div className="flex items-center gap-3 pt-2">
-                  <Link to="/customer/pay">
+                  <Link to="/customer/buy">
                     <Button size="sm" className="rounded-xl font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md">
-                      Try QR Pay Desk <ArrowRight className="ml-1.5 h-4 w-4" />
+                      Open Buy Desk <ArrowRight className="ml-1.5 h-4 w-4" />
                     </Button>
                   </Link>
                 </div>
@@ -2002,9 +2002,9 @@ function OneDeskShowcase() {
                 </div>
 
                 <div className="flex items-center gap-3 pt-2">
-                  <Link to="/customer/gift-cards">
+                  <Link to="/customer/buy">
                     <Button size="sm" className="rounded-xl font-bold bg-amber-600 hover:bg-amber-500 text-white shadow-md">
-                      Browse Full Catalog <ArrowRight className="ml-1.5 h-4 w-4" />
+                      Open Buy Desk <ArrowRight className="ml-1.5 h-4 w-4" />
                     </Button>
                   </Link>
                 </div>
@@ -2118,9 +2118,9 @@ function OneDeskShowcase() {
                       </div>
                       <p className="text-[10px] text-slate-500 dark:text-slate-400">84 Days Validity · 2GB/day Data + Unlimited Calls</p>
                     </div>
-                    <Link to="/customer/gift-cards">
+                    <Link to="/customer/buy">
                       <Button className="w-full rounded-xl font-bold bg-amber-600 hover:bg-amber-500 text-white py-4 mt-2">
-                        Execute Mobile Recharge →
+                        Open Buy Desk →
                       </Button>
                     </Link>
                   </div>
@@ -2144,9 +2144,9 @@ function OneDeskShowcase() {
                         <span className="text-amber-600 dark:text-amber-400">₹1,240.00 (~14.71 USDT)</span>
                       </div>
                     </div>
-                    <Link to="/customer/gift-cards">
+                    <Link to="/customer/buy">
                       <Button className="w-full rounded-xl font-bold bg-amber-600 hover:bg-amber-500 text-white py-4">
-                        Pay Utility Bill Now →
+                        Open Buy Desk →
                       </Button>
                     </Link>
                   </div>
