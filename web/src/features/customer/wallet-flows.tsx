@@ -14,7 +14,7 @@ import {} from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { newIdempotencyKey, v1 } from '@/lib/api'
-import { cn } from '@/lib/utils'
+import { cn, usdt2dp } from '@/lib/utils'
 
 /** `GET /v1/wallet/summary`. Every figure is a string (PRD §5.1). */
 export interface WalletSummary {
@@ -102,7 +102,7 @@ export function WalletHome() {
           <div>
             <span className="text-xs text-slate-400 font-medium">Available to Spend</span>
             <div className="text-2xl sm:text-3xl font-black font-mono tracking-tight mt-0.5 break-all">
-              {d.balances.AVAILABLE} <span className="text-base">USDT</span>
+              {usdt2dp(d.balances.AVAILABLE)} <span className="text-base">USDT</span>
             </div>
           </div>
 
@@ -111,7 +111,7 @@ export function WalletHome() {
               <div key={key}>
                 <span className="text-[10px] text-slate-400 block uppercase">{label}</span>
                 <span className={cn('font-mono font-bold break-all', tone)}>
-                  {d.balances[key]} USDT
+                  {usdt2dp(d.balances[key])} USDT
                 </span>
               </div>
             ))}
@@ -167,7 +167,7 @@ export function WalletHome() {
               <div className="text-right">
                 <span className="text-xs font-black font-mono text-slate-900 dark:text-white block break-all">
                   {row.direction === 'DEBIT' ? '−' : '+'}
-                  {row.amount} {row.assetSymbol}
+                  {usdt2dp(row.amount)} {row.assetSymbol}
                 </span>
                 <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                   {row.bucket}

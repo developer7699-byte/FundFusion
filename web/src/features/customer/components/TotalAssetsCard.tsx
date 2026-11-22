@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Eye, EyeOff, ArrowDown, ArrowUp } from 'lucide-react'
-import {} from '@/lib/utils'
+import { usdt2dp } from '@/lib/utils'
 import { useLanguage } from '@/lib/language'
 
 interface TotalAssetsCardProps {
-  /** A string at full scale, straight from the ledger (PRD §5.1). */
+  /** A string at full scale, straight from the ledger (PRD §5.1). Shown at 2dp; never parsed. */
   availableUsdt?: string
   onOpenDeposit?: () => void
   onOpenSell?: () => void
@@ -20,7 +20,7 @@ export function TotalAssetsCard({
   const [isVisible, setIsVisible] = useState(true)
 
   return (
-    <div className="w-full rounded-[28px] bg-white dark:bg-[#111827] border border-slate-100/90 dark:border-slate-800/80 p-4 sm:p-5 shadow-xs space-y-4">
+    <div data-testid="total-assets-card" className="w-full rounded-[28px] bg-white dark:bg-[#111827] border border-slate-100/90 dark:border-slate-800/80 p-4 sm:p-5 shadow-xs space-y-4">
       {/* 1. Label & Eye Toggle */}
       <div className="space-y-1">
         <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
@@ -39,7 +39,7 @@ export function TotalAssetsCard({
         {/* 2. Large Balance Display Matching Screenshot 3 */}
         <div className="flex items-baseline gap-2">
           <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white font-mono break-all">
-            {isVisible ? availableUsdt : '••••••'}
+            {isVisible ? usdt2dp(availableUsdt) : '••••••'}
           </span>
         </div>
 

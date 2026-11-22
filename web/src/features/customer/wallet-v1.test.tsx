@@ -5,6 +5,8 @@ import { MemoryRouter } from 'react-router-dom'
 import { AppProviders } from '@/app/providers'
 import { TOKEN_KEY } from '@/lib/api'
 import { DepositFlow, WalletHome, WithdrawFlow } from './wallet-flows'
+import { CustomerDashboard } from './CustomerDashboard'
+import * as assetsCard from './components/TotalAssetsCard'
 
 /** NUMERIC(38,18). A JavaScript number cannot hold this (PRD §5.1). */
 const AVAILABLE = '1234.567890123456789012'
@@ -40,6 +42,7 @@ function jsonResponse(body: unknown, status = 200) {
 
 interface Routes {
   summary?: () => Promise<Response>
+  activity?: () => Promise<Response>
   withdrawal?: () => Promise<Response>
 }
 
@@ -50,7 +53,7 @@ function stubApi(routes: Routes = {}) {
     if (path.endsWith('/wallet/summary'))
       return routes.summary?.() ?? jsonResponse({ success: true, data: SUMMARY })
     if (path.endsWith('/wallet/activity'))
-      return jsonResponse({ success: true, data: [] })
+      return routes.activity?.() ?? jsonResponse({ success: true, data: [] })
     if (path.endsWith('/wallet/allowlist'))
       return jsonResponse({ success: true, data: [] })
     if (path.endsWith('/wallet/withdrawals'))
@@ -76,11 +79,58 @@ beforeEach(() => {
 })
 
 describe('the wallet screens on the v1 API (PRD §5.1, §8)', () => {
-  it('shows the balance at full scale, never through a number', async () => {
+  it('shows the 18-dp balance at 2dp on the wallet home', async () => {
     stubApi()
     show(<WalletHome />)
 
-    expect(await screen.findByText(AVAILABLE)).toBeInTheDocument()
+    expect(await screen.findByText(/1,234\.57/)).toBeInTheDocument()
+    expect(screen.queryByText(new RegExp(AVAILABLE.replace('.', '\\.')))).toBeNull()
+  })
+
+  it('lists the entries from /wallet/activity on the wallet home', async () => {
+    stubApi({
+      activity: () =>
+        jsonResponse({
+          success: true,
+          data: [
+            {
+              id: 'j2', kind: 'DEPOSIT', bucket: 'AVAILABLE', direction: 'CREDIT',
+              amount: '50.000000000000000000', assetSymbol: 'USDT', memo: '', at: '2026-11-22T10:00:00Z',
+            },
+            {
+              id: 'j1', kind: 'WITHDRAWAL', bucket: 'AVAILABLE', direction: 'DEBIT',
+              amount: '5.000000000000000000', assetSymbol: 'USDT', memo: '', at: '2026-11-21T10:00:00Z',
+            },
+          ],
+        }),
+    })
+    show(<WalletHome />)
+
+    const rows = await screen.findAllByText(/^(DEPOSIT|WITHDRAWAL)$/)
+    expect(rows.map((r) => r.textContent)).toEqual(['DEPOSIT', 'WITHDRAWAL'])
+  })
+
+  it('hands the dashboard card the full string and shows it at 2dp', async () => {
+    stubApi()
+    const spy = vi.spyOn(assetsCard, 'TotalAssetsCard')
+    show(<CustomerDashboard />)
+
+    const card = await screen.findByTestId('total-assets-card')
+    expect(card).toHaveTextContent('1,234.57')
+    expect(card).not.toHaveTextContent(AVAILABLE)
+    expect(spy).toHaveBeenCalled()
+    const props = spy.mock.calls.at(-1)![0]
+    expect(props.availableUsdt).toBe(AVAILABLE)
+    expect(typeof props.availableUsdt).toBe('string')
+  })
+
+  it('shows no INR headline or estimate and no BTC/ETH rows on the dashboard', async () => {
+    stubApi()
+    show(<CustomerDashboard />)
+
+    const card = await screen.findByTestId('total-assets-card')
+    expect(card).not.toHaveTextContent(/₹|INR|≈/)
+    expect(screen.queryByText(/\b(BTC|ETH|Bitcoin|Ethereum)\b/)).toBeNull()
   })
 
   it('shows the real deposit address and refuses to invent one', async () => {
