@@ -156,7 +156,7 @@ export function WalletHome() {
               className="py-2.5 flex items-center justify-between rounded-xl px-1.5"
             >
               <div>
-                <span className="text-xs font-black text-slate-900 dark:text-white block group-hover:text-emerald-500 transition-colors">
+                <span className="text-xs font-black text-slate-900 dark:text-white block">
                   {row.kind}
                 </span>
                 <span className="text-[10px] text-slate-400">
