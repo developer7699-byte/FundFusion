@@ -392,4 +392,74 @@ describe('the wallet screens on the v1 API (PRD §5.1, §8)', () => {
     show(<WithdrawFlow />)
     expect(await screen.findByText(/Available: 1,234\.57/)).toBeInTheDocument()
   })
+
+  const ADDR2 = '0x71C889e2F1d46788B2c99aF0394A723eF1000002'
+  const keysOf = (fm: ReturnType<typeof stubApi>) =>
+    fm.mock.calls
+      .filter((c) => String(c[0]).endsWith('/wallet/withdrawals'))
+      .map((c) => new Headers((c[1] as RequestInit).headers).get('Idempotency-Key'))
+
+  it.each([
+    ['address', async (u: ReturnType<typeof userEvent.setup>) => {
+      const el = screen.getByLabelText(/destination address/i)
+      await u.clear(el)
+      await u.type(el, ADDR2)
+    }],
+    ['amount', async (u: ReturnType<typeof userEvent.setup>) => {
+      const el = screen.getByLabelText(/amount/i)
+      await u.clear(el)
+      await u.type(el, '11')
+    }],
+  ])('uses a new Idempotency-Key when the %s changes', async (_name, change) => {
+    let n = 0
+    const fm = stubApi({
+      withdrawal: () =>
+        n++ < 2
+          ? jsonResponse({ success: false, error: { code: 'ERROR', message: 'boom' } }, 500)
+          : jsonResponse({ success: true, data: { id: 'w1' } }),
+    })
+    const user = userEvent.setup()
+    show(<WithdrawFlow />)
+
+    await user.type(await screen.findByLabelText(/destination address/i), ADDR)
+    await user.type(screen.getByLabelText(/amount/i), '10')
+    await user.type(screen.getByLabelText(/authenticator code/i), '123456')
+    await user.click(screen.getByRole('button', { name: /request withdrawal/i }))
+    await screen.findByText('boom')
+    await user.click(screen.getByRole('button', { name: /request withdrawal/i }))
+    await waitFor(() => expect(keysOf(fm)).toHaveLength(2))
+    await change(user)
+    await user.click(screen.getByRole('button', { name: /request withdrawal/i }))
+
+    await screen.findByText(/withdrawal requested/i)
+    const keys = keysOf(fm)
+    expect(keys).toHaveLength(3)
+    expect(keys[1]).toBe(keys[0])
+    expect(keys[2]).toBeTruthy()
+    expect(keys[2]).not.toBe(keys[0])
+  })
+
+  it('uses a fresh Idempotency-Key for the next withdrawal after a success', async () => {
+    const fm = stubApi()
+    const user = userEvent.setup()
+    const first = show(<WithdrawFlow />)
+    await user.type(await screen.findByLabelText(/destination address/i), ADDR)
+    await user.type(screen.getByLabelText(/amount/i), '10')
+    await user.type(screen.getByLabelText(/authenticator code/i), '123456')
+    await user.click(screen.getByRole('button', { name: /request withdrawal/i }))
+    await screen.findByText(/withdrawal requested/i)
+    first.unmount()
+
+    show(<WithdrawFlow />)
+    await user.type(await screen.findByLabelText(/destination address/i), ADDR)
+    await user.type(screen.getByLabelText(/amount/i), '10')
+    await user.type(screen.getByLabelText(/authenticator code/i), '123456')
+    await user.click(screen.getByRole('button', { name: /request withdrawal/i }))
+    await screen.findByText(/withdrawal requested/i)
+
+    const keys = keysOf(fm)
+    expect(keys).toHaveLength(2)
+    expect(keys[0]).toBeTruthy()
+    expect(keys[1]).not.toBe(keys[0])
+  })
 })
