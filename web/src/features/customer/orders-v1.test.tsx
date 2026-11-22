@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { AppProviders } from '@/app/providers'
 import { REFRESH_KEY, TOKEN_KEY } from '@/lib/api'
 import { QuoteFlow, WalletHome } from './wallet-flows'
-import { OrderDetail } from './ops-pages'
+import { OrderDetail, OrdersList } from './ops-pages'
 
 const QUOTE = {
   id: 'q1',
@@ -510,5 +510,177 @@ describe('customer orders on the v1 API (PRD §6)', () => {
     show(<QuoteFlow side="SELL" />)
     await quoteThenConfirm(user)
     expect(await screen.findByText(/100\.00 USDT · ₹9,700\.00/)).toBeInTheDocument()
+  })
+})
+
+const BASE_ORDER = {
+  orderId: 'o1',
+  usdtAmount: '100.000000000000000000',
+  inrAmount: '9700.00',
+  customerRate: '97.00',
+  platformFeeUsdt: '3.000000000000000000',
+  role: 'CUSTOMER',
+  merchantUserId: null,
+  utr: null,
+  broadcastAt: null,
+  updatedAt: '2026-11-21T09:00:00.000Z',
+  payeeInstruction: null,
+}
+
+const STATES = [
+  'QUOTED',
+  'AWAITING_MERCHANT',
+  'ACCEPTED',
+  'PAYMENT_SUBMITTED',
+  'COMPLETED',
+  'DISPUTED',
+  'REFUNDED',
+  'EXPIRED',
+]
+
+function allowed(side: string, status: string): 'utr' | 'confirm' | null {
+  if (side === 'BUY' && status === 'ACCEPTED') return 'utr'
+  if (side === 'SELL' && status === 'PAYMENT_SUBMITTED') return 'confirm'
+  return null
+}
+
+function detailRoute() {
+  return (
+    <AppProviders>
+      <MemoryRouter initialEntries={['/customer/orders/o1']}>
+        <Routes>
+          <Route path="/customer/orders/:orderId" element={<OrderDetail />} />
+        </Routes>
+      </MemoryRouter>
+    </AppProviders>
+  )
+}
+
+describe('order list and detail (state x side matrix)', () => {
+  it("the list shows the user's orders with side, status and 2dp money", async () => {
+    const fetchMock = vi.fn((url: string) =>
+      String(url).endsWith('/p2p/orders')
+        ? jsonResponse({
+            success: true,
+            data: [
+              { ...BASE_ORDER, orderId: 'a', side: 'BUY', status: 'ACCEPTED' },
+              { ...BASE_ORDER, orderId: 'b', side: 'SELL', status: 'COMPLETED' },
+            ],
+          })
+        : jsonResponse({ success: true, data: [] }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    show(<OrdersList />)
+
+    expect(await screen.findByText(/BUY · ACCEPTED/)).toBeInTheDocument()
+    expect(screen.getByText(/SELL · COMPLETED/)).toBeInTheDocument()
+    expect(screen.getAllByText(/100\.00 USDT/).length).toBe(2)
+    expect(screen.queryByText(/100\.000000000000000000/)).toBeNull()
+  })
+
+  for (const side of ['BUY', 'SELL']) {
+    for (const status of STATES) {
+      it(`${side} at ${status} offers ${allowed(side, status) ?? 'no action'}`, async () => {
+        showOrder({ ...BASE_ORDER, side, status })
+        await screen.findByText(new RegExp(status.replace(/_/g, ' '), 'i'))
+        const want = allowed(side, status)
+        const utr = screen.queryByRole('button', { name: /submit utr/i })
+        const confirm = screen.queryByRole('button', { name: /confirm receipt/i })
+        expect(!!utr).toBe(want === 'utr')
+        expect(!!confirm).toBe(want === 'confirm')
+        // Nothing else is actionable on any state, notably no dispute.
+        expect(screen.queryByRole('button', { name: /dispute/i })).toBeNull()
+      })
+    }
+  }
+
+  it('a null payee renders "awaiting payee" without throwing', async () => {
+    showOrder({ ...BASE_ORDER, side: 'BUY', status: 'AWAITING_MERCHANT' })
+    expect(await screen.findByText(/awaiting payee/i)).toBeInTheDocument()
+  })
+
+  it('a bound bank instruction renders the frozen destination', async () => {
+    showOrder({
+      ...BASE_ORDER,
+      side: 'BUY',
+      status: 'ACCEPTED',
+      payeeInstruction: {
+        payeeUserId: 'm1',
+        type: 'BANK',
+        holderName: 'Merchant Desk',
+        accountNumber: '9988776655',
+        ifsc: 'ICIC0000001',
+        upiVpa: null,
+      },
+    })
+    expect(await screen.findByText(/9988776655/)).toBeInTheDocument()
+    expect(screen.getByText(/ICIC0000001/)).toBeInTheDocument()
+    expect(screen.getByText(/Merchant Desk/)).toBeInTheDocument()
+  })
+
+  it('a bound UPI instruction renders the VPA', async () => {
+    showOrder({
+      ...BASE_ORDER,
+      side: 'BUY',
+      status: 'ACCEPTED',
+      payeeInstruction: {
+        payeeUserId: 'm1',
+        type: 'UPI',
+        holderName: 'Merchant Desk',
+        accountNumber: null,
+        ifsc: null,
+        upiVpa: 'desk@okbank',
+      },
+    })
+    expect(await screen.findByText(/desk@okbank/)).toBeInTheDocument()
+  })
+
+  it('detail shows money at 2dp, not raw 18dp strings', async () => {
+    showOrder({ ...BASE_ORDER, side: 'BUY', status: 'COMPLETED' })
+    await screen.findByText(/COMPLETED/)
+    expect(screen.queryByText(/100\.000000000000000000/)).toBeNull()
+    expect(screen.getByText('100.00')).toBeInTheDocument()
+  })
+
+  it('confirm receipt retried after a 5xx reuses one Idempotency-Key', async () => {
+    const fetchMock = stubApi({
+      order: { ...BASE_ORDER, side: 'SELL', status: 'PAYMENT_SUBMITTED' },
+    })
+    const base = fetchMock.getMockImplementation()!
+    let posts = 0
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).endsWith('/confirm') && posts++ === 0)
+        return jsonResponse(
+          { success: false, error: { code: 'ERROR', message: 'gateway timeout' } },
+          504,
+        )
+      return base(url, init)
+    })
+    const user = userEvent.setup()
+    render(detailRoute())
+    await user.click(await screen.findByRole('button', { name: /confirm receipt/i }))
+    await screen.findByText(/gateway timeout/i)
+    await user.click(screen.getByRole('button', { name: /confirm receipt/i }))
+    await waitFor(() => {
+      const keys = fetchMock.mock.calls
+        .filter((c) => String(c[0]).endsWith('/confirm'))
+        .map((c) => new Headers(c[1]?.headers).get('Idempotency-Key'))
+      expect(keys).toHaveLength(2)
+      expect(keys[0]).toBeTruthy()
+      expect(keys[1]).toBe(keys[0])
+    })
+  })
+
+  it('submitting a UTR sends no Idempotency-Key', async () => {
+    const fetchMock = stubApi({ order: { ...BASE_ORDER, side: 'BUY', status: 'ACCEPTED' } })
+    const user = userEvent.setup()
+    render(detailRoute())
+    await user.type(await screen.findByLabelText(/utr/i), 'UTR123456789')
+    await user.click(screen.getByRole('button', { name: /submit utr/i }))
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find((c) => String(c[0]).endsWith('/o1/utr'))
+      expect(post).toBeDefined()
+      expect(new Headers(post![1]?.headers).get('Idempotency-Key')).toBeNull()
+    })
   })
 })

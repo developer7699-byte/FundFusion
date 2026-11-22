@@ -1,15 +1,25 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { CheckCircle2, Send, HelpCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { newIdempotencyKey, v1 } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
-import { cn } from '@/lib/utils'
+import { cn, usdt2dp } from '@/lib/utils'
+import { definitiveRefusal } from './wallet-flows'
 import { BackButton } from '@/components/ui/BackButton'
 import { useNotifications } from '@/lib/notifications'
+
+/** Where the rupees go, frozen onto the order. Null until a counterparty binds it. */
+type Payee = {
+  type: 'BANK' | 'UPI'
+  holderName: string
+  accountNumber: string | null
+  ifsc: string | null
+  upiVpa: string | null
+}
 
 type Order = {
   orderId: string
@@ -22,6 +32,7 @@ type Order = {
   role: 'CUSTOMER' | 'MERCHANT'
   merchantUserId: string | null
   utr: string | null
+  payeeInstruction: Payee | null
   broadcastAt: string | null
   updatedAt: string
 }
@@ -125,10 +136,10 @@ export function OrdersList() {
             </div>
             <div className="text-right shrink-0">
               <span className="text-xs font-black font-mono text-slate-900 dark:text-white block break-all">
-                {o.usdtAmount} USDT
+                {usdt2dp(o.usdtAmount)} USDT
               </span>
               <span className="text-[10px] text-slate-400 font-mono">
-                ₹{o.inrAmount}
+                ₹{usdt2dp(o.inrAmount)}
               </span>
             </div>
           </Link>
@@ -153,6 +164,8 @@ export function OrderDetail({ backTo = '/customer/orders' }: { backTo?: string }
   const [utr, setUtr] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  // One key per order for releasing escrow; a retried confirm is the same call.
+  const confirmKey = useRef<{ orderId: string; key: string } | null>(null)
 
   const q = useQuery({
     queryKey: ['order', orderId],
@@ -218,10 +231,10 @@ export function OrderDetail({ backTo = '/customer/orders' }: { backTo?: string }
         <dl className="space-y-2 text-sm">
           {[
             ['Side', o.side],
-            ['USDT', o.usdtAmount],
-            ['Rupees', `₹${o.inrAmount}`],
-            ['Rate', `₹${o.customerRate} per USDT`],
-            ['Platform fee', `${o.platformFeeUsdt} USDT`],
+            ['USDT', usdt2dp(o.usdtAmount)],
+            ['Rupees', `₹${usdt2dp(o.inrAmount)}`],
+            ['Rate', `₹${usdt2dp(o.customerRate)} per USDT`],
+            ['Platform fee', `${usdt2dp(o.platformFeeUsdt)} USDT`],
             ['UTR', o.utr ?? 'Not submitted'],
           ].map(([label, value]) => (
             <div key={label} className="flex justify-between gap-3">
@@ -231,6 +244,26 @@ export function OrderDetail({ backTo = '/customer/orders' }: { backTo?: string }
           ))}
         </dl>
       </div>
+
+      {o.role === 'CUSTOMER' && o.side === 'BUY' && (
+        <div className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 space-y-1">
+          {o.payeeInstruction ? (
+            <>
+              <p className="font-bold">Pay ₹{usdt2dp(o.inrAmount)} to</p>
+              <p>{o.payeeInstruction.holderName}</p>
+              {o.payeeInstruction.type === 'UPI' ? (
+                <p className="font-mono">{o.payeeInstruction.upiVpa}</p>
+              ) : (
+                <p className="font-mono">
+                  {o.payeeInstruction.accountNumber} · {o.payeeInstruction.ifsc}
+                </p>
+              )}
+            </>
+          ) : (
+            <p>Awaiting payee: the merchant's payment details appear here once they accept.</p>
+          )}
+        </div>
+      )}
 
       {action === 'SUBMIT_UTR' && (
         <form
@@ -276,20 +309,29 @@ export function OrderDetail({ backTo = '/customer/orders' }: { backTo?: string }
       {action === 'CONFIRM_RECEIPT' && (
         <div className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-2.5 shadow-2xs">
           <p className="text-xs text-slate-600 dark:text-slate-300">
-            Confirm only once ₹{o.inrAmount} has actually arrived in your bank
+            Confirm only once ₹{usdt2dp(o.inrAmount)} has actually arrived in your bank
             account. This releases the escrow.
           </p>
           <Button
             type="button"
             disabled={busy}
-            onClick={() =>
-              void run(() =>
-                v1(`/p2p/orders/${o.orderId}/confirm`, {
-                  method: 'POST',
-                  idempotencyKey: newIdempotencyKey(),
-                }),
-              )
-            }
+            onClick={() => {
+              if (confirmKey.current?.orderId !== o.orderId)
+                confirmKey.current = { orderId: o.orderId, key: newIdempotencyKey() }
+              const key = confirmKey.current.key
+              void run(async () => {
+                try {
+                  await v1(`/p2p/orders/${o.orderId}/confirm`, {
+                    method: 'POST',
+                    idempotencyKey: key,
+                  })
+                  confirmKey.current = null
+                } catch (err) {
+                  if (definitiveRefusal(err)) confirmKey.current = null
+                  throw err
+                }
+              })
+            }}
             className="w-full h-11 rounded-full font-semibold text-sm bg-emerald-500 text-white"
           >
             {busy ? 'Confirming...' : 'Confirm receipt'}
@@ -301,24 +343,6 @@ export function OrderDetail({ backTo = '/customer/orders' }: { backTo?: string }
         <p className="text-xs text-rose-500 font-medium bg-rose-500/10 p-2.5 rounded-xl border border-rose-500/20">
           {error}
         </p>
-      )}
-
-      {OPEN_STATES.includes(o.status) && o.status !== 'QUOTED' && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() =>
-            void run(() =>
-              v1(`/p2p/orders/${o.orderId}/dispute`, {
-                method: 'POST',
-                body: JSON.stringify({ reason: 'Raised from the order screen' }),
-              }),
-            )
-          }
-          className="w-full py-2.5 px-3 rounded-xl text-xs font-bold bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 hover:bg-rose-100 border border-rose-200/60 dark:border-rose-900/40 cursor-pointer text-center"
-        >
-          Raise a dispute
-        </button>
       )}
 
       <Link

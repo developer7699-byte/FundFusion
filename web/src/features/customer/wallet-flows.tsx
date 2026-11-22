@@ -790,7 +790,7 @@ function customerAction(o: PlacedOrder): 'SUBMIT_UTR' | 'CONFIRM_RECEIPT' | null
  * succeed later. A 5xx, a timeout or a dropped connection says nothing about
  * whether the work landed, so those keep their idempotency key for a replay.
  */
-function definitiveRefusal(err: unknown): boolean {
+export function definitiveRefusal(err: unknown): boolean {
   return (
     err instanceof ApiError &&
     err.status >= 400 &&
