@@ -594,6 +594,14 @@ describe('order list and detail (state x side matrix)', () => {
     }
   }
 
+  it('the merchant desk keeps its dispute action on open states', async () => {
+    for (const status of ['ACCEPTED', 'PAYMENT_SUBMITTED']) {
+      const { unmount } = showOrder({ ...BASE_ORDER, role: 'MERCHANT', side: 'BUY', status })
+      expect(await screen.findByRole('button', { name: /raise a dispute/i })).toBeInTheDocument()
+      unmount()
+    }
+  })
+
   it('a null payee renders "awaiting payee" without throwing', async () => {
     showOrder({ ...BASE_ORDER, side: 'BUY', status: 'AWAITING_MERCHANT' })
     expect(await screen.findByText(/awaiting payee/i)).toBeInTheDocument()

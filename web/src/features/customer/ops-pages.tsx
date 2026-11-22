@@ -345,6 +345,24 @@ export function OrderDetail({ backTo = '/customer/orders' }: { backTo?: string }
         </p>
       )}
 
+      {o.role === 'MERCHANT' && OPEN_STATES.includes(o.status) && o.status !== 'QUOTED' && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() =>
+            void run(() =>
+              v1(`/p2p/orders/${o.orderId}/dispute`, {
+                method: 'POST',
+                body: JSON.stringify({ reason: 'Raised from the order screen' }),
+              }),
+            )
+          }
+          className="w-full py-2.5 px-3 rounded-xl text-xs font-bold bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 hover:bg-rose-100 border border-rose-200/60 dark:border-rose-900/40 cursor-pointer text-center"
+        >
+          Raise a dispute
+        </button>
+      )}
+
       <Link
         to="/customer/support"
         className="w-full py-2.5 rounded-xl text-xs font-bold bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center gap-1.5"
