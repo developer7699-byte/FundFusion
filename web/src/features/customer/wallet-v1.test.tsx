@@ -222,34 +222,40 @@ describe('the wallet screens on the v1 API (PRD §5.1, §8)', () => {
     expect(screen.queryByRole('button', { name: /simulate/i })).toBeNull()
   })
 
-  it('shows waiting, then credited, off the activity feed', async () => {
-    stubApi()
-    show(<DepositFlow />)
-    expect(await screen.findByText(/waiting for your deposit/i)).toBeInTheDocument()
-  })
+  const DEPOSIT_ROW = {
+    id: 'e1',
+    kind: 'DEPOSIT',
+    bucket: 'AVAILABLE',
+    direction: 'CREDIT',
+    amount: '25.500000000000000000',
+    assetSymbol: 'USDT',
+    memo: 'deposit 0xabc',
+    at: '2026-11-22T00:00:00Z',
+  }
 
-  it('shows the credited deposit from /wallet/activity', async () => {
+  it('stays waiting when a deposit already existed on load', async () => {
     stubApi({
-      activity: () =>
-        jsonResponse({
-          success: true,
-          data: [
-            {
-              id: 'e1',
-              kind: 'DEPOSIT',
-              bucket: 'AVAILABLE',
-              direction: 'CREDIT',
-              amount: '25.500000000000000000',
-              assetSymbol: 'USDT',
-              memo: 'deposit 0xabc',
-              at: '2026-11-22T00:00:00Z',
-            },
-          ],
-        }),
+      activity: () => jsonResponse({ success: true, data: [DEPOSIT_ROW] }),
     })
     show(<ReceiveFlow />)
-    expect(await screen.findByText(/deposit credited: 25\.50 USDT/i)).toBeInTheDocument()
+    expect(await screen.findByText(SUMMARY.address)).toBeInTheDocument()
+    expect(await screen.findByText(/waiting for your deposit/i)).toBeInTheDocument()
+    expect(screen.queryByText(/deposit credited/i)).toBeNull()
   })
+
+  it('flips to credited when a new deposit arrives on a later poll', async () => {
+    let polls = 0
+    stubApi({
+      activity: () =>
+        jsonResponse({ success: true, data: polls++ === 0 ? [] : [DEPOSIT_ROW] }),
+    })
+    show(<DepositFlow />)
+    expect(await screen.findByText(/waiting for your deposit/i)).toBeInTheDocument()
+
+    expect(
+      await screen.findByText(/deposit credited: 25\.50 USDT/i, {}, { timeout: 12_000 }),
+    ).toBeInTheDocument()
+  }, 15_000)
 
   it('Send is a parked action and makes no API call', async () => {
     const fetchMock = stubApi()

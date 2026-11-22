@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   Copy,
@@ -210,8 +210,10 @@ interface WalletAddress {
  * no fallback, because money sent to an invented address is gone.
  *
  * The ledger posts a deposit only once, at fifteen confirmations, so the
- * activity feed has no half-way row. Until a deposit row appears the screen
- * says it is waiting; once one does, it says it was credited.
+ * activity feed has no half-way row. The deposits already in the feed when the
+ * screen opens are a baseline and never count: the screen says it is waiting
+ * until a deposit row that was not in that baseline arrives on a later poll,
+ * and only then says it was credited.
  */
 function AddressScreen({ title }: { title: string }) {
   const q = useQuery({
@@ -233,8 +235,15 @@ function AddressScreen({ title }: { title: string }) {
     setTimeout(() => setCopied(false), 1500)
   }
 
+  const isDeposit = (r: ActivityRow) =>
+    r.kind === 'DEPOSIT' && r.direction === 'CREDIT' && r.bucket === 'AVAILABLE'
+  // Captured once, from the first successful response.
+  const baseline = useRef<Set<string> | null>(null)
+  if (baseline.current === null && activity.data) {
+    baseline.current = new Set(activity.data.filter(isDeposit).map((r) => r.id))
+  }
   const credited = activity.data?.find(
-    (r) => r.kind === 'DEPOSIT' && r.direction === 'CREDIT' && r.bucket === 'AVAILABLE',
+    (r) => isDeposit(r) && baseline.current !== null && !baseline.current.has(r.id),
   )
 
   return (
