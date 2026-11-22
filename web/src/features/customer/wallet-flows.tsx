@@ -10,6 +10,7 @@ import {
 import { BackButton } from '@/components/ui/BackButton'
 import {} from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ParkedAction } from '@/components/ui/ParkedAction'
 import {} from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -194,14 +195,47 @@ export function WalletHome() {
  * conjures a balance is the one thing a wallet must never have.
  */
 export function DepositFlow() {
-  const q = useWalletSummary()
+  return <AddressScreen title="Add Money" />
+}
+
+/** `GET /v1/wallet/address`. */
+interface WalletAddress {
+  address: string
+  network: string
+}
+
+/**
+ * Deposit and Receive are the same thing: the one address the ledger knows
+ * this person by. It is read from `/wallet/address` and nothing else; there is
+ * no fallback, because money sent to an invented address is gone.
+ *
+ * The ledger posts a deposit only once, at fifteen confirmations, so the
+ * activity feed has no half-way row. Until a deposit row appears the screen
+ * says it is waiting; once one does, it says it was credited.
+ */
+function AddressScreen({ title }: { title: string }) {
+  const q = useQuery({
+    queryKey: ['wallet', 'address'],
+    queryFn: () => v1<WalletAddress>('/wallet/address'),
+    retry: false,
+  })
+  const activity = useQuery({
+    queryKey: ['wallet', 'activity'],
+    queryFn: () => v1<ActivityRow[]>('/wallet/activity'),
+    retry: false,
+    refetchInterval: 10_000,
+  })
   const [copied, setCopied] = useState(false)
 
   const copy = async (address: string) => {
-    await navigator.clipboard.writeText(address)
+    await navigator.clipboard?.writeText(address)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }
+
+  const credited = activity.data?.find(
+    (r) => r.kind === 'DEPOSIT' && r.direction === 'CREDIT' && r.bucket === 'AVAILABLE',
+  )
 
   return (
     <div className="max-w-lg mx-auto space-y-4 pb-4 w-full overflow-x-hidden min-w-0">
@@ -209,7 +243,7 @@ export function DepositFlow() {
         <div className="flex items-center gap-3">
           <BackButton fallback="/customer/wallet" />
           <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight">
-            Add Money
+            {title}
           </h1>
         </div>
 
@@ -229,14 +263,7 @@ export function DepositFlow() {
         </p>
       )}
 
-      {q.data && !q.data.address && (
-        <p className="text-amber-600 dark:text-amber-400 font-bold p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-sm">
-          This server cannot issue a deposit address. Nothing should be sent
-          anywhere until it can.
-        </p>
-      )}
-
-      {q.data?.address && (
+      {q.data && (
         <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
           <div className="p-[1.5px] rounded-[28px] bg-gradient-to-br from-[#3b59f8] via-[#10b981] to-[#3b59f8] shadow-lg shadow-blue-500/10">
             <div className="rounded-[26px] bg-white dark:bg-[#121829] p-4.5 space-y-4 text-center">
@@ -255,7 +282,7 @@ export function DepositFlow() {
 
               <Button
                 type="button"
-                onClick={() => void copy(q.data!.address!)}
+                onClick={() => void copy(q.data.address)}
                 className="w-full h-11 rounded-full font-bold text-sm bg-slate-900 dark:bg-white text-white dark:text-slate-900"
               >
                 {copied ? (
@@ -269,6 +296,29 @@ export function DepositFlow() {
                 )}
               </Button>
             </div>
+          </div>
+
+          <div
+            role="status"
+            data-testid="deposit-status"
+            className="rounded-2xl border border-slate-100 dark:border-slate-800 p-3 text-xs flex items-start gap-2"
+          >
+            {credited ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                <span className="text-slate-700 dark:text-slate-200">
+                  Deposit credited: {usdt2dp(credited.amount)} USDT
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="mt-1 w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                <span className="text-slate-600 dark:text-slate-300">
+                  Waiting for your deposit. It is credited after fifteen
+                  confirmations.
+                </span>
+              </>
+            )}
           </div>
 
           <div className="rounded-[28px] bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 p-4 space-y-2 shadow-xs">
@@ -494,89 +544,18 @@ export function SendFlow() {
           Sending to another account on this platform is not part of this
           release.
         </p>
-        <Link to="/customer/wallet/withdraw">
-          <Button className="w-full h-11 rounded-full font-semibold bg-slate-900 dark:bg-white text-white dark:text-slate-900">
-            Withdraw to a chain address instead
-          </Button>
-        </Link>
+        <ParkedAction
+          label="Send USDT"
+          className="w-full h-11 rounded-full font-semibold bg-slate-900 dark:bg-white text-white dark:text-slate-900"
+          labelClassName=""
+        />
       </div>
     </div>
   )
 }
 
 export function ReceiveFlow() {
-  const [copied, setCopied] = useState(false)
-  const [selectedNetwork, setSelectedNetwork] = useState('TRX')
-  const address =
-    selectedNetwork === 'TRX'
-      ? 'TLvM8vPq7uN9eX2xK92bA8m1pQ4rT9vW'
-      : '0x71C889e2F1d46788B2c99aF0394A723eF10'
-
-  return (
-    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
-      <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800">
-        <BackButton fallback="/customer/wallet" />
-        <div>
-          <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
-            Receive USDT
-          </h1>
-          <p className="text-[11px] text-slate-500">Your secure deposit vault address</p>
-        </div>
-      </div>
-
-      {/* Network Picker */}
-      <div className="flex gap-2">
-        {['TRX', 'BNB', 'ETH'].map((net) => (
-          <button
-            key={net}
-            type="button"
-            onClick={() => setSelectedNetwork(net)}
-            className={cn(
-              'flex-1 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer',
-              selectedNetwork === net
-                ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-black'
-                : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
-            )}
-          >
-            {net === 'TRX' ? 'TRC20' : net === 'BNB' ? 'BEP20' : 'ERC20'}
-          </button>
-        ))}
-      </div>
-
-      {/* QR Code Card */}
-      <div className="rounded-[28px] bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 p-6 text-center space-y-4 shadow-xl">
-        <div className="w-48 h-48 mx-auto p-3 bg-white rounded-2xl shadow-inner border border-slate-200/80 flex items-center justify-center">
-          <QrCode className="w-40 h-40 text-slate-900" />
-        </div>
-
-        <div className="space-y-1">
-          <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
-            {selectedNetwork === 'TRX' ? 'Tron (TRC20)' : 'Binance Smart Chain (BEP20)'} Address
-          </span>
-          <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 break-all font-mono text-xs font-bold text-slate-900 dark:text-white">
-            {address}
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            navigator.clipboard?.writeText(address)
-            setCopied(true)
-            setTimeout(() => setCopied(false), 2000)
-          }}
-          className="w-full py-3 rounded-xl bg-[#0a2316] text-white hover:bg-emerald-950 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
-        >
-          {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-          <span>{copied ? 'Address Copied!' : 'Copy Vault Address'}</span>
-        </button>
-      </div>
-
-      <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300">
-        Send only USDT on the selected network. Other tokens will result in permanent loss.
-      </div>
-    </div>
-  )
+  return <AddressScreen title="Receive USDT" />
 }
 
 export function AddressesFlow() {

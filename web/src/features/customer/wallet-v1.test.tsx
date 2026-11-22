@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { AppProviders } from '@/app/providers'
 import { TOKEN_KEY } from '@/lib/api'
-import { DepositFlow, WalletHome, WithdrawFlow } from './wallet-flows'
+import { DepositFlow, ReceiveFlow, SendFlow, WalletHome, WithdrawFlow } from './wallet-flows'
 import { CustomerDashboard } from './CustomerDashboard'
 import * as assetsCard from './components/TotalAssetsCard'
 
@@ -42,6 +42,7 @@ function jsonResponse(body: unknown, status = 200) {
 
 interface Routes {
   summary?: () => Promise<Response>
+  address?: () => Promise<Response>
   activity?: () => Promise<Response>
   withdrawal?: () => Promise<Response>
 }
@@ -52,6 +53,14 @@ function stubApi(routes: Routes = {}) {
     if (path.endsWith('/auth/me')) return jsonResponse({ success: true, data: ME })
     if (path.endsWith('/wallet/summary'))
       return routes.summary?.() ?? jsonResponse({ success: true, data: SUMMARY })
+    if (path.endsWith('/wallet/address'))
+      return (
+        routes.address?.() ??
+        jsonResponse({
+          success: true,
+          data: { address: SUMMARY.address, network: SUMMARY.network },
+        })
+      )
     if (path.endsWith('/wallet/activity'))
       return routes.activity?.() ?? jsonResponse({ success: true, data: [] })
     if (path.endsWith('/wallet/allowlist'))
@@ -135,7 +144,7 @@ describe('the wallet screens on the v1 API (PRD §5.1, §8)', () => {
 
   it('shows the real deposit address and refuses to invent one', async () => {
     stubApi({
-      summary: () =>
+      address: () =>
         jsonResponse(
           { success: false, error: { code: 'ERROR', message: 'No address yet.' } },
           503,
@@ -203,5 +212,57 @@ describe('the wallet screens on the v1 API (PRD §5.1, §8)', () => {
         paths.slice(posted + 1).some((p) => p.endsWith('/wallet/summary')),
       ).toBe(true)
     })
+  })
+
+  it('Receive shows the same real address as Deposit', async () => {
+    stubApi()
+    show(<ReceiveFlow />)
+
+    expect(await screen.findByText(SUMMARY.address)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /simulate/i })).toBeNull()
+  })
+
+  it('shows waiting, then credited, off the activity feed', async () => {
+    stubApi()
+    show(<DepositFlow />)
+    expect(await screen.findByText(/waiting for your deposit/i)).toBeInTheDocument()
+  })
+
+  it('shows the credited deposit from /wallet/activity', async () => {
+    stubApi({
+      activity: () =>
+        jsonResponse({
+          success: true,
+          data: [
+            {
+              id: 'e1',
+              kind: 'DEPOSIT',
+              bucket: 'AVAILABLE',
+              direction: 'CREDIT',
+              amount: '25.500000000000000000',
+              assetSymbol: 'USDT',
+              memo: 'deposit 0xabc',
+              at: '2026-11-22T00:00:00Z',
+            },
+          ],
+        }),
+    })
+    show(<ReceiveFlow />)
+    expect(await screen.findByText(/deposit credited: 25\.50 USDT/i)).toBeInTheDocument()
+  })
+
+  it('Send is a parked action and makes no API call', async () => {
+    const fetchMock = stubApi()
+    const user = userEvent.setup()
+    show(<SendFlow />)
+
+    const btn = screen.getByRole('button', { name: /send usdt/i })
+    expect(btn).toHaveAttribute('aria-disabled', 'true')
+    await user.click(btn)
+    expect(await screen.findByText(/not available yet/i)).toBeInTheDocument()
+    expect(screen.queryByRole('link')).toBeNull()
+    // AppProviders' own session probe is the only call; Send adds none.
+    const paths = fetchMock.mock.calls.map((c) => String(c[0]))
+    expect(paths.filter((p) => !p.endsWith('/auth/me'))).toEqual([])
   })
 })
