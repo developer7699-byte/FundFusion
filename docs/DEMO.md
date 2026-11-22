@@ -166,3 +166,142 @@ never appears in their balance.
 This is M3 code and outside M4.6's scope, so it was recorded rather than
 fixed. The second run — with the watcher already live before the transfers
 landed — credited both correctly, which is the run recorded above.
+
+---
+
+## 6. The customer UI round-trip (customer slice, Task 9)
+
+The customer screens rebuilt on the v1 engine (auth, authenticator, wallet,
+deposit, receive, withdraw, payment methods, buy, sell, orders) are driven
+end to end with a **seeded merchant as the counterparty**. There is no
+customer-facing merchant UI: the merchant side is an operator script,
+`api/scripts/seed-accept-merchant.ts`.
+
+> **Honest status.** The procedure below is complete and the script is
+> written, type-checked and linted. The live testnet run itself was **not
+> executed** in the session that wrote this section: it needs a running API
+> with `JOBS_ENABLED=true`, a funded BSC testnet faucet (`BSC_HD_SEED`,
+> `USDT_CONTRACT_ADDRESS`, a NodeReal RPC key), the chain watcher and a
+> database, and none of those were configured there (no `api/.env`, no
+> `DATABASE_URL`, no RPC key). So this section records **no figures from a
+> run**. Section 4 above is the last real testnet record; the fill-in table
+> in 6.3 is to be completed by whoever performs the run.
+
+### 6.1 The counterparty script
+
+```bash
+# once, with the API running and api/.env configured as in section 1
+npm run demo:seed --workspace api        # customer@demo.test + merchant@demo.test,
+                                         # desk opened via POST /v1/p2p/merchant/desk,
+                                         # 150 test USDT to each, by real deposit
+npm run seed:merchant --workspace api    # serve the merchant feed until Ctrl-C
+npm run seed:merchant --workspace api -- <orderId>   # or handle one order and exit
+```
+
+It signs in as `merchant@demo.test` (password and `OTP_STATIC_DEV` code as
+printed by `demo:seed`; override with `MERCHANT_EMAIL`, `MERCHANT_PASSWORD`,
+`SPINE_API`), makes sure the desk is open, then polls
+`GET /v1/p2p/merchant/feed` and for each order:
+
+| Side | Merchant script does | Customer does on `/customer/orders/:id` |
+|---|---|---|
+| SELL | `POST .../accept`, then `POST .../utr` ("paid the rupees") | confirms receipt, `POST .../confirm` |
+| BUY | `POST .../accept` (locks the merchant's USDT), waits for `PAYMENT_SUBMITTED`, then `POST .../confirm` | submits the UTR, `POST .../utr` |
+
+Accept and confirm carry a fresh `Idempotency-Key`. Money is only ever a
+string in the script; nothing is computed.
+
+### 6.2 The walk, screen by screen
+
+Start `npm run dev:api`, `npm run dev:web`, then run `seed:merchant` in a
+second terminal. In the browser at http://localhost:5173:
+
+| # | Screen | Do | Figure to record |
+|---|---|---|---|
+| 1 | `/register`, `/verify-otp` | sign up a fresh customer, enter the emailed code (`OTP_STATIC_DEV`) | none |
+| 2 | `/mfa/enroll` | scan the secret, confirm a code; money screens redirect here until done | none |
+| 3 | `/customer/wallet/deposit` | copy the derived address; send test USDT from the faucet | address; after 15 confirmations the wallet shows the credit: AVAILABLE |
+| 4 | `/customer/wallet` | read the buckets | AVAILABLE, LOCKED, BONDED, PENDING, each separately (no total, PRD §5.1) |
+| 5 | `/customer/payment-methods` | add a bank or UPI payee (required to sell, else `422 NO_PAYMENT_METHOD`) | the payee shown |
+| 6 | `/customer/sell` | amount, quote, place order | quote: USDT, INR, rate, platform fee; order id |
+| 7 | `/customer/orders/:id` | wait for ACCEPTED then PAYMENT_SUBMITTED (script accepted and submitted its UTR); press the one offered action, confirm receipt | status `COMPLETED`; wallet AVAILABLE down by the sold USDT |
+| 8 | `/customer/buy` | amount, quote, place order | quote USDT, INR, rate; order id |
+| 9 | `/customer/orders/:id` | after the script accepts, submit the UTR; the script then confirms | status `COMPLETED`; wallet AVAILABLE up by exactly the bought USDT |
+| 10 | `/customer/orders` | list | both orders `COMPLETED` |
+| 11 | `/admin/dashboard` | staff account | escrow locked 0, orders by status |
+
+No screen should offer an action the order's state forbids: on a SELL the
+customer has no UTR field, on a BUY they have no confirm button.
+
+### 6.3 Proof that money round-trips and the ledger balances
+
+After both orders complete, against the same database:
+
+```sql
+-- every journal nets to zero
+SELECT transaction_id FROM ledger_entry GROUP BY transaction_id
+ HAVING SUM(CASE WHEN direction='CREDIT' THEN amount ELSE -amount END) <> 0;
+-- expect 0 rows
+
+-- platform revenue
+SELECT COALESCE(SUM(CASE WHEN direction='CREDIT' THEN amount ELSE -amount END),0)::text
+  FROM ledger_entry WHERE account_type = 'REVENUE';
+```
+
+Expected shape, from section 4: on a sell the merchant receives the sold
+amount less the platform fee and the customer's AVAILABLE falls by the full
+amount; on a buy the customer receives exactly the quoted USDT (merchant fee
+0 while `quote.buyFeeBps` is 0, decision D-01). To be filled in by the
+person who runs it:
+
+| Item | Value |
+|---|---|
+| Sell: quote USDT / INR / rate / fee | _not yet run_ |
+| Sell: customer AVAILABLE before / after | _not yet run_ |
+| Buy: quote USDT / INR / rate | _not yet run_ |
+| Buy: customer AVAILABLE before / after | _not yet run_ |
+| Unbalanced journals | _not yet run_ (expect 0) |
+| Platform revenue | _not yet run_ |
+
+### 6.4 What was run in the authoring session
+
+See section 7.
+
+---
+
+## 7. What was and was not run while authoring section 6
+
+Run for real, in the worktree, with a throwaway PostgreSQL 16 container
+(`ff-task9-pg`, port 55433, migrated with `MIGRATE_TARGET=test`) standing in
+for the compose database:
+
+| Gate step | Result |
+|---|---|
+| `npm run lint` | exit 0 (warnings only, none in the new script) |
+| `npm run typecheck` | exit 0 |
+| `npm test` (api jest with `--watchman=false`, then web vitest) | api **56 suites, 589 tests passed**; web **12 files, 142 tests passed** |
+| `npm run test:e2e --workspace api` (`--watchman=false`) | **5 suites passed, 75 tests passed; 1 suite skipped (14 tests)** |
+| `npm run build` | exit 0 |
+
+The skipped suite is `api/test/wallet-v1.e2e-spec.ts`: it needs a custody
+seed and RPC configuration (`isChainConfigured()`), absent here, so the
+deposit-address paths were not exercised end to end.
+
+**Not run, and why:**
+
+- **The live testnet buy and sell (section 6.2) and the ledger figures
+  (6.3).** No `api/.env`, no BSC RPC key, no faucet seed, no running chain
+  watcher. Nothing in 6.3's table was observed.
+- **`npm run seed:merchant` against a live API.** It was started once; it
+  reached whatever was listening on `localhost:3001`, which was not this
+  API (`POST /auth/login -> 404: Cannot POST /api/v1/auth/login`), so it
+  could not sign in. The script is therefore verified only by type-check
+  and lint, not by a run.
+- The compose stack's own containers (`fundfusion-postgres`,
+  `fundfusion-redis`) were already running but publish no host ports in this
+  environment, so `docker compose up` could not be used; the throwaway
+  container above was used instead.
+
+Also note that the route names in section 2's table (`/enrol-authenticator`,
+`/customer/wallet/payment-methods`) predate the customer-slice router; the
+current paths are `/mfa/enroll` and `/customer/payment-methods`, as in 6.2.

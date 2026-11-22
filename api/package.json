@@ -27,6 +27,7 @@
     "chain:roundtrip": "ts-node -P tsconfig.json scripts/m3-roundtrip.ts",
     "spine:roundtrip": "ts-node -P tsconfig.json scripts/m45-spine.ts",
     "demo:seed": "ts-node -P tsconfig.json scripts/demo-seed.ts",
+    "seed:merchant": "ts-node -P tsconfig.json scripts/seed-accept-merchant.ts",
     "disputes:exercise": "ts-node -P tsconfig.json scripts/m5-disputes.ts"
   },
   "dependencies": {
