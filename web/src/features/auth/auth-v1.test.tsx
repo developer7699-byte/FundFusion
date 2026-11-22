@@ -89,7 +89,7 @@ describe('signing in against the v1 API (PRD §9.1)', () => {
   it('shows the authenticator secret once, with the warning that it is not shown again', async () => {
     localStorage.setItem(TOKEN_KEY, 'a-token')
     stubApi(UNENROLLED)
-    renderAt('/enrol-authenticator')
+    renderAt('/mfa/enroll')
 
     expect(await screen.findByText('JBSWY3DPEHPK3PXP')).toBeInTheDocument()
     expect(screen.getByText(/not shown again/i)).toBeInTheDocument()
@@ -104,5 +104,56 @@ describe('signing in against the v1 API (PRD §9.1)', () => {
     await waitFor(() =>
       expect(window.location.pathname).toBe('/customer/wallet'),
     )
+  })
+
+  it('sends an unenrolled user on a money route to /mfa/enroll', async () => {
+    localStorage.setItem(TOKEN_KEY, 'a-token')
+    stubApi(UNENROLLED)
+    renderAt('/customer/wallet')
+
+    await screen.findByRole('heading', { name: /authenticator/i })
+    expect(window.location.pathname).toBe('/mfa/enroll')
+  })
+
+  it('logs in, verifies the code and stores a session', async () => {
+    const fetchMock = stubApi(ENROLLED)
+    const user = userEvent.setup()
+    renderAt('/login')
+
+    await user.type(await screen.findByPlaceholderText(/email/i), 'a@example.test')
+    await user.type(screen.getByPlaceholderText(/password/i), 'Example!Demo1')
+    await user.click(screen.getByRole('button', { name: /sign in|log in/i }))
+    await user.type(await screen.findByLabelText(/emailed code/i), '246810')
+    await user.click(screen.getByRole('button', { name: /continue/i }))
+
+    await waitFor(() => expect(localStorage.getItem(TOKEN_KEY)).toBe('a-token'))
+    expect(localStorage.getItem(REFRESH_KEY)).toBe('r-token')
+    const paths = fetchMock.mock.calls.map((c) => String(c[0]))
+    expect(paths.some((p) => p.endsWith('/auth/login/verify'))).toBe(true)
+  })
+
+  it('enrols: begin, then confirm with the entered code, then lands home', async () => {
+    localStorage.setItem(TOKEN_KEY, 'a-token')
+    const fetchMock = stubApi(UNENROLLED)
+    const user = userEvent.setup()
+    renderAt('/mfa/enroll')
+
+    await screen.findByText('JBSWY3DPEHPK3PXP')
+    // After confirming, the server reports the gate open.
+    fetchMock.mockImplementation(((url: string) => {
+      const path = String(url)
+      if (path.endsWith('/auth/me')) return jsonResponse({ success: true, data: ENROLLED })
+      return jsonResponse({ success: true, data: { enrolled: true } })
+    }) as never)
+    await user.type(screen.getByLabelText(/authenticator code/i), '123456')
+    await user.click(screen.getByRole('button', { name: /confirm/i }))
+
+    await waitFor(() => expect(window.location.pathname).toBe('/customer/dashboard'))
+    const calls = fetchMock.mock.calls.map((c) => [String(c[0]), c[1]] as const)
+    const begin = calls.findIndex(([u]) => u.endsWith('/auth/mfa/begin'))
+    const confirm = calls.findIndex(([u]) => u.endsWith('/auth/mfa/confirm'))
+    expect(begin).toBeGreaterThanOrEqual(0)
+    expect(confirm).toBeGreaterThan(begin)
+    expect(JSON.parse(String((calls[confirm][1] as RequestInit).body))).toEqual({ code: '123456' })
   })
 })

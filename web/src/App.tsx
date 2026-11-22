@@ -3,12 +3,12 @@ import { AppProviders } from '@/app/providers'
 import { PrototypeBanner, SiteFooter, SiteHeader } from '@/components/layout/SiteChrome'
 import { NotFound } from '@/components/layout/NotFound'
 import {
-  EnrolAuthenticatorPage,
   ForgotPasswordPage,
   LoginPage,
   RegisterPage,
   VerifyOtpPage,
 } from '@/features/auth/pages'
+import { MfaEnrollPage } from '@/features/auth/MfaEnrollPage'
 import { CustomerDashboard } from '@/features/customer/CustomerDashboard'
 import {
   AddressesFlow,
@@ -99,7 +99,7 @@ function RequireAuth({ role, money }: { role?: string; money?: boolean }) {
     return <Navigate to="/" replace />
   }
   if (money && !user.canMoveMoney) {
-    return <Navigate to="/enrol-authenticator" replace />
+    return <Navigate to="/mfa/enroll" replace />
   }
   return <Outlet />
 }
@@ -144,10 +144,7 @@ export function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route element={<RequireAuth />}>
-            <Route
-              path="/enrol-authenticator"
-              element={<EnrolAuthenticatorPage />}
-            />
+            <Route path="/mfa/enroll" element={<MfaEnrollPage />} />
           </Route>
           <Route path="/verify-otp" element={<VerifyOtpPage />} />
 
@@ -168,7 +165,7 @@ export function App() {
                 <Route path="orders" element={<OrdersList />} />
                 <Route path="orders/:orderId" element={<OrderDetail />} />
               </Route>
-              <Route path="mfa/enroll" element={<EnrolAuthenticatorPage />} />
+              <Route path="mfa/enroll" element={<MfaEnrollPage />} />
               <Route path="profile" element={<CustomerProfilePage />} />
               <Route path="settings" element={<AccountLive title="Settings" />} />
               <Route path="security" element={<AccountLive title="Security" />} />

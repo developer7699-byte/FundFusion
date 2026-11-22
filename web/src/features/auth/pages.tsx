@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { homeFor, useAuth } from '@/lib/auth'
 
-function AuthLayout({
+export function AuthLayout({
   title,
   subtitle,
   children,
@@ -486,7 +486,7 @@ export function VerifyOtpPage() {
             // The authenticator is the financial gate (PRD §9.1). Someone who
             // has not enrolled one is sent there, not to a screen that would
             // refuse every request it makes.
-            navigate(me.canMoveMoney ? homeFor(me) : '/enrol-authenticator', {
+            navigate(me.canMoveMoney ? homeFor(me) : '/mfa/enroll', {
               replace: true,
             })
           } catch (err) {
@@ -535,111 +535,6 @@ export function VerifyOtpPage() {
         <Link to="/login" className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
           Back to Sign in
         </Link>
-      </div>
-    </AuthLayout>
-  )
-}
-
-/**
- * The financial gate (PRD §9.1). Until an authenticator is enrolled the
- * account has no deposit address, no balance and cannot place orders, so
- * every money screen sends an unenrolled person here rather than letting
- * them collect a 403 they cannot act on.
- */
-export function EnrolAuthenticatorPage() {
-  const { user, beginMfa, confirmMfa } = useAuth()
-  const navigate = useNavigate()
-  const [secret, setSecret] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    let live = true
-    beginMfa()
-      .then((s) => live && setSecret(s))
-      .catch((e: unknown) =>
-        live && setError(e instanceof Error ? e.message : 'Enrolment could not start.'),
-      )
-    return () => {
-      live = false
-    }
-  }, [beginMfa])
-
-  return (
-    <AuthLayout
-      title="Add your authenticator"
-      subtitle="Moving money needs a code from an authenticator app."
-    >
-      <div className="space-y-4">
-        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0c101d] p-4 text-center">
-          <p className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Setup key
-          </p>
-          <p className="mt-2 font-mono text-sm tracking-widest break-all text-slate-900 dark:text-white">
-            {secret || 'Preparing...'}
-          </p>
-          <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
-            Save it now — it is not shown again.
-          </p>
-        </div>
-
-        <form
-          className="space-y-4"
-          onSubmit={async (e) => {
-            e.preventDefault()
-            setError('')
-            setLoading(true)
-            const code = String(new FormData(e.currentTarget).get('code') ?? '')
-            try {
-              const me = await confirmMfa(code)
-              navigate(homeFor(me), { replace: true })
-            } catch (err) {
-              setError(err instanceof Error ? err.message : 'That code was not accepted.')
-            } finally {
-              setLoading(false)
-            }
-          }}
-        >
-          <div className="space-y-1.5">
-            <label
-              htmlFor="authenticator-code"
-              className="text-xs font-medium text-slate-600 dark:text-slate-300"
-            >
-              Authenticator code
-            </label>
-            <div className="relative">
-              <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
-              <Input
-                id="authenticator-code"
-                name="code"
-                required
-                inputMode="numeric"
-                placeholder="000000"
-                className="pl-10 h-11 rounded-xl bg-slate-50 dark:bg-[#0c101d] border-slate-200 dark:border-slate-800 tracking-widest font-mono"
-              />
-            </div>
-          </div>
-
-          {error && (
-            <p className="text-xs text-rose-500 text-center font-medium bg-rose-500/10 p-2 rounded-xl border border-rose-500/20">
-              {error}
-            </p>
-          )}
-
-          <Button
-            type="submit"
-            disabled={loading || !secret}
-            className="w-full h-11 rounded-full font-semibold text-sm bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg"
-          >
-            {loading ? 'Confirming...' : 'Confirm'}
-          </Button>
-        </form>
-
-        {user && (
-          <p className="text-center text-[11px] text-slate-500 dark:text-slate-400">
-            Signed in as {user.email}
-          </p>
-        )}
       </div>
     </AuthLayout>
   )
