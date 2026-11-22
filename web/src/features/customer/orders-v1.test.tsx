@@ -390,4 +390,125 @@ describe('customer orders on the v1 API (PRD §6)', () => {
       expect(keys[1]).toBe(keys[0])
     })
   })
+
+  it('uses the exact payment-methods URL', async () => {
+    const fetchMock = stubApi()
+    show(<QuoteFlow side="SELL" />)
+    await waitFor(() => {
+      const urls = fetchMock.mock.calls.map((c) => String(c[0]))
+      expect(urls).toContain('/api/v1/wallet/payment-methods')
+    })
+  })
+
+  it('a second quote places its order under a different key', async () => {
+    const fetchMock = stubApi()
+    const user = userEvent.setup()
+    show(<QuoteFlow side="SELL" />)
+    await quoteThenConfirm(user)
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.filter((c) => String(c[0]).endsWith('/p2p/orders')),
+      ).toHaveLength(1),
+    )
+    await user.click(screen.getByRole('button', { name: /get a price/i }))
+    await user.click(await screen.findByRole('button', { name: /confirm at/i }))
+
+    await waitFor(() => {
+      const keys = fetchMock.mock.calls
+        .filter((c) => String(c[0]).endsWith('/p2p/orders'))
+        .map((c) => new Headers(c[1]?.headers).get('Idempotency-Key'))
+      expect(keys).toHaveLength(2)
+      expect(keys[1]).not.toBe(keys[0])
+    })
+  })
+
+  it('the confirm guard refuses a sell with no method even when clicked', async () => {
+    const fetchMock = stubApi()
+    const base = fetchMock.getMockImplementation()!
+    // Methods never arrive, so the button is live but there is no payee.
+    fetchMock.mockImplementation((url: string, init?: RequestInit) =>
+      String(url).includes('/wallet/payment-methods')
+        ? new Promise<Response>(() => {})
+        : base(url, init),
+    )
+    const user = userEvent.setup()
+    show(<QuoteFlow side="SELL" />)
+    await user.type(await screen.findByLabelText(/amount/i), '100')
+    await user.click(screen.getByRole('button', { name: /get a price/i }))
+    await user.click(await screen.findByRole('button', { name: /confirm at/i }))
+
+    expect(await screen.findByText(/where to receive the rupees/i)).toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls.filter((c) => String(c[0]).endsWith('/p2p/orders')),
+    ).toHaveLength(0)
+  })
+
+  it('a 5xx on order create keeps the quote and replays the same key', async () => {
+    let posts = 0
+    const fetchMock = stubApi()
+    const base = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).endsWith('/p2p/orders') && init?.method === 'POST' && posts++ === 0)
+        return jsonResponse({ success: false, error: { code: 'ERROR', message: 'gateway timeout' } }, 504)
+      return base(url, init)
+    })
+    const user = userEvent.setup()
+    show(<QuoteFlow side="SELL" />)
+    await quoteThenConfirm(user)
+    expect(await screen.findByText(/gateway timeout/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /confirm at/i }))
+
+    await waitFor(() => {
+      const keys = fetchMock.mock.calls
+        .filter((c) => String(c[0]).endsWith('/p2p/orders') && c[1]?.method === 'POST')
+        .map((c) => new Headers(c[1]?.headers).get('Idempotency-Key'))
+      expect(keys).toHaveLength(2)
+      expect(keys[1]).toBe(keys[0])
+    })
+  })
+
+  it('a confirm-receipt retry after a 5xx reuses the same key', async () => {
+    let posts = 0
+    const fetchMock = stubApi({
+      order: {
+        orderId: 'o1',
+        status: 'PAYMENT_SUBMITTED',
+        side: 'SELL',
+        usdtAmount: '100.000000000000000000',
+        inrAmount: '9700.00',
+        role: 'CUSTOMER',
+        utr: 'UTR1',
+        payeeInstruction: null,
+      },
+    })
+    const base = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).endsWith('/p2p/orders/o1/confirm') && posts++ === 0)
+        return jsonResponse({ success: false, error: { code: 'ERROR', message: 'upstream down' } }, 503)
+      return base(url, init)
+    })
+    const user = userEvent.setup()
+    show(<QuoteFlow side="SELL" />)
+    await quoteThenConfirm(user)
+    await user.click(await screen.findByRole('button', { name: /confirm receipt/i }))
+    expect(await screen.findByText(/upstream down/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /confirm receipt/i }))
+
+    await waitFor(() => {
+      const keys = fetchMock.mock.calls
+        .filter((c) => String(c[0]).endsWith('/p2p/orders/o1/confirm'))
+        .map((c) => new Headers(c[1]?.headers).get('Idempotency-Key'))
+      expect(keys).toHaveLength(2)
+      expect(keys[0]).toBeTruthy()
+      expect(keys[1]).toBe(keys[0])
+    })
+  })
+
+  it('shows the placed order amounts at 2dp', async () => {
+    stubApi()
+    const user = userEvent.setup()
+    show(<QuoteFlow side="SELL" />)
+    await quoteThenConfirm(user)
+    expect(await screen.findByText(/100\.00 USDT · ₹9,700\.00/)).toBeInTheDocument()
+  })
 })

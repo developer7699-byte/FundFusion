@@ -785,6 +785,22 @@ function customerAction(o: PlacedOrder): 'SUBMIT_UTR' | 'CONFIRM_RECEIPT' | null
   return null
 }
 
+/**
+ * Whether the server definitively refused, so the same request can never
+ * succeed later. A 5xx, a timeout or a dropped connection says nothing about
+ * whether the work landed, so those keep their idempotency key for a replay.
+ */
+function definitiveRefusal(err: unknown): boolean {
+  return (
+    err instanceof ApiError &&
+    err.status >= 400 &&
+    err.status < 500 &&
+    err.status !== 401 &&
+    err.status !== 408 &&
+    err.status !== 429
+  )
+}
+
 function PlacedOrderPanel({
   orderId,
   onChanged,
@@ -796,6 +812,10 @@ function PlacedOrderPanel({
   const [utr, setUtr] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  // One key per order for releasing escrow: a confirm retried after a timeout
+  // is the same call, and the server replays by this key rather than releasing
+  // twice. Cleared only on success or a definitive refusal.
+  const confirmKey = useRef<{ orderId: string; key: string } | null>(null)
 
   const q = useQuery({
     queryKey: ['order', orderId],
@@ -836,14 +856,14 @@ function PlacedOrderPanel({
         </span>
       </div>
       <p className="text-[11px] text-slate-500 font-mono break-all">
-        {o.usdtAmount} USDT · ₹{o.inrAmount}
+        {usdt2dp(o.usdtAmount)} USDT · ₹{usdt2dp(o.inrAmount)}
       </p>
 
       {o.side === 'BUY' && (
         <div className="text-xs text-slate-600 dark:text-slate-300 space-y-1">
           {payee ? (
             <>
-              <p className="font-bold">Pay ₹{o.inrAmount} to</p>
+              <p className="font-bold">Pay ₹{usdt2dp(o.inrAmount)} to</p>
               <p>{payee.holderName}</p>
               {payee.type === 'UPI' ? (
                 <p className="font-mono">{payee.upiVpa}</p>
@@ -899,20 +919,29 @@ function PlacedOrderPanel({
       {action === 'CONFIRM_RECEIPT' && (
         <div className="space-y-2.5">
           <p className="text-xs text-slate-600 dark:text-slate-300">
-            Confirm only once ₹{o.inrAmount} has actually arrived in your bank
+            Confirm only once ₹{usdt2dp(o.inrAmount)} has actually arrived in your bank
             account. This releases the escrow.
           </p>
           <Button
             type="button"
             disabled={busy}
-            onClick={() =>
-              void run(() =>
-                v1(`/p2p/orders/${o.orderId}/confirm`, {
-                  method: 'POST',
-                  idempotencyKey: newIdempotencyKey(),
-                }),
-              )
-            }
+            onClick={() => {
+              if (confirmKey.current?.orderId !== o.orderId)
+                confirmKey.current = { orderId: o.orderId, key: newIdempotencyKey() }
+              const key = confirmKey.current.key
+              void run(async () => {
+                try {
+                  await v1(`/p2p/orders/${o.orderId}/confirm`, {
+                    method: 'POST',
+                    idempotencyKey: key,
+                  })
+                  confirmKey.current = null
+                } catch (err) {
+                  if (definitiveRefusal(err)) confirmKey.current = null
+                  throw err
+                }
+              })
+            }}
             className="w-full h-11 rounded-full font-semibold text-sm bg-emerald-500 text-white"
           >
             {busy ? 'Confirming...' : 'Confirm receipt'}
@@ -1022,7 +1051,10 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
   const confirm = async () => {
     if (!quote || !orderKey.current) return
     // The API would answer 422 NO_PAYMENT_METHOD. Say so before asking.
-    if (side === 'SELL' && !payoutId) return
+    if (side === 'SELL' && !payoutId) {
+      setError('Choose where to receive the rupees first.')
+      return
+    }
     setError('')
     setBusy(true)
     try {
@@ -1041,9 +1073,10 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
       setPlacedId(order.id)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'That order was refused.')
-      // A refusal spends the quote. A dropped connection does not tell us
-      // whether the order landed, so the quote and its key stay for a retry.
-      if (err instanceof ApiError) {
+      // A definitive 4xx spends the quote. A 5xx, timeout or dropped
+      // connection does not tell us whether the order landed, so the quote and
+      // its key stay and a retry is a replay, never a second order.
+      if (definitiveRefusal(err)) {
         setQuote(null)
         orderKey.current = null
       }
@@ -1149,7 +1182,7 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
           <Button
             type="button"
             onClick={() => void confirm()}
-            disabled={busy || missingMethod || (side === 'SELL' && !payoutId)}
+            disabled={busy || missingMethod}
             className="w-full h-11 rounded-full font-semibold text-sm bg-emerald-500 text-white"
           >
             {busy ? 'Confirming...' : 'Confirm at this price'}
