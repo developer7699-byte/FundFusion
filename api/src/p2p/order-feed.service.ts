@@ -34,6 +34,16 @@ export interface FeedOrder {
   obligationUsdt: string;
 }
 
+/** Where the rupees go, frozen onto the order (PRD §6.3/§6.4). */
+export interface PayeeInstruction {
+  payeeUserId: string;
+  type: 'BANK' | 'UPI';
+  holderName: string;
+  accountNumber: string | null;
+  ifsc: string | null;
+  upiVpa: string | null;
+}
+
 /** One order as a party to it sees it, snapshot included. */
 export interface OrderDetail {
   orderId: string;
@@ -47,6 +57,13 @@ export interface OrderDetail {
   role: 'CUSTOMER' | 'MERCHANT';
   merchantUserId: string | null;
   utr: string | null;
+  /**
+   * The payee's INR destination, once bound — full, because the only readers
+   * here are the two parties to the trade, and the payer cannot pay without
+   * it (PRD §6.3/§6.4). `detail` already refuses everyone else. Null until the
+   * order binds a payee.
+   */
+  payeeInstruction: PayeeInstruction | null;
   broadcastAt: Date | null;
   updatedAt: Date;
 }
@@ -81,6 +98,22 @@ export class OrderFeedService {
 
     if (!profile || profile.status !== 'ACTIVE') return [];
 
+    // On a buy the merchant receives the rupees, so accept binds their payee
+    // (PRD §6.4). A merchant with no live method cannot win a buy — offering
+    // one would cost them a wasted request and a 422, exactly what this feed
+    // exists to avoid. Checked once here, not per row.
+    const [hasPayee] = await this.db
+      .select({ id: schema.paymentMethod.id })
+      .from(schema.paymentMethod)
+      .where(
+        and(
+          eq(schema.paymentMethod.userId, merchantUserId),
+          isNull(schema.paymentMethod.deletedAt),
+        ),
+      )
+      .limit(1);
+    const merchantHasPayee = Boolean(hasPayee);
+
     const searchWindowSeconds = await this.settings.integer(
       'order.searchWindowSeconds',
     );
@@ -114,6 +147,9 @@ export class OrderFeedService {
 
     const offered: FeedOrder[] = [];
     for (const row of rows) {
+      // A buy the merchant has nowhere to be paid into is not offered.
+      if (row.quote.side === 'BUY' && !merchantHasPayee) continue;
+
       // Eligibility decides capability, desk status and balance in one place,
       // and throws a different reason for each. Here every reason means the
       // same thing — do not offer it — so the throw is the filter.
@@ -188,6 +224,9 @@ export class OrderFeedService {
       role: row.order.customerId === userId ? 'CUSTOMER' : 'MERCHANT',
       merchantUserId: row.assignment?.userId ?? null,
       utr: row.utr ?? null,
+      // The list stays light and holds no bank details in bulk; the payee
+      // instruction is read on the order's own detail, where one is paying.
+      payeeInstruction: null,
       broadcastAt: row.order.broadcastAt,
       updatedAt: row.order.updatedAt,
     }));
@@ -231,6 +270,12 @@ export class OrderFeedService {
       .where(eq(schema.paymentProof.orderId, orderId))
       .limit(1);
 
+    const [instruction] = await this.db
+      .select()
+      .from(schema.orderPaymentInstruction)
+      .where(eq(schema.orderPaymentInstruction.orderId, orderId))
+      .limit(1);
+
     return {
       orderId: row.order.id,
       status: row.order.status,
@@ -242,6 +287,16 @@ export class OrderFeedService {
       role: isCustomer ? 'CUSTOMER' : 'MERCHANT',
       merchantUserId: row.assignment?.userId ?? null,
       utr: proof?.utr ?? null,
+      payeeInstruction: instruction
+        ? {
+            payeeUserId: instruction.payeeUserId,
+            type: instruction.type,
+            holderName: instruction.holderName,
+            accountNumber: instruction.accountNumber,
+            ifsc: instruction.ifsc,
+            upiVpa: instruction.upiVpa,
+          }
+        : null,
       broadcastAt: row.order.broadcastAt,
       updatedAt: row.order.updatedAt,
     };

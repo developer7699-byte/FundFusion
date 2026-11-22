@@ -73,6 +73,18 @@ describe('disputes over http (e2e)', () => {
     await grantRole(merchant.userId, 'MERCHANT');
     await fund(customer, '500');
     await fund(merchant, '500');
+
+    // The customer sells, so they receive the rupees and need a payee
+    // destination before a sell can bind (PRD §6.3).
+    await asUser(customer, 'post', '/api/v1/wallet/payment-methods')
+      .send({
+        type: 'BANK',
+        label: 'Primary',
+        holderName: 'Account Holder',
+        accountNumber: '50100123456789',
+        ifsc: 'HDFC0001234',
+      })
+      .expect(201);
   }, 90000);
 
   afterAll(async () => {

@@ -4,6 +4,7 @@ import {
   IsNumberString,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
 } from 'class-validator';
 
@@ -31,6 +32,26 @@ export class ConfirmOrderDto {
   @ApiProperty()
   @IsString()
   quoteId!: string;
+
+  /**
+   * SELL only: which of the customer's payment methods receives the rupees.
+   * Omitted means their default. (PRD §6.3.)
+   */
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsUUID()
+  paymentMethodId?: string;
+}
+
+export class AcceptOrderDto {
+  /**
+   * BUY only: which of the merchant's payment methods receives the rupees.
+   * Omitted means their default. (PRD §6.4.)
+   */
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsUUID()
+  paymentMethodId?: string;
 }
 
 export class SubmitUtrDto {

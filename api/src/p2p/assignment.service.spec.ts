@@ -1,7 +1,10 @@
 import { AccountService } from '../ledger/account.service';
 import { BalanceService } from '../ledger/balance.service';
 import { PostingService } from '../ledger/posting.service';
+import { AuditService } from '../audit/audit.service';
 import { CapabilityService } from '../capability/capability.service';
+import { PaymentInstructionService } from '../payment/payment-instruction.service';
+import { PaymentMethodService } from '../payment/payment-method.service';
 import { MockRateProvider } from '../rates/rate.provider';
 import { RateService } from '../rates/rate.service';
 import {
@@ -364,5 +367,87 @@ describe('accepting (PRD §6.7)', () => {
     expect(await balances.balance(m.accountId, 'BONDED')).toBe(
       '100.000000000000000000',
     );
+  });
+});
+
+/**
+ * PRD §6.4. On a buy the merchant receives the rupees, so winning binds their
+ * payee inside the accept transaction — before the bond, so a merchant with no
+ * method rolls the whole accept back.
+ */
+describe('the payee instruction on a buy (PRD §6.4)', () => {
+  const BANK = {
+    type: 'BANK' as const,
+    label: 'HDFC',
+    holderName: 'Desk',
+    accountNumber: '50100123456789',
+    ifsc: 'HDFC0001234',
+  };
+  let bound: AssignmentService;
+  let methods: PaymentMethodService;
+
+  beforeEach(() => {
+    methods = new PaymentMethodService(t.db, new AuditService(t.db));
+    bound = new AssignmentService(
+      t.db,
+      quotes,
+      eligibility,
+      posting,
+      accounts,
+      fixedSettings(),
+      new PaymentInstructionService(t.db),
+    );
+  });
+
+  it('binds the winning merchant’s method', async () => {
+    const order = await buyOrder();
+    const m = await merchant('payee@example.test', '200', 'P2P_BUY');
+    await methods.add(m.userId, BANK);
+
+    await bound.accept(order.id, m.userId, 'accept-buy');
+
+    const row = await t.pool.query(
+      `SELECT payee_user_id, type, account_number
+         FROM order_payment_instruction WHERE order_id = $1`,
+      [order.id],
+    );
+    const inst = row.rows[0] as {
+      payee_user_id: string;
+      type: string;
+      account_number: string;
+    };
+    expect(inst.payee_user_id).toBe(m.userId);
+    expect(inst.type).toBe('BANK');
+    expect(inst.account_number).toBe('50100123456789');
+  });
+
+  it('refuses a buy from a merchant with no method, moving nothing', async () => {
+    const order = await buyOrder();
+    const m = await merchant('nomethod@example.test', '200', 'P2P_BUY');
+
+    await expect(
+      bound.accept(order.id, m.userId, 'accept-nomethod'),
+    ).rejects.toThrow(/NO_PAYMENT_METHOD/);
+
+    const assigned = await t.pool.query(
+      `SELECT 1 FROM merchant_assignment WHERE order_id = $1`,
+      [order.id],
+    );
+    expect(assigned.rowCount).toBe(0);
+    expect(Number(await balances.balance(m.accountId, 'LOCKED'))).toBe(0);
+    const status = await t.pool.query(
+      `SELECT status FROM p2p_order WHERE id = $1`,
+      [order.id],
+    );
+    expect((status.rows[0] as { status: string }).status).toBe(
+      'AWAITING_MERCHANT',
+    );
+
+    // A second merchant who has a method can still win the same order.
+    const m2 = await merchant('hasmethod@example.test', '200', 'P2P_BUY');
+    await methods.add(m2.userId, BANK);
+    await expect(
+      bound.accept(order.id, m2.userId, 'accept-win'),
+    ).resolves.toBeDefined();
   });
 });

@@ -132,3 +132,10 @@ export const authoritativeSide = pgEnum('authoritative_side', [
   'CRYPTO',
   'FIAT',
 ]);
+
+/**
+ * PRD §6.3/§6.4. A payee's INR destination for the manual bank-to-bank leg.
+ * A UPI VPA here is a static payee address the payer sends to — not a scanned
+ * QR, which is a §3 non-goal.
+ */
+export const paymentMethodType = pgEnum('payment_method_type', ['BANK', 'UPI']);

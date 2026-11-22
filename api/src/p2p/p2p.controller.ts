@@ -10,6 +10,7 @@ import { OrderFeedService } from './order-feed.service';
 import { OrderService } from './order.service';
 import { MerchantService } from './merchant.service';
 import {
+  AcceptOrderDto,
   ConfirmOrderDto,
   CreateQuoteDto,
   OpenDeskDto,
@@ -75,7 +76,11 @@ export class P2pController {
     @Body() dto: ConfirmOrderDto,
     @IdempotencyKey() idempotencyKey: string,
   ) {
-    return ok(await this.orders.confirm(dto.quoteId, user.sub, idempotencyKey));
+    return ok(
+      await this.orders.confirm(dto.quoteId, user.sub, idempotencyKey, {
+        paymentMethodId: dto.paymentMethodId,
+      }),
+    );
   }
 
   /** Every order this caller is a party to — the orders screen. */
@@ -98,9 +103,14 @@ export class P2pController {
   async accept(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
+    @Body() dto: AcceptOrderDto,
     @IdempotencyKey() idempotencyKey: string,
   ) {
-    return ok(await this.assignments.accept(id, user.sub, idempotencyKey));
+    return ok(
+      await this.assignments.accept(id, user.sub, idempotencyKey, {
+        paymentMethodId: dto.paymentMethodId,
+      }),
+    );
   }
 
   /** Evidence, not authority — a UTR alone never releases escrow (PRD §6.8). */

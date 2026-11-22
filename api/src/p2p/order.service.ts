@@ -13,6 +13,7 @@ import { PostingService } from '../ledger/posting.service';
 import { canTransition, type OrderState } from './order.state';
 import { AbandonmentService } from './abandonment.service';
 import type { OrderBroadcaster } from './p2p.gateway';
+import type { PaymentInstructionBinder } from '../payment/payment-instruction.service';
 import { QuoteService, type QuoteSnapshot } from './quote.service';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -33,6 +34,12 @@ export class OrderService {
      * for the feed. The broadcast is how they hear it sooner (PRD §11).
      */
     private readonly broadcaster?: OrderBroadcaster,
+    /**
+     * Optional like the broadcaster, so the ledger paths stay testable without
+     * the payment module. When present, a sell binds the customer's INR payee
+     * before any funds lock (PRD §6.3).
+     */
+    private readonly payees?: PaymentInstructionBinder,
   ) {}
 
   /**
@@ -50,6 +57,7 @@ export class OrderService {
     quoteId: string,
     actorId: string,
     idempotencyKey: string,
+    options: { paymentMethodId?: string } = {},
   ): Promise<Order> {
     const quote = await this.quotes.get(quoteId);
 
@@ -80,6 +88,14 @@ export class OrderService {
     }
 
     if (quote.side === 'SELL') {
+      // The customer receives the rupees, so their payee is frozen here —
+      // before the lock, so "no payment method" (422) moves nothing and the
+      // order stays a recoverable QUOTED row.
+      if (this.payees) {
+        await this.payees.bind(order.id, quote.userId, {
+          methodId: options.paymentMethodId,
+        });
+      }
       await this.lock(quote, order.id);
     }
 

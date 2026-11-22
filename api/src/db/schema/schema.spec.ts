@@ -216,3 +216,59 @@ describe('dispute', () => {
     ]);
   });
 });
+
+/**
+ * PRD §6.3/§6.4. A payee's INR destination, and the immutable copy frozen onto
+ * an order so a later edit cannot rewrite where a historical trade said to pay.
+ */
+describe('payment methods', () => {
+  it('both tables exist', async () => {
+    const names = await tableNames();
+    expect(names).toEqual(
+      expect.arrayContaining(['payment_method', 'order_payment_instruction']),
+    );
+  });
+
+  it('a method carries bank and upi fields and a soft-delete column', async () => {
+    const names = (await columns('payment_method')).map((c) => c.column_name);
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'user_id',
+        'type',
+        'holder_name',
+        'account_number',
+        'ifsc',
+        'upi_vpa',
+        'is_default',
+        'deleted_at',
+      ]),
+    );
+  });
+
+  it('allows at most one live default per user', async () => {
+    const res = await client.query(
+      `SELECT indexdef FROM pg_indexes
+        WHERE tablename = 'payment_method'
+          AND indexname = 'payment_method_one_default_idx'`,
+    );
+    expect(res.rows).toHaveLength(1);
+    const def = (res.rows[0] as { indexdef: string }).indexdef;
+    expect(def).toMatch(/unique/i);
+    expect(def).toMatch(/is_default/);
+    expect(def).toMatch(/deleted_at/);
+  });
+
+  it('the type enum is exactly BANK and UPI', async () => {
+    expect(await enumValues('payment_method_type')).toEqual(['BANK', 'UPI']);
+  });
+
+  it('the order instruction is one-per-order and carries no money column', async () => {
+    const cols = await columns('order_payment_instruction');
+    const names = cols.map((c) => c.column_name);
+    expect(names).toEqual(
+      expect.arrayContaining(['order_id', 'payee_user_id', 'source_method_id']),
+    );
+    // Reference data, never money (PRD §5): no numeric columns here.
+    expect(cols.filter((c) => c.data_type === 'numeric')).toEqual([]);
+  });
+});

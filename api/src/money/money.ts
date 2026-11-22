@@ -4,9 +4,9 @@ import { Decimal as BaseDecimal } from 'decimal.js';
  * v1 money primitives (PRD §5.1).
  *
  * A private Decimal constructor, so configuring it cannot disturb the global
- * one that `money/decimal.ts` sets up for the prototype surfaces. Precision is
- * deliberately far above the column scale: intermediate products (a rate
- * multiplied by a quantity) need headroom, and only the boundary rounds.
+ * one. Precision is deliberately far above the column scale: intermediate
+ * products (a rate multiplied by a quantity) need headroom, and only the
+ * boundary rounds.
  */
 export const Decimal = BaseDecimal.clone({
   precision: 60,

@@ -10,14 +10,11 @@ import { P2pModule } from './p2p/p2p.module';
 import { SettingsModule } from './settings/settings.module';
 import { JobsModule } from './jobs/jobs.module';
 import { ThrottlerModule } from '@nestjs/throttler';
-import { AuthModule } from './auth/auth.module';
 import { HealthController } from './health.controller';
-import { PrototypeModule } from './prototype/prototype.module';
-import { WalletModule } from './wallet/wallet.module';
 import { ChainModule } from './chain/chain.module';
 import { DisputesModule } from './disputes/disputes.module';
 import { WalletV1Module } from './wallet/v1/wallet-v1.module';
-import { OpsModule } from './ops/ops.module';
+import { PaymentModule } from './payment/payment.module';
 
 @Module({
   imports: [
@@ -33,11 +30,8 @@ import { OpsModule } from './ops/ops.module';
     DisputesModule,
     SettingsModule,
     JobsModule,
-    PrototypeModule,
-    AuthModule,
-    WalletModule,
     WalletV1Module,
-    OpsModule,
+    PaymentModule,
   ],
   controllers: [HealthController],
 })

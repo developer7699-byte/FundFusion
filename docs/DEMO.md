@@ -50,7 +50,8 @@ code from it; being signed in is never enough (PRD §9.1).
 | 2 | `/verify-otp` | The emailed code → a session |
 | 3 | `/enrol-authenticator` | Secret shown **once**, then confirmed. Until this is done every money screen redirects here rather than collecting a 403 |
 | 4 | `/customer/wallet/deposit` | The real derived address. Credited after 15 confirmations by the watcher — there is no button that credits a balance |
-| 5 | `/customer/sell` | Amount → `POST /v1/p2p/quotes` → the snapshot → `POST /v1/p2p/orders` with a fresh `Idempotency-Key` |
+| 4b | `/customer/wallet/payment-methods` | Add a bank or UPI payee via `POST /v1/wallet/payment-methods`. A sell cannot confirm without one — the customer receives the rupees, so the engine binds their payee and refuses `422 NO_PAYMENT_METHOD` otherwise (PRD §6.3) |
+| 5 | `/customer/sell` | Amount → `POST /v1/p2p/quotes` → the snapshot → `POST /v1/p2p/orders` with a fresh `Idempotency-Key`. The customer's chosen (or default) payee is frozen onto the order |
 | 6 | `/merchant/available-orders` | The live feed with each obligation. Refetched on the `order.broadcast` socket event. First accept wins; the loser is shown the engine's 409 |
 | 7 | `/customer/orders/:id` | The one action this state allows — submit a UTR on a buy, confirm receipt on a sell — and nothing else |
 | 8 | `/admin/dashboard` | Escrow locked, bonded, revenue, open disputes, orders by status |
@@ -76,16 +77,18 @@ Removed, because nothing behind them was real:
 
 Still local mocks, clearly marked in `web/src/lib/merchant-store.ts`:
 merchant settlement accounts, notices, earnings and the desk profile.
-Notifications and support still come from the prototype routes, which is the
-only prototype surface left.
+Notifications and support are no longer served at all: the prototype surface
+behind them was removed in M0, and M6 rebuilds them on the database.
 
-**The gap that matters.** No screen can show a merchant's bank details to a
-customer, or a customer's to a merchant, because there is no bank-detail
-table anywhere in the v1 schema. The plan put payment instructions out of
-scope. A sell driven through these screens therefore stops exactly where
-rupees are meant to move: the escrow, the UTR field and the confirmation all
-work, but the two parties have to exchange account details outside the
-product. This is why M4.6 is not M6's "three roles usable end to end".
+**The gap that mattered — now closed (0.3.2).** The payee's INR destination
+is real: `payment_method` holds a user's bank/UPI payees, the engine freezes
+the payee onto an order at the money-leg boundary (the customer's on a sell
+at confirm, the merchant's on a buy at accept), and the order detail
+(`GET /v1/p2p/orders/:id`) shows the payer where to send the rupees. The API
+flow no longer stops where the rupees move. The approved UI still has to be
+re-skinned onto this (the parked web spine does not yet read the instruction
+or offer the payment-method screen), which is M6's "three roles usable end to
+end".
 
 ---
 

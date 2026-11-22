@@ -38,6 +38,16 @@ const GONE: [string, string][] = [
   ['get', '/api/admin/users'],
   ['get', '/api/admin/ledger'],
   ['get', '/api/admin/audit-logs'],
+
+  // M0 finish: the ops bridge (notifications + support) ran on the in-memory
+  // prototype store and 401'd under v1 auth. Removed; M6 rebuilds them on the
+  // ledger-backed database.
+  ['get', '/api/notifications'],
+  ['post', '/api/notifications/read'],
+  ['get', '/api/support'],
+  ['post', '/api/support'],
+  ['get', '/api/support/some-id'],
+  ['post', '/api/support/some-id/reply'],
 ];
 
 describe('Removed out-of-scope routes (e2e)', () => {
@@ -57,11 +67,6 @@ describe('Removed out-of-scope routes (e2e)', () => {
       path,
     );
     expect(res.status).toBe(404);
-  });
-
-  it('an in-scope ops route is still registered', async () => {
-    const res = await request(app.getHttpServer()).get('/api/notifications');
-    expect(res.status).not.toBe(404);
   });
 
   afterAll(async () => {

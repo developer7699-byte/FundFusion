@@ -13,6 +13,7 @@ import { PostingService } from '../ledger/posting.service';
 import { EligibilityService, type Obligation } from './eligibility.service';
 import type { Order } from './order.service';
 import { canTransition } from './order.state';
+import type { PaymentInstructionBinder } from '../payment/payment-instruction.service';
 import {
   fixedSettings,
   type SettingsReader,
@@ -32,6 +33,12 @@ export class AssignmentService {
     private readonly posting: PostingService,
     private readonly accounts: AccountService,
     private readonly settings: SettingsReader = fixedSettings(),
+    /**
+     * Optional like the broadcaster. On a buy the merchant receives the rupees,
+     * so their INR payee is frozen inside this transaction before the bond —
+     * a merchant with no method cannot win an order they could not be paid on.
+     */
+    private readonly payees?: PaymentInstructionBinder,
   ) {}
 
   /**
@@ -47,6 +54,7 @@ export class AssignmentService {
     orderId: string,
     merchantUserId: string,
     idempotencyKey: string,
+    options: { paymentMethodId?: string } = {},
   ): Promise<Assignment> {
     return this.db.transaction(async (tx) => {
       // 1. Serialise every merchant racing for this order.
@@ -97,6 +105,19 @@ export class AssignmentService {
       );
       await this.accounts.lockForUpdate(tx, accountId);
       const owed = await this.eligibility.check(merchantUserId, order, tx);
+
+      // The merchant is the INR payee on a buy. Freeze their destination inside
+      // this transaction, before the bond, so a merchant with no method rolls
+      // the whole accept back rather than winning an order no one can pay into.
+      // BUY ⟺ the merchant locks USDT; a sell bonds, and its payee is the
+      // customer, already bound at confirm. `owed` was read through `tx`, so
+      // nothing here borrows a second connection while the row lock is held.
+      if (this.payees && owed.bucket === 'LOCKED') {
+        await this.payees.bind(orderId, merchantUserId, {
+          methodId: options.paymentMethodId,
+          tx,
+        });
+      }
 
       // 6. UNIQUE(order_id) is the second arbiter, in case the row lock is
       // ever removed by someone who does not know what it was for.

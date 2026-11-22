@@ -17,11 +17,12 @@ describe('Health (e2e)', () => {
     await app.init();
   });
 
-  it('/api/health (GET) uses the mock store', async () => {
+  it('/api/health (GET) reports the service is up', async () => {
     const res = await request(app.getHttpServer()).get('/api/health');
     expect(res.status).toBe(200);
-    const body = res.body as { data: { mode: string } };
-    expect(body.data.mode).toBe('mock-prototype');
+    const body = res.body as { data: { service: string; status: string } };
+    expect(body.data.status).toBe('ok');
+    expect(body.data.service).toContain('API');
   });
 
   afterEach(async () => {

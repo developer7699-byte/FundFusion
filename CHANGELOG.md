@@ -2,6 +2,48 @@
 
 All notable project changes are recorded here.
 
+## [0.3.2] — 2026-11-22
+
+Payment methods and the INR payee instruction (PRD §6.3/§6.4) — the first of
+the gap endpoints the approved UI needs. Lets the manual bank-to-bank leg
+actually be paid: the payer can now see where to send the rupees.
+
+### Added
+
+- `payment_method` (a user's bank/UPI payee destinations) and
+  `order_payment_instruction` (the payee frozen onto an order, immutable like
+  the quote). Reference data — no ledger, no money.
+- `PaymentMethodService` and `GET/POST/DELETE/PATCH /v1/wallet/payment-methods`,
+  behind the money gate. Validated IFSC/account/VPA, soft delete, one default
+  per user, object-level scoping.
+- The engine binds a payee at the money-leg boundary: the customer's method on
+  a sell (at confirm), the merchant's on a buy (at accept). A party reads the
+  full instruction on the order's detail; a trade with no payee method is
+  refused with `422 NO_PAYMENT_METHOD` before anything locks.
+
+## [0.3.1] — 2026-11-22
+
+Finish M0 repo hygiene: the prototype surface is gone (PRD §14 M0, "dead
+surface gone").
+
+### Removed
+
+- The in-memory prototype store and everything that rode it: the mock wallet
+  (`wallet/wallet.service`), mock providers (`providers/mock-*`), the prototype
+  ledger, the old prototype `AuthModule` and its guards, and the `ops` bridge
+  (notifications + support). The ops routes ran on the prototype store and
+  already 401'd under v1 auth — `JWT_ACCESS_SECRET` is not even set — so nothing
+  real depended on them. Notifications and support return in M6 on the
+  ledger-backed database.
+- `money/decimal.ts` (the prototype's global Decimal setup); v1 money uses
+  `money/money.ts`.
+
+### Changed
+
+- `GET /health` no longer advertises `mode: mock-prototype`; it reports the
+  service name and `status: ok`.
+- `removed-routes` e2e now asserts the six ops routes return 404.
+
 ## [0.3.0] — 2026-11-18
 
 v1 rebuild begins. See `docs/PRD.md`; milestone M0 of §14.

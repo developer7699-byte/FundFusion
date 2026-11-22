@@ -1,4 +1,7 @@
+import { AuditService } from '../audit/audit.service';
 import { CapabilityService } from '../capability/capability.service';
+import { PaymentInstructionService } from '../payment/payment-instruction.service';
+import { PaymentMethodService } from '../payment/payment-method.service';
 import { AccountService } from '../ledger/account.service';
 import { BalanceService } from '../ledger/balance.service';
 import { PostingService } from '../ledger/posting.service';
@@ -303,5 +306,49 @@ describe('the orders I am party to (PRD §13.5)', () => {
     const stranger = await seedUser(t.pool, 'stranger@example.test');
 
     expect(await feed.minePaged(stranger)).toEqual([]);
+  });
+});
+
+describe('the payee instruction on an order (PRD §6.3/§6.4)', () => {
+  it('is null until a payee is bound', async () => {
+    const order = await sellOrder();
+
+    const detail = await feed.detail(order.id, customerId);
+
+    expect(detail.payeeInstruction).toBeNull();
+  });
+
+  it('shows the bound payee destination in full to a party', async () => {
+    const methods = new PaymentMethodService(t.db, new AuditService(t.db));
+    await methods.add(customerId, {
+      type: 'BANK',
+      label: 'HDFC',
+      holderName: 'Aarav Sharma',
+      accountNumber: '50100123456789',
+      ifsc: 'HDFC0001234',
+    });
+    const bound = new OrderService(
+      t.db,
+      quotes,
+      posting,
+      accounts,
+      new AbandonmentService(t.db, fixedSettings()),
+      undefined,
+      new PaymentInstructionService(t.db),
+    );
+    const quote = await quotes.create({
+      userId: customerId,
+      side: 'SELL',
+      usdtAmount: '100',
+    });
+    const order = await bound.confirm(quote.id, customerId, 'bound-1');
+
+    const detail = await feed.detail(order.id, customerId);
+
+    expect(detail.payeeInstruction).not.toBeNull();
+    expect(detail.payeeInstruction?.type).toBe('BANK');
+    expect(detail.payeeInstruction?.accountNumber).toBe('50100123456789');
+    expect(detail.payeeInstruction?.ifsc).toBe('HDFC0001234');
+    expect(detail.payeeInstruction?.payeeUserId).toBe(customerId);
   });
 });

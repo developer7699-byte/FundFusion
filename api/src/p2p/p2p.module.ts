@@ -11,6 +11,8 @@ import { PostingService } from '../ledger/posting.service';
 import { BalanceService } from '../ledger/balance.service';
 import { CapabilityModule } from '../capability/capability.module';
 import { CapabilityService } from '../capability/capability.service';
+import { PaymentModule } from '../payment/payment.module';
+import { PaymentInstructionService } from '../payment/payment-instruction.service';
 import { AbandonmentService } from './abandonment.service';
 import { AssignmentService } from './assignment.service';
 import { EligibilityService } from './eligibility.service';
@@ -28,7 +30,13 @@ import { TimeoutService } from './timeout.service';
  * against the snapshot a quote wrote, never against a current rate.
  */
 @Module({
-  imports: [RateModule, LedgerModule, CapabilityModule, SettingsModule],
+  imports: [
+    RateModule,
+    LedgerModule,
+    CapabilityModule,
+    SettingsModule,
+    PaymentModule,
+  ],
   controllers: [P2pController],
   providers: [
     {
@@ -61,6 +69,7 @@ import { TimeoutService } from './timeout.service';
         accounts: AccountService,
         abandonment: AbandonmentService,
         gateway: P2pGateway,
+        payees: PaymentInstructionService,
       ) =>
         new OrderService(
           db.db,
@@ -69,6 +78,7 @@ import { TimeoutService } from './timeout.service';
           accounts,
           abandonment,
           gateway,
+          payees,
         ),
       inject: [
         DbService,
@@ -77,6 +87,7 @@ import { TimeoutService } from './timeout.service';
         AccountService,
         AbandonmentService,
         P2pGateway,
+        PaymentInstructionService,
       ],
     },
     {
@@ -136,6 +147,7 @@ import { TimeoutService } from './timeout.service';
         posting: PostingService,
         accounts: AccountService,
         settings: PlatformSettingsService,
+        payees: PaymentInstructionService,
       ) =>
         new AssignmentService(
           db.db,
@@ -144,6 +156,7 @@ import { TimeoutService } from './timeout.service';
           posting,
           accounts,
           settings,
+          payees,
         ),
       inject: [
         DbService,
@@ -152,6 +165,7 @@ import { TimeoutService } from './timeout.service';
         PostingService,
         AccountService,
         PlatformSettingsService,
+        PaymentInstructionService,
       ],
     },
     {

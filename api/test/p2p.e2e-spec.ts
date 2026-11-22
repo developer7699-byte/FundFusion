@@ -72,6 +72,10 @@ describe('p2p over http (e2e)', () => {
     await fund(customer, '1000');
     await fund(merchant, '1000');
     await fund(other, '1000');
+
+    // The customer sells, so the customer receives the rupees: they need a
+    // payee destination before any sell can bind (PRD §6.3).
+    await addBankMethod(customer).expect(201);
   }, 90000);
 
   afterAll(async () => {
@@ -155,6 +159,18 @@ describe('p2p over http (e2e)', () => {
     return request(http)
       [method](path)
       .set('Authorization', `Bearer ${party.token}`);
+  }
+
+  /** A payee destination, so a sell has somewhere to send the rupees. */
+  const CUSTOMER_ACCOUNT = '50100123456789';
+  function addBankMethod(party: Party) {
+    return asUser(party, 'post', '/api/v1/wallet/payment-methods').send({
+      type: 'BANK',
+      label: 'Primary',
+      holderName: 'Account Holder',
+      accountNumber: CUSTOMER_ACCOUNT,
+      ifsc: 'HDFC0001234',
+    });
   }
 
   let quoteId: string;
@@ -320,6 +336,31 @@ describe('p2p over http (e2e)', () => {
     expect(data<{ orderId: string }[]>(theirs)).toEqual([]);
   });
 
+  it('refuses to confirm a sell when the customer has no payee method (422)', async () => {
+    const noMethod = await signUp('nomethod');
+    await fund(noMethod, '1000');
+
+    const quote = await asUser(noMethod, 'post', '/api/v1/p2p/quotes')
+      .send({ side: 'SELL', usdtAmount: '10' })
+      .expect(201);
+
+    const res = await asUser(noMethod, 'post', '/api/v1/p2p/orders')
+      .set('Idempotency-Key', 'no-method-1')
+      .send({ quoteId: data<{ id: string }>(quote).id })
+      .expect(422);
+    expect(JSON.stringify(res.body)).toMatch(/NO_PAYMENT_METHOD/);
+
+    // Nothing locked: the rejection happened before the escrow journal.
+    const locked = await pool.query(
+      `SELECT COALESCE(SUM(CASE WHEN account_type='LOCKED' AND direction='CREDIT'
+                THEN amount ELSE 0 END),0)::text AS v
+         FROM ledger_entry le JOIN wallet_account wa ON wa.id = le.account_id
+         JOIN wallet w ON w.id = wa.wallet_id WHERE w.user_id = $1`,
+      [noMethod.userId],
+    );
+    expect((locked.rows[0] as { v: string }).v).toBe('0');
+  });
+
   it('gives exactly one winner when two merchants accept at once', async () => {
     const [a, b] = await Promise.all([
       asUser(merchant, 'post', `/api/v1/p2p/orders/${orderId}/accept`)
@@ -344,6 +385,18 @@ describe('p2p over http (e2e)', () => {
     ).expect(200);
     const winner = data<{ merchantUserId: string }>(detail).merchantUserId;
     const payer = [merchant, other].find((p) => p.userId === winner)!;
+
+    // The paying merchant can read where to send the rupees (PRD §6.3).
+    const payerView = await asUser(
+      payer,
+      'get',
+      `/api/v1/p2p/orders/${orderId}`,
+    ).expect(200);
+    expect(
+      data<{
+        payeeInstruction: { accountNumber: string; type: string } | null;
+      }>(payerView).payeeInstruction,
+    ).toMatchObject({ type: 'BANK', accountNumber: CUSTOMER_ACCOUNT });
 
     await asUser(payer, 'post', `/api/v1/p2p/orders/${orderId}/utr`)
       .send({ utr: 'UTR-E2E-0001' })
