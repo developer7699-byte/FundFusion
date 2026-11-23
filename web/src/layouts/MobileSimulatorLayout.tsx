@@ -54,6 +54,27 @@ import { useNotifications } from '@/lib/notifications'
 import { useLanguage } from '@/lib/language'
 import { useMerchantStore } from '@/lib/merchant-store'
 
+// Viewfinder Barcode / QR Scanner Icon matching reference Image 6
+function ScannerViewfinderIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M4 7V5a2 2 0 0 1 2-2h2" />
+      <path d="M16 3h2a2 2 0 0 1 2 2v2" />
+      <path d="M20 17v2a2 2 0 0 1-2 2h-2" />
+      <path d="M8 21H6a2 2 0 0 1-2-2v-2" />
+      <line x1="2.5" y1="12" x2="21.5" y2="12" strokeWidth="2.6" />
+    </svg>
+  )
+}
+
 // Global scroll position memory across tabs and routes within this session
 const scrollMemory = new Map<string, number>()
 
@@ -139,26 +160,12 @@ export function MobileSimulatorLayout({
   const [viewMode, setViewMode] = useState<'phone' | 'tablet' | 'fluid'>('phone')
   const isPhoneFrame = viewMode === 'phone'
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
-  const [currentTime, setCurrentTime] = useState('')
   const [sellRate, setSellRate] = useState('97.32')
   const [isRateUp, setIsRateUp] = useState(true)
   const [showDownloadModal, setShowDownloadModal] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null)
   const [downloadComplete, setDownloadComplete] = useState(false)
-
-  // Live time ticker
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date()
-      const hours = String(now.getHours()).padStart(2, '0')
-      const minutes = String(now.getMinutes()).padStart(2, '0')
-      setCurrentTime(`${hours}:${minutes}`)
-    }
-    updateTime()
-    const timer = setInterval(updateTime, 1000)
-    return () => clearInterval(timer)
-  }, [])
 
   // Simulated live rate fluctuation centered near 97.32
   useEffect(() => {
@@ -231,13 +238,13 @@ export function MobileSimulatorLayout({
   const linksToUse = sideLinks.length > 0 ? sideLinks : panelType === 'merchant' ? defaultMerchantSideLinks : defaultCustomerSideLinks
   const isMerchant = panelType === 'merchant'
 
-  // Navigation dock items (Matching Reference Screenshots 1, 2 & 3: Home, Leaderboard, Scan & Pay, Transactions, Menu)
+  // Navigation dock items (Updated: Home, Gift Cards, Scan & Pay, Transactions, Wallet)
   const customerNav = [
-    { to: '/customer/dashboard', label: t('nav.home'), icon: LayoutGrid },
-    { to: '/customer/dashboard?tab=leaderboard', label: t('nav.leaderboard'), icon: Trophy },
+    { to: '/customer/dashboard', label: t('nav.home') || 'Home', icon: LayoutGrid },
+    { to: '/customer/gift-cards', label: 'Gift Cards', icon: Gift },
     { to: '/customer/pay/scan', label: '', icon: QrCode, isCenter: true },
-    { to: '/customer/transactions', label: t('nav.transactions'), icon: ReceiptText },
-    { to: '/customer/dashboard?tab=menu', label: t('nav.menu'), icon: Menu },
+    { to: '/customer/transactions', label: t('nav.transactions') || 'Orders', icon: ReceiptText },
+    { to: '/customer/wallet', label: 'Wallet', icon: Wallet },
   ]
 
   const merchantNav = [
@@ -250,68 +257,110 @@ export function MobileSimulatorLayout({
 
   const bottomNav = isMerchant ? merchantNav : customerNav
 
+  // Pure Automatic Responsive Scale (Preserves natural 80% view across all desktop resolutions seamlessly)
+  const [computedScale, setComputedScale] = useState<number>(0.8)
+  const [isMobileScreen, setIsMobileScreen] = useState(false)
+
+  useEffect(() => {
+    const calculateScale = () => {
+      const w = window.innerWidth
+      const h = window.innerHeight
+
+      // Actual mobile devices (< 640px): native full screen mobile experience
+      if (w < 640) {
+        setIsMobileScreen(true)
+        setComputedScale(1)
+        return
+      }
+
+      setIsMobileScreen(false)
+
+      // Available window dimensions with comfortable breathing room
+      const availableHeight = h - 36
+      const availableWidth = w - 36
+
+      // Auto-fit responsive scale:
+      // Phone design: 412px width by 870px height
+      // Caps at 0.80 on normal/large screens to preserve the exact sleek 80% look at 100% browser zoom!
+      // Dynamically scales down on shorter/smaller screens so it never overflows or clips.
+      const fitH = availableHeight / 870
+      const fitW = availableWidth / 412
+      const optimal = Math.min(fitH, fitW, 0.80)
+      setComputedScale(Math.max(0.55, Number(optimal.toFixed(3))))
+    }
+
+    calculateScale()
+    window.addEventListener('resize', calculateScale)
+    return () => window.removeEventListener('resize', calculateScale)
+  }, [])
+
   return (
-    <div className="min-h-screen bg-[#edf2f9] text-slate-900 flex flex-col items-center justify-center font-sans selection:bg-indigo-500 selection:text-white relative overflow-hidden p-0 sm:p-4 md:p-6">
-      {/* Subtle Ambient Glow Background */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-500/10 rounded-full blur-[120px]" />
-        <div className="absolute top-1/2 -right-40 w-96 h-96 bg-blue-500/10 rounded-full blur-[120px]" />
-      </div>
-
-      {/* Central Viewport Frame - Sleek Smartphone Simulator */}
-      <main
-        data-theme={theme}
-        className={cn(
-          'w-full sm:max-w-[412px] h-screen sm:h-[870px] sm:max-h-[96vh] rounded-none sm:rounded-[50px] border-0 sm:border-[11px] border-slate-900 dark:border-[#131b2e] shadow-none sm:shadow-[0_25px_80px_-15px_rgba(0,0,0,0.35)] sm:ring-1 sm:ring-black/10 dark:sm:ring-white/10 z-10 flex flex-col relative overflow-hidden transition-all duration-300',
-          '[transform:translateZ(0)]',
-          'bg-white dark:bg-[#0b1020] text-slate-900 dark:text-slate-100'
-        )}
-      >
-        {/* Integrated Mobile Phone Top Status Bar (Inside Phone Screen) */}
-        <div className="bg-white/95 dark:bg-[#0b1020]/95 backdrop-blur-md px-5 pt-3 pb-1.5 flex items-center justify-between text-xs text-slate-800 dark:text-slate-200 select-none shrink-0 z-30 transition-colors border-b border-transparent">
-          {/* Left: Real-time Clock */}
-          <div className="text-[12px] font-extrabold tracking-tight pl-1 font-mono">
-            {currentTime || '09:41'}
-          </div>
-
-          {/* Center: Dynamic Island / Camera Notch */}
-          <div className="flex items-center gap-2 px-3 py-1 bg-black text-white rounded-full shadow-inner text-[10px]">
-            <span className="w-2.5 h-2.5 rounded-full bg-slate-900 border border-slate-700/80 shrink-0" />
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          </div>
-
-          {/* Right: Dark Mode Toggle inside phone screen + Wifi + Battery */}
-          <div className="flex items-center gap-2 pr-1">
-            {/* Theme Toggle Button INSIDE mobile screen */}
-            <button
-              type="button"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="p-1 rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
-              aria-label="Toggle dark mode"
-            >
-              {theme === 'dark' ? (
-                <Sun className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-              ) : (
-                <Moon className="w-3.5 h-3.5 text-slate-700 fill-slate-700" />
-              )}
-            </button>
-            <Wifi className="w-3.5 h-3.5 stroke-[2.2]" />
-            <div className="flex items-center gap-0.5">
-              <span className="text-[10px] font-bold">98%</span>
-              <Battery className="w-4 h-4 stroke-[2.2] fill-current" />
-            </div>
-          </div>
+    <div
+      className={cn(
+        'min-h-screen text-slate-900 font-sans selection:bg-indigo-500 selection:text-white relative overflow-hidden',
+        isMobileScreen
+          ? 'w-full h-screen bg-white dark:bg-[#0b1020] flex flex-col'
+          : 'w-full h-screen bg-[#edf2f9] flex flex-col items-center justify-center select-none'
+      )}
+    >
+      {/* Subtle Ambient Glow Background (Desktop only) */}
+      {!isMobileScreen && (
+        <div className="fixed inset-0 pointer-events-none z-0">
+          <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-500/10 rounded-full blur-[120px]" />
+          <div className="absolute top-1/2 -right-40 w-96 h-96 bg-blue-500/10 rounded-full blur-[120px]" />
         </div>
+      )}
 
+      {/* Responsive Scaled Device Frame */}
+      <div
+        className={cn(
+          'relative transition-[width,height] duration-200 ease-out',
+          isMobileScreen
+            ? 'w-full h-full'
+            : 'flex items-center justify-center shrink-0'
+        )}
+        style={
+          isMobileScreen
+            ? { width: '100%', height: '100%' }
+            : {
+                width: `${Math.round(412 * computedScale)}px`,
+                height: `${Math.round(870 * computedScale)}px`,
+              }
+        }
+      >
+        <main
+          data-theme={theme}
+          style={
+            isMobileScreen
+              ? { width: '100%', height: '100%' }
+              : {
+                  width: '412px',
+                  height: '870px',
+                  transform: `scale(${computedScale}) translateZ(0)`,
+                  transformOrigin: 'top left',
+                  WebkitFontSmoothing: 'antialiased',
+                  MozOsxFontSmoothing: 'grayscale',
+                  textRendering: 'optimizeLegibility',
+                }
+          }
+          className={cn(
+            'z-10 flex flex-col relative overflow-hidden transition-colors duration-300',
+            'bg-white dark:bg-[#0b1020] text-slate-900 dark:text-slate-100',
+            isMobileScreen
+              ? 'w-full h-full rounded-none border-0 shadow-none'
+              : 'absolute top-0 left-0 rounded-[50px] border-[11px] border-slate-900 dark:border-[#131b2e] shadow-[0_25px_80px_-15px_rgba(0,0,0,0.35)] ring-1 ring-black/10 dark:ring-white/10'
+          )}
+        >
         {/* Top Header Bar Matching Exact Reference Image */}
         {!location.pathname.includes('/buy') &&
           !location.pathname.includes('/sell') &&
           !location.pathname.includes('/pay/scan') &&
-          !location.pathname.includes('/deposit') && (
+          !location.pathname.includes('/deposit') &&
+          !location.pathname.includes('/profile') &&
+          !location.pathname.includes('/gift-cards') && (
             !isMerchant ? (
               /* CUSTOMER HEADER MATCHING REFERENCE SCREENSHOT 3 EXACTLY */
-              <header className="bg-white/95 dark:bg-[#0b1020]/95 backdrop-blur-md px-3 sm:px-4 py-2.5 flex items-center justify-between gap-2.5 border-b border-slate-100 dark:border-slate-800/80 z-20 shrink-0 sticky top-0 transition-colors">
+              <header className="bg-white/95 dark:bg-[#0b1020]/95 backdrop-blur-md px-3 sm:px-4 pt-3.5 sm:pt-4 pb-2.5 flex items-center justify-between gap-2.5 border-b border-slate-100 dark:border-slate-800/80 z-20 shrink-0 sticky top-0 transition-colors">
                 {/* 1. Purple Gradient Profile Avatar Circle */}
                 <NavLink
                   to="/customer/profile"
@@ -363,24 +412,14 @@ export function MobileSimulatorLayout({
                     )}
                   </button>
 
-                  {/* Scan QR Icon */}
+                  {/* Scan QR / Barcode Icon Matching Reference Image 6 */}
                   <NavLink
                     to="/customer/pay/scan"
                     className="p-1.5 sm:p-2 rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors"
                     title={t('header.scan')}
                     aria-label="Scan QR Code"
                   >
-                    <QrCode className="w-5 h-5 stroke-[2]" />
-                  </NavLink>
-
-                  {/* Help / Support Icon */}
-                  <NavLink
-                    to="/customer/support"
-                    className="p-1.5 sm:p-2 rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors"
-                    title={t('header.help')}
-                    aria-label="Help and Support"
-                  >
-                    <HelpCircle className="w-5 h-5 stroke-[2]" />
+                    <ScannerViewfinderIcon className="w-5 h-5 text-slate-700 dark:text-slate-300" />
                   </NavLink>
 
                   {/* Notification Bell with Dynamic Badge Count */}
@@ -401,7 +440,7 @@ export function MobileSimulatorLayout({
               </header>
             ) : (
               /* MERCHANT DESK HEADER */
-              <header className="bg-white/95 dark:bg-[#0b1020]/95 backdrop-blur-md px-3 sm:px-4 py-2.5 flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800/80 z-20 shrink-0 sticky top-0 transition-colors">
+              <header className="bg-white/95 dark:bg-[#0b1020]/95 backdrop-blur-md px-3 sm:px-4 pt-3.5 sm:pt-4 pb-2.5 flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800/80 z-20 shrink-0 sticky top-0 transition-colors">
                 {/* 1. Green / Emerald Gradient Store Avatar Circle */}
                 <NavLink
                   to="/merchant/profile"
@@ -485,7 +524,10 @@ export function MobileSimulatorLayout({
               location.pathname.includes('/sell') ||
               location.pathname.includes('/pay/scan') ||
               location.pathname.includes('/deposit')
-              ? 'pb-8 pt-2.5'
+              ? 'pb-8 pt-5'
+              : location.pathname.includes('/profile') ||
+                location.pathname.includes('/gift-cards')
+              ? 'pb-24 pt-3'
               : 'pb-24 pt-2.5'
           )}
         >
@@ -654,7 +696,8 @@ export function MobileSimulatorLayout({
           </div>
         </div>
       )}
-      </main>
+        </main>
+      </div>
     </div>
   )
 }

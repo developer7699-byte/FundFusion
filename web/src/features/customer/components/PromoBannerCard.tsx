@@ -70,7 +70,15 @@ export function PromoBannerCard({ onOpenAction }: PromoBannerCardProps) {
           </p>
 
           {/* White Capsule Action Button Matching Screenshot 3 */}
-          {onOpenAction ? (
+          {current.type === 'gifts' ? (
+            <Link
+              to="/customer/gift-cards"
+              className="px-6 py-2 rounded-full bg-white text-slate-950 font-extrabold text-xs sm:text-sm hover:bg-slate-100 hover:scale-105 active:scale-95 transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+            >
+              <span>{current.cta}</span>
+              <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+            </Link>
+          ) : onOpenAction ? (
             <button
               type="button"
               onClick={() => onOpenAction(current.type)}
@@ -80,14 +88,12 @@ export function PromoBannerCard({ onOpenAction }: PromoBannerCardProps) {
               <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
             </button>
           ) : (
-            <Link to={current.link}>
-              <button
-                type="button"
-                className="px-6 py-2 rounded-full bg-white text-slate-950 font-extrabold text-xs sm:text-sm hover:bg-slate-100 hover:scale-105 active:scale-95 transition-all shadow-md cursor-pointer flex items-center gap-1.5"
-              >
-                <span>{current.cta}</span>
-                <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
-              </button>
+            <Link
+              to={current.link}
+              className="px-6 py-2 rounded-full bg-white text-slate-950 font-extrabold text-xs sm:text-sm hover:bg-slate-100 hover:scale-105 active:scale-95 transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+            >
+              <span>{current.cta}</span>
+              <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
             </Link>
           )}
 

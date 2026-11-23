@@ -35,6 +35,9 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   ArrowRight,
+  Sun,
+  Moon,
+  Receipt,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -42,6 +45,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import { useTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { BackButton } from '@/components/ui/BackButton'
 import { useNotifications } from '@/lib/notifications'
@@ -74,8 +78,8 @@ export function OrdersList() {
       status: 'ESCROW_LOCKED',
       usdtAmount: '50.00',
       inrAmount: '4575.00',
-      beneficiary: 'NexoraEscrow_Fast',
-      upiId: 'merchant.nexora@okaxis',
+      beneficiary: 'FundFusionEscrow_Fast',
+      upiId: 'merchant.fundfusion@okaxis',
       timeline: [
         { at: '14:20', status: 'CREATED', note: 'Order matched with verified merchant' },
         { at: '14:21', status: 'ESCROW_LOCKED', note: '50.00 USDT held safely in smart escrow' },
@@ -604,130 +608,342 @@ export function PayConfirm() {
    ========================================================================= */
 export function GiftHub() {
   const { user } = useAuth()
+  const { theme, toggle } = useTheme()
   const { fulfillGiftCardOrder } = useAdminStore()
   const [selectedCategory, setSelectedCategory] = useState('ALL')
   const [searchQuery, setSearchQuery] = useState('')
   const [boughtVoucher, setBoughtVoucher] = useState<{ brand: string; code: string; pin: string; message?: string } | null>(null)
   const [copiedCode, setCopiedCode] = useState(false)
+  const [copiedPin, setCopiedPin] = useState(false)
+  const [buyingBrand, setBuyingBrand] = useState<{ id: string; name: string; emoji: string; min: string; discount: string; cat?: string } | null>(null)
+  const [selectedDenom, setSelectedDenom] = useState('500')
+  const [customAmount, setCustomAmount] = useState('')
+  const [playerUid, setPlayerUid] = useState('')
 
   const giftBrands = [
-    { id: 'amazon', name: 'Amazon Pay Gift Card', cat: 'SHOPPING', discount: '5% Back', emoji: '📦', min: '₹100', popular: true },
-    { id: 'flipkart', name: 'Flipkart Voucher', cat: 'SHOPPING', discount: '3% Back', emoji: '🛍️', min: '₹250', popular: true },
-    { id: 'googleplay', name: 'Google Play Recharge', cat: 'GAMING', discount: 'Instant', emoji: '▶️', min: '₹50', popular: true },
-    { id: 'apple', name: 'Apple App Store & iTunes', cat: 'ENTERTAINMENT', discount: 'Instant', emoji: '🍎', min: '₹200', popular: false },
-    { id: 'swiggy', name: 'Swiggy Money Voucher', cat: 'FOOD', discount: '4% Back', emoji: '🍔', min: '₹150', popular: true },
-    { id: 'zomato', name: 'Zomato Pro Gift Voucher', cat: 'FOOD', discount: '4% Back', emoji: '🍕', min: '₹150', popular: false },
-    { id: 'myntra', name: 'Myntra Fashion Card', cat: 'SHOPPING', discount: '6% Back', emoji: '👗', min: '₹500', popular: true },
-    { id: 'uber', name: 'Uber Rides & Eats Voucher', cat: 'TRAVEL', discount: 'Instant', emoji: '🚗', min: '₹200', popular: false },
-    { id: 'psn', name: 'Sony PlayStation Store', cat: 'GAMING', discount: 'Instant', emoji: '🎮', min: '₹500', popular: false },
-    { id: 'netflix', name: 'Netflix Subscription Card', cat: 'ENTERTAINMENT', discount: 'Instant', emoji: '🎬', min: '₹649', popular: false },
+    { id: 'amazon', name: 'Amazon Pay Gift Card', cat: 'SHOPPING', discount: '5% Back', emoji: '📦', min: '₹100', recommended: true, badge: '🔥 Most Popular' },
+    { id: 'flipkart', name: 'Flipkart Voucher', cat: 'SHOPPING', discount: '4% Back', emoji: '🛍️', min: '₹250', recommended: true, badge: '⚡ Super Fast' },
+    { id: 'googleplay', name: 'Google Play Recharge Code', cat: 'GAMING', discount: 'Instant', emoji: '▶️', min: '₹50', recommended: true, badge: '🎮 Instant Code' },
+    { id: 'freefire', name: 'Free Fire MAX Diamonds', cat: 'GAMING', discount: 'Bonus 10%', emoji: '💎', min: '₹80', recommended: true, badge: '🔥 Gaming Hot' },
+    { id: 'bgmi', name: 'BGMI Unknown Cash (UC)', cat: 'GAMING', discount: 'Instant', emoji: '🪖', min: '₹75', recommended: true, badge: '⭐ Top Seller' },
+    { id: 'swiggy', name: 'Swiggy Food & Instamart', cat: 'FOOD', discount: '6% Back', emoji: '🍔', min: '₹150', recommended: true, badge: '🍔 Instant Food' },
+    { id: 'apple', name: 'Apple App Store & iTunes', cat: 'ENTERTAINMENT', discount: '2% Back', emoji: '🍎', min: '₹200', recommended: true, badge: '🎵 Apps & Music' },
+    { id: 'zomato', name: 'Zomato Pro Dining Voucher', cat: 'FOOD', discount: '5% Back', emoji: '🍕', min: '₹150', recommended: false },
+    { id: 'myntra', name: 'Myntra Fashion Voucher', cat: 'SHOPPING', discount: '6% Back', emoji: '👗', min: '₹500', recommended: false },
+    { id: 'uber', name: 'Uber Rides & Eats Voucher', cat: 'TRAVEL', discount: 'Instant', emoji: '🚗', min: '₹200', recommended: false },
+    { id: 'psn', name: 'PlayStation Store Wallet', cat: 'GAMING', discount: 'Instant', emoji: '🎮', min: '₹500', recommended: false },
+    { id: 'netflix', name: 'Netflix Subscription Voucher', cat: 'ENTERTAINMENT', discount: 'Instant', emoji: '🎬', min: '₹649', recommended: false },
+    { id: 'steam', name: 'Steam Wallet Card', cat: 'GAMING', discount: 'Instant', emoji: '🕹️', min: '₹250', recommended: false },
+    { id: 'bookmyshow', name: 'BookMyShow Movies Voucher', cat: 'ENTERTAINMENT', discount: 'Instant', emoji: '🎟️', min: '₹200', recommended: false },
   ]
 
+  const topRecommendations = giftBrands.filter((b) => b.recommended)
+
   const filteredBrands = giftBrands.filter((b) => {
-    const matchCat = selectedCategory === 'ALL' || b.cat === selectedCategory
-    const matchSearch = b.name.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchCat =
+      selectedCategory === 'ALL'
+        ? true
+        : selectedCategory === 'RECOMMENDED'
+        ? b.recommended
+        : b.cat === selectedCategory
+    const matchSearch =
+      b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      b.cat.toLowerCase().includes(searchQuery.toLowerCase())
     return matchCat && matchSearch
   })
 
-  const handleQuickBuy = (brandName: string) => {
-    const res = fulfillGiftCardOrder(brandName, 1000, user?.displayName || '@customer')
+  const rate = 91.5
+  const currentBuyAmount = customAmount ? parseFloat(customAmount) || 0 : parseFloat(selectedDenom) || 500
+  const usdtCost = (currentBuyAmount / rate).toFixed(2)
+
+  const handleConfirmPurchase = () => {
+    if (!buyingBrand || currentBuyAmount <= 0) return
+    const res = fulfillGiftCardOrder(buyingBrand.name, currentBuyAmount, user?.displayName || '@customer')
+    setBuyingBrand(null)
+    setCustomAmount('')
+    setPlayerUid('')
     if (res.code) {
-      setBoughtVoucher({ brand: brandName, code: res.code, pin: res.pin || '—', message: res.message })
+      setBoughtVoucher({ brand: buyingBrand.name, code: res.code, pin: res.pin || '—', message: res.message })
     } else {
       setBoughtVoucher({
-        brand: brandName,
+        brand: buyingBrand.name,
         code: 'FORWARDED_TO_OTC_DESK',
-        pin: 'Pending Retail Procurement',
+        pin: 'Pending Procurement',
         message: res.message,
       })
     }
   }
 
   return (
-    <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
-      {/* Top Header */}
-      <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-        <div className="flex items-center gap-2.5">
-          <BackButton fallback="/customer/dashboard" />
-          <div>
-            <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
-              Gift Cards Mall
+    <div className="space-y-3.5 max-w-lg mx-auto w-full pb-28">
+      {/* Top Header - One Line Responsive */}
+      <div className="pb-2 border-b border-slate-100 dark:border-slate-800 space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <BackButton fallback="/customer/dashboard" />
+            <h1 className="text-sm sm:text-base font-black text-slate-900 dark:text-white whitespace-nowrap tracking-tight">
+              Gift Cards & Vouchers
             </h1>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">100+ Brands Delivered Instantly via USDT</p>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={(e) => toggle(e)}
+              className="p-1.5 rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              title="Toggle Color Theme"
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
+            </button>
+            <Link
+              to="/customer/gift-cards/orders"
+              className="px-2.5 py-1 rounded-xl text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 flex items-center gap-1 transition-all whitespace-nowrap shadow-2xs"
+            >
+              <Receipt className="w-3.5 h-3.5" />
+              <span>My Vouchers</span>
+            </Link>
           </div>
         </div>
 
-        <Link
-          to="/customer/gift-cards/orders"
-          className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 hover:underline"
-        >
-          My Vouchers
-        </Link>
+        {/* Subtitle & Badge Sub-row */}
+        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 px-0.5">
+          <span>Instant code & PIN delivery via USDT</span>
+          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 whitespace-nowrap">
+            100+ Brands
+          </span>
+        </div>
       </div>
 
-      {/* Search Input */}
+      {/* Prominent Search Bar */}
       <div className="relative">
         <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search Amazon, Flipkart, Swiggy, Steam..."
-          className="w-full pl-10 pr-4 py-2.5 text-xs rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-900 dark:text-white placeholder:text-slate-400"
+          placeholder="Search Amazon, Free Fire, Flipkart, Swiggy, Steam..."
+          className="w-full pl-10 pr-10 py-2.5 text-xs rounded-2xl bg-slate-50/80 dark:bg-[#111827] border border-slate-200/90 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 text-slate-900 dark:text-white placeholder:text-slate-400 shadow-2xs font-medium"
         />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => setSearchQuery('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
+      {/* Top Recommendations Section */}
+      {!searchQuery && selectedCategory === 'ALL' && (
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+              <span>🔥 Top Recommended Vouchers</span>
+            </h2>
+            <span className="text-[10px] font-bold text-slate-400">Instant Delivery</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            {topRecommendations.slice(0, 4).map((b) => (
+              <div
+                key={'top-' + b.id}
+                onClick={() => setBuyingBrand(b)}
+                className="p-3 rounded-2xl bg-gradient-to-br from-white via-amber-500/[0.02] to-slate-50 dark:from-[#111827] dark:via-amber-500/[0.03] dark:to-[#0f172a] border border-amber-500/30 dark:border-amber-500/25 shadow-2xs hover:shadow-md hover:border-amber-500/60 transition-all cursor-pointer relative overflow-hidden group flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-2xl">{b.emoji}</span>
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                      {b.badge || b.discount}
+                    </span>
+                  </div>
+                  <h3 className="text-xs font-black text-slate-900 dark:text-white line-clamp-2 min-h-[32px] leading-snug">
+                    {b.name}
+                  </h3>
+                </div>
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-[10px]">
+                  <span className="text-slate-400 font-mono">Min {b.min}</span>
+                  <span className="font-extrabold text-emerald-600 dark:text-emerald-400 group-hover:underline flex items-center gap-0.5">
+                    <span>Buy</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Category Pills */}
-      <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
-        {['ALL', 'SHOPPING', 'FOOD', 'GAMING', 'ENTERTAINMENT', 'TRAVEL'].map((cat) => (
+      <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1 -mx-0.5 px-0.5">
+        {[
+          { id: 'ALL', label: '🏷️ All' },
+          { id: 'RECOMMENDED', label: '⭐ Top Picks' },
+          { id: 'SHOPPING', label: '🛍️ Shopping' },
+          { id: 'GAMING', label: '🎮 Gaming & Topup' },
+          { id: 'FOOD', label: '🍔 Food' },
+          { id: 'ENTERTAINMENT', label: '🎬 Entertainment' },
+          { id: 'TRAVEL', label: '✈️ Travel' },
+        ].map((cat) => (
           <button
-            key={cat}
+            key={cat.id}
             type="button"
-            onClick={() => setSelectedCategory(cat)}
+            onClick={() => setSelectedCategory(cat.id)}
             className={cn(
               'px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer',
-              selectedCategory === cat
+              selectedCategory === cat.id
                 ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
             )}
           >
-            {cat.charAt(0) + cat.slice(1).toLowerCase()}
+            {cat.label}
           </button>
         ))}
       </div>
 
-      {/* Brands Grid */}
-      <div className="grid grid-cols-2 gap-2.5">
-        {filteredBrands.map((b) => (
-          <div
-            key={b.id}
-            className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 flex flex-col justify-between space-y-3 hover:border-emerald-500/40 hover:shadow-xs transition-all shadow-2xs group"
-          >
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-2xl">{b.emoji}</span>
-                <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                  {b.discount}
-                </span>
-              </div>
-              <h3 className="text-xs font-black text-slate-900 dark:text-white leading-tight">
-                {b.name}
-              </h3>
-              <p className="text-[10px] text-slate-400">Min {b.min}</p>
-            </div>
+      {/* All Filtered Brands Grid */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between px-1 text-[11px] text-slate-400">
+          <span>Available Brands ({filteredBrands.length})</span>
+          <span>Zero network fee</span>
+        </div>
 
-            <button
-              type="button"
-              onClick={() => handleQuickBuy(b.name)}
-              className="w-full py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-emerald-500 hover:text-white transition-colors cursor-pointer text-slate-800 dark:text-slate-200"
+        <div className="grid grid-cols-2 gap-2.5">
+          {filteredBrands.map((b) => (
+            <div
+              key={b.id}
+              className="p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 flex flex-col justify-between space-y-3 hover:border-emerald-500/40 hover:shadow-xs transition-all shadow-2xs group"
             >
-              Buy Voucher
-            </button>
-          </div>
-        ))}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl">{b.emoji}</span>
+                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    {b.discount}
+                  </span>
+                </div>
+                <h3 className="text-xs font-black text-slate-900 dark:text-white line-clamp-2 min-h-[32px] leading-snug">
+                  {b.name}
+                </h3>
+                <p className="text-[10px] text-slate-400 font-mono">Min {b.min}</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setBuyingBrand(b)}
+                className="w-full py-2 rounded-xl text-xs font-extrabold bg-slate-100 dark:bg-slate-800 hover:bg-emerald-600 hover:text-white transition-all cursor-pointer text-slate-800 dark:text-slate-200 active:scale-95"
+              >
+                Buy Voucher
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Voucher Generated Modal */}
+      {/* Interactive Purchase Sheet / Modal */}
+      {buyingBrand && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#111827] w-full max-w-[360px] rounded-[28px] p-5 shadow-2xl border border-slate-100 dark:border-slate-800 space-y-4 max-h-[90%] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{buyingBrand.emoji}</span>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 dark:text-white">{buyingBrand.name}</h3>
+                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">{buyingBrand.discount}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBuyingBrand(null)}
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* In-Game Player ID if gaming brand */}
+            {buyingBrand.cat === 'GAMING' && (
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex justify-between">
+                  <span>Player UID / Character ID</span>
+                  <span className="text-emerald-500 font-semibold text-[10px]">Instant Crediting</span>
+                </label>
+                <input
+                  type="text"
+                  value={playerUid}
+                  onChange={(e) => setPlayerUid(e.target.value)}
+                  placeholder="e.g. Free Fire UID / BGMI ID"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                />
+              </div>
+            )}
+
+            {/* Denomination Choices */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                Select Voucher Amount
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {['100', '250', '500', '1000', '2500', '5000'].map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => {
+                      setSelectedDenom(d)
+                      setCustomAmount('')
+                    }}
+                    className={cn(
+                      'py-2 rounded-xl text-xs font-extrabold border transition-all cursor-pointer font-mono',
+                      selectedDenom === d && !customAmount
+                        ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                        : 'border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    )}
+                  >
+                    ₹{d}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom Amount */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-slate-500 block">Or Custom INR Amount</label>
+              <input
+                type="number"
+                value={customAmount}
+                onChange={(e) => setCustomAmount(e.target.value)}
+                placeholder="Enter custom ₹ amount"
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+              />
+            </div>
+
+            {/* USDT Cost Banner */}
+            <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-500/20 flex items-center justify-between text-xs">
+              <div>
+                <span className="text-[10px] text-slate-500 block">Total USDT Payable</span>
+                <span className="text-base font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                  {usdtCost} USDT
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-400 font-mono">1 USDT ≈ ₹{rate}</span>
+            </div>
+
+            {/* Buy CTA */}
+            <button
+              type="button"
+              onClick={handleConfirmPurchase}
+              disabled={currentBuyAmount <= 0}
+              className="w-full py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-98"
+            >
+              <span>Pay ₹{currentBuyAmount} with USDT</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Voucher Generated Modal (Only Rendered Once!) */}
       {boughtVoucher && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white dark:bg-[#111827] w-full max-w-[360px] rounded-[28px] p-5 shadow-2xl border border-slate-100 dark:border-slate-800 space-y-4 max-h-[85%] overflow-y-auto">
@@ -773,18 +989,33 @@ export function GiftHub() {
                 </button>
               </div>
 
-              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-between text-xs">
-                <span className="text-slate-400">Security PIN</span>
-                <span className="font-mono font-black text-slate-900 dark:text-white">
-                  {boughtVoucher.pin}
-                </span>
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs">
+                <div>
+                  <span className="text-slate-400 block text-[10px]">Security PIN</span>
+                  <span className="font-mono font-black text-slate-900 dark:text-white">
+                    {boughtVoucher.pin}
+                  </span>
+                </div>
+                {boughtVoucher.pin !== '—' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(boughtVoucher.pin)
+                      setCopiedPin(true)
+                      setTimeout(() => setCopiedPin(false), 2000)
+                    }}
+                    className="p-1 text-xs text-slate-500 hover:text-emerald-600 font-bold cursor-pointer"
+                  >
+                    {copiedPin ? 'Copied!' : 'Copy PIN'}
+                  </button>
+                )}
               </div>
             </div>
 
             <button
               type="button"
               onClick={() => setBoughtVoucher(null)}
-              className="w-full py-2.5 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-bold text-xs"
+              className="w-full py-2.5 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-bold text-xs cursor-pointer shadow-xs active:scale-98"
             >
               Done
             </button>

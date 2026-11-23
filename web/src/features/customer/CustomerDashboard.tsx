@@ -30,7 +30,6 @@ import { FullServicesMenu } from './components/FullServicesMenu'
 import { DepositModal } from './components/DepositModal'
 import { BillPaymentModal } from './components/BillPaymentModal'
 import { GiftCardsModal } from './components/GiftCardsModal'
-import { VirtualCardModal } from './components/VirtualCardModal'
 import { OffersModal } from './components/OffersModal'
 import { LeaderboardModal } from './components/LeaderboardModal'
 import { CardlessCashModal } from './components/CardlessCashModal'
@@ -61,10 +60,9 @@ export function CustomerDashboard() {
   const [isDepositOpen, setIsDepositOpen] = useState(false)
   const [isBillsOpen, setIsBillsOpen] = useState(false)
   const [selectedBillCat, setSelectedBillCat] = useState<
-    'recharge' | 'electricity' | 'dth' | 'broadband' | 'gas' | 'water' | 'fastag'
+    'gaming' | 'recharge' | 'electricity' | 'dth' | 'broadband' | 'gas' | 'water' | 'fastag'
   >('recharge')
   const [isGiftsOpen, setIsGiftsOpen] = useState(false)
-  const [isCardsOpen, setIsCardsOpen] = useState(false)
   const [isOffersOpen, setIsOffersOpen] = useState(false)
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false)
   const [isCashOpen, setIsCashOpen] = useState(false)
@@ -113,8 +111,12 @@ export function CustomerDashboard() {
   // Handle Quick Action Grid clicks
   const handleQuickAction = (actionId: string) => {
     switch (actionId) {
+      case 'gaming':
+        setSelectedBillCat('gaming')
+        setIsBillsOpen(true)
+        break
       case 'gifts':
-        setIsGiftsOpen(true)
+        navigate('/customer/gift-cards')
         break
       case 'bills':
         setSelectedBillCat('recharge')
@@ -122,9 +124,6 @@ export function CustomerDashboard() {
         break
       case 'offers':
         setIsOffersOpen(true)
-        break
-      case 'cards':
-        setIsCardsOpen(true)
         break
       case 'community':
         setIsReferralOpen(true)
@@ -140,7 +139,7 @@ export function CustomerDashboard() {
       setSelectedBillCat('recharge')
       setIsBillsOpen(true)
     } else if (type === 'gifts') {
-      setIsGiftsOpen(true)
+      navigate('/customer/gift-cards')
     } else {
       navigate('/customer/buy')
     }
@@ -177,7 +176,7 @@ export function CustomerDashboard() {
               setSelectedBillCat(cat || 'recharge')
               setIsBillsOpen(true)
             }}
-            onOpenGifts={() => setIsGiftsOpen(true)}
+            onOpenGifts={() => navigate('/customer/gift-cards')}
             onOpenVirtualCard={() => setIsCardsOpen(true)}
             onOpenCardlessCash={() => setIsCashOpen(true)}
             onOpenLeaderboard={() => setIsLeaderboardOpen(true)}
@@ -306,7 +305,7 @@ export function CustomerDashboard() {
               setSelectedBillCat(cat)
               setIsBillsOpen(true)
             }}
-            onOpenGifts={() => setIsGiftsOpen(true)}
+            onOpenGifts={() => navigate('/customer/gift-cards')}
           />
 
           {/* 5. Live P2P USDT/INR Rates (Buy USDT @ ₹91.45, Sell USDT @ ₹97.10) */}
@@ -358,11 +357,6 @@ export function CustomerDashboard() {
         isOpen={isGiftsOpen}
         onClose={() => setIsGiftsOpen(false)}
         onBuySuccess={handleDeductBalance}
-      />
-
-      <VirtualCardModal
-        isOpen={isCardsOpen}
-        onClose={() => setIsCardsOpen(false)}
       />
 
       <OffersModal

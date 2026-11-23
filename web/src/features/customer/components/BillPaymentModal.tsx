@@ -8,6 +8,7 @@ import {
   Droplet,
   Flame,
   Car,
+  Gamepad2,
   CheckCircle2,
   ShieldCheck,
   ArrowRight,
@@ -21,7 +22,7 @@ import { cn } from '@/lib/utils'
 interface BillPaymentModalProps {
   isOpen: boolean
   onClose: () => void
-  initialCategory?: 'recharge' | 'electricity' | 'dth' | 'broadband' | 'gas' | 'water' | 'fastag'
+  initialCategory?: 'gaming' | 'recharge' | 'electricity' | 'dth' | 'broadband' | 'gas' | 'water' | 'fastag'
   onPaymentSuccess?: (amountInr: number, usdtAmount: number) => void
 }
 
@@ -33,14 +34,15 @@ export function BillPaymentModal({
 }: BillPaymentModalProps) {
   if (!isOpen) return null
 
-  const [activeCat, setActiveCat] = useState(initialCategory)
-  const [operator, setOperator] = useState('Jio')
-  const [consumerId, setConsumerId] = useState('9876543210')
-  const [amount, setAmount] = useState('299')
+  const [activeCat, setActiveCat] = useState<string>(initialCategory)
+  const [operator, setOperator] = useState(initialCategory === 'gaming' ? 'Free Fire MAX (Diamonds)' : 'Jio')
+  const [consumerId, setConsumerId] = useState(initialCategory === 'gaming' ? '2948102948' : '9876543210')
+  const [amount, setAmount] = useState(initialCategory === 'gaming' ? '240' : '299')
   const [isProcessing, setIsProcessing] = useState(false)
   const [receipt, setReceipt] = useState<{ id: string; time: string } | null>(null)
 
   const categories = [
+    { id: 'gaming', label: 'Game Topup', icon: Gamepad2 },
     { id: 'recharge', label: 'Mobile', icon: Smartphone },
     { id: 'electricity', label: 'Electricity', icon: Zap },
     { id: 'dth', label: 'DTH TV', icon: Tv },
@@ -51,6 +53,13 @@ export function BillPaymentModal({
   ] as const
 
   const operatorsByCat: Record<string, string[]> = {
+    gaming: [
+      'Free Fire MAX (Diamonds)',
+      'BGMI (Battlegrounds Mobile India - UC)',
+      'Google Play Redeem Code',
+      'Call of Duty: Mobile (CP)',
+      'Roblox (Robux Gift Card)',
+    ],
     recharge: ['Jio', 'Airtel', 'Vi (Vodafone Idea)', 'BSNL'],
     electricity: ['BESCOM (Karnataka)', 'Adani Electricity (Mumbai)', 'Tata Power (Delhi)', 'PSPCL (Punjab)'],
     dth: ['Tata Play (Sky)', 'Airtel Digital TV', 'Dish TV', 'Sun Direct'],
@@ -60,12 +69,35 @@ export function BillPaymentModal({
     fastag: ['Paytm Payments Bank', 'ICICI Bank FASTag', 'SBI FASTag', 'HDFC Bank FASTag'],
   }
 
-  const quickPacks = [
+  const quickPacksRecharge = [
     { inr: '199', desc: '1.5GB/day · 28 Days' },
     { inr: '299', desc: '2GB/day + 5G · 28 Days' },
     { inr: '719', desc: '1.5GB/day · 84 Days' },
     { inr: '999', desc: 'Unlimited 5G · 84 Days' },
   ]
+
+  const quickPacksGaming = operator.includes('Free Fire')
+    ? [
+        { inr: '80', desc: '100 💎 Diamonds' },
+        { inr: '160', desc: 'Weekly Pass ⚡' },
+        { inr: '240', desc: '310 💎 Diamonds' },
+        { inr: '400', desc: '520 💎 Diamonds' },
+        { inr: '800', desc: '1060 💎 Diamonds' },
+        { inr: '1600', desc: '2180 💎 Diamonds' },
+      ]
+    : operator.includes('BGMI')
+    ? [
+        { inr: '75', desc: '60 UC Pack' },
+        { inr: '380', desc: '325 UC Pack' },
+        { inr: '750', desc: '660 UC Royale' },
+        { inr: '1900', desc: '1800 UC Pack' },
+      ]
+    : [
+        { inr: '100', desc: 'Instant Code' },
+        { inr: '250', desc: 'Instant Code' },
+        { inr: '500', desc: 'Instant Code' },
+        { inr: '1000', desc: 'Instant Code' },
+      ]
 
   const rate = 91.5 // 1 USDT = ~91.5 INR
   const usdtEquivalent = (parseFloat(amount || '0') / rate).toFixed(2)
@@ -216,16 +248,26 @@ export function BillPaymentModal({
               </select>
             </div>
 
-            {/* Consumer ID / Phone */}
+            {/* Consumer ID / Phone / UID */}
             <div>
               <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                {activeCat === 'recharge' ? 'Mobile Number' : 'Consumer / Account Number'}
+                {activeCat === 'gaming'
+                  ? 'Player UID / Character ID'
+                  : activeCat === 'recharge'
+                  ? 'Mobile Number'
+                  : 'Consumer / Account Number'}
               </label>
               <Input
                 type="text"
                 value={consumerId}
                 onChange={(e) => setConsumerId(e.target.value)}
-                placeholder={activeCat === 'recharge' ? '10-digit mobile' : 'Consumer ID'}
+                placeholder={
+                  activeCat === 'gaming'
+                    ? 'Enter Game UID (e.g. 294819204)'
+                    : activeCat === 'recharge'
+                    ? '10-digit mobile'
+                    : 'Consumer ID'
+                }
                 className="rounded-xl text-xs font-mono font-bold"
               />
             </div>
@@ -233,7 +275,7 @@ export function BillPaymentModal({
             {/* Amount */}
             <div>
               <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                Bill Amount (₹ INR)
+                {activeCat === 'gaming' ? 'Top-up Package Amount (₹ INR)' : 'Bill Amount (₹ INR)'}
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">
@@ -248,12 +290,12 @@ export function BillPaymentModal({
                 />
               </div>
 
-              {/* Quick Packs for recharge */}
-              {activeCat === 'recharge' && (
+              {/* Quick Packs for Gaming or Recharge */}
+              {(activeCat === 'gaming' || activeCat === 'recharge') && (
                 <div className="grid grid-cols-2 gap-1.5 mt-2">
-                  {quickPacks.map((p) => (
+                  {(activeCat === 'gaming' ? quickPacksGaming : quickPacksRecharge).map((p) => (
                     <button
-                      key={p.inr}
+                      key={p.inr + p.desc}
                       type="button"
                       onClick={() => setAmount(p.inr)}
                       className={cn(

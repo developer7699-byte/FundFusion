@@ -27,6 +27,17 @@ import {
   Plus,
   Trash2,
   Mail,
+  Smartphone,
+  Star,
+  Eye,
+  EyeOff,
+  KeyRound,
+  QrCode,
+  Laptop,
+  Edit3,
+  Award,
+  Share2,
+  Lock,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import { useTheme } from '@/lib/theme'
@@ -49,6 +60,14 @@ type ModalType =
   | 'share_feedback'
   | 'privacy_policy'
   | 'logout_confirm'
+  | '2fa_modal'
+  | 'kyc_modal'
+  | 'password_modal'
+  | 'anti_phishing_modal'
+  | 'sessions_modal'
+  | 'vip_modal'
+  | 'edit_name_modal'
+  | 'market_overview_modal'
 
 interface WithdrawAddress {
   id: string
@@ -81,9 +100,35 @@ export function CustomerProfilePage() {
 
   // State
   const [copiedUser, setCopiedUser] = useState(false)
-  const [displayCurrency, setDisplayCurrency] = useState<'USDT' | 'INR' | 'USD' | 'EUR'>('USDT')
+  const [displayCurrency, setDisplayCurrency] = useState<'USDT' | 'INR' | 'USD' | 'EUR'>('USD')
   const [activeModal, setActiveModal] = useState<ModalType>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [profileTab, setProfileTab] = useState<'my_info' | 'security' | 'preference' | 'general'>('my_info')
+  const [alwaysOn, setAlwaysOn] = useState(false)
+
+  // Full User Info & Security states
+  const [showFullEmail, setShowFullEmail] = useState(false)
+  const [displayName, setDisplayName] = useState(user?.displayName || 'developer7699')
+  const [nicknameInput, setNicknameInput] = useState('')
+  const [totpEnabled, setTotpEnabled] = useState(true)
+  const [antiPhishingCode, setAntiPhishingCode] = useState('FUND-SAFE-92')
+  const [newAntiPhishingInput, setNewAntiPhishingInput] = useState('')
+  const [currPassInput, setCurrPassInput] = useState('')
+  const [newPassInput, setNewPassInput] = useState('')
+  const [confirmPassInput, setConfirmPassInput] = useState('')
+  const [sessions, setSessions] = useState([
+    { id: 's1', device: 'Chrome on Windows 11', location: 'New Delhi, India', ip: '103.212.44.18', isCurrent: true, time: 'Active now' },
+    { id: 's2', device: 'Safari on iPhone 15 Pro', location: 'Mumbai, India', ip: '49.36.120.91', isCurrent: false, time: 'Active 2h ago' },
+  ])
+
+  const userEmail = user?.email || 'customer@fundfusion.io'
+  const emailParts = userEmail.split('@')
+  const emailPrefix = emailParts[0] || 'customer'
+  const emailDomain = emailParts[1] || 'fundfusion.io'
+  const maskedPrefix = emailPrefix.length > 3
+    ? `${emailPrefix.slice(0, 3)}${'*'.repeat(Math.max(4, emailPrefix.length - 3))}`
+    : `${emailPrefix}***`
+  const maskedEmail = `${maskedPrefix}@${emailDomain}`
 
   // Sub-states
   // 1. Manage Payments (Persistent via usePaymentMethods hook)
@@ -120,10 +165,6 @@ export function CustomerProfilePage() {
   const [feedbackText, setFeedbackText] = useState('')
 
   const username = user?.displayName
-    ? `@${user.displayName.toLowerCase().replace(/\s+/g, '')}`
-    : user?.email
-    ? `@${user.email.split('@')[0]}`
-    : '@developer7699'
     ? `@${user.displayName.toLowerCase().replace(/\s+/g, '')}`
     : user?.email
     ? `@${user.email.split('@')[0]}`
@@ -233,323 +274,485 @@ export function CustomerProfilePage() {
   ]
 
   return (
-    <div className="space-y-4 max-w-lg mx-auto pb-3 relative">
+    <div className="space-y-4 max-w-lg mx-auto pb-24 relative">
       {/* Toast Notification overlay */}
       <ToastNotification message={toastMessage} onClose={() => setToastMessage(null)} />
 
-      {/* Top Header with Back */}
-      <div className="flex items-center gap-2.5 pb-1 border-b border-slate-100 dark:border-slate-800">
+      {/* Top Header Matching Image 5: Back Arrow, User Center, Sun/Moon Theme Toggle, Globe Language */}
+      <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
         <BackButton fallback="/customer/dashboard" />
-        <div>
-          <h1 className="text-base font-black text-slate-900 dark:text-white">{t('profile.title')}</h1>
-          <p className="text-[11px] text-slate-500">{t('profile.subtitle')}</p>
-        </div>
-      </div>
-
-      {/* Top Profile Card (Deep blue gradient matching screenshot) */}
-      <div className="rounded-3xl bg-gradient-to-b from-indigo-600 via-indigo-700 to-indigo-900 text-white p-6 text-center space-y-4 shadow-xl shadow-indigo-600/30 relative overflow-hidden">
-        {/* Decorative background glow */}
-        <div className="absolute -top-12 -right-12 w-36 h-36 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-indigo-400/20 rounded-full blur-xl pointer-events-none" />
-
-        {/* User Avatar Circle */}
-        <div className="relative inline-block mx-auto">
-          <div className="w-20 h-20 rounded-full bg-white/15 border-2 border-white/30 flex items-center justify-center text-white shadow-inner mx-auto backdrop-blur-md">
-            <User className="w-10 h-10 text-white" />
-          </div>
-          <span className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-emerald-400 border-2 border-indigo-700 flex items-center justify-center text-[10px] text-indigo-950 font-bold shadow-xs">
-            ✓
-          </span>
-        </div>
-
-        {/* Username & Copy Button */}
-        <div className="space-y-1.5">
-          <h2 className="text-xl font-black tracking-tight">{username}</h2>
+        <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">User Center</h1>
+        <div className="flex items-center gap-1">
           <button
-            onClick={copyUsername}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-white/15 hover:bg-white/25 text-white backdrop-blur-md transition-all cursor-pointer border border-white/20 active:scale-95"
-          >
-            {copiedUser ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{copiedUser ? t('profile.copied') : t('profile.copyUsername')}</span>
-          </button>
-        </div>
-
-        {/* VIP Level Progress Bar */}
-        <div className="pt-2 space-y-1.5 max-w-xs mx-auto">
-          <div className="h-2 w-full bg-indigo-950/60 rounded-full overflow-hidden p-0.5 border border-white/10">
-            <div className="h-full bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-200 rounded-full w-[12%] shadow-xs" />
-          </div>
-          <div className="flex justify-between items-center text-[11px] font-bold text-indigo-200">
-            <span>{t('profile.vipProgress')}</span>
-            <span className="font-mono text-amber-300">0%</span>
-          </div>
-        </div>
-      </div>
-
-      {/* GENERAL SETTINGS Card Group */}
-      <div className="space-y-2">
-        <p className="text-[11px] font-extrabold tracking-wider uppercase text-slate-500 dark:text-slate-400 px-3">
-          {t('profile.generalSettings')}
-        </p>
-
-        <div className="rounded-3xl bg-white dark:bg-[#121829] border border-slate-200/90 dark:border-slate-800/90 divide-y divide-slate-100 dark:divide-slate-800/60 shadow-xs overflow-hidden">
-          {/* 1. Manage Payments */}
-          <button
-            onClick={() => setActiveModal('manage_payments')}
-            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                <CreditCard className="w-4 h-4" />
-              </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
-                {t('profile.managePayments')}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                {paymentMethods.length} {t('profile.methods')}
-              </span>
-              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
-            </div>
-          </button>
-
-          {/* 2. Buy Methods */}
-          <button
-            onClick={() => setActiveModal('buy_methods')}
-            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                <Building2 className="w-4 h-4" />
-              </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
-                {t('profile.buyMethods')}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                {t('profile.verifyBank')}
-              </span>
-              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
-            </div>
-          </button>
-
-          {/* 3. Language (Only English & Hindi) */}
-          <button
-            onClick={() => setActiveModal('language')}
-            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-9 h-9 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center shrink-0">
-                <Globe className="w-4 h-4" />
-              </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
-                {t('profile.language')}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                {language === 'hi' ? 'हिंदी' : 'English'}
-              </span>
-              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
-            </div>
-          </button>
-
-          {/* 4. Display Currency */}
-          <button
-            onClick={() => setActiveModal('display_currency')}
-            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                <DollarSign className="w-4 h-4" />
-              </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
-                {t('profile.displayCurrency')}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                {displayCurrency}
-              </span>
-              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
-            </div>
-          </button>
-
-          {/* 5. Appearance (White Mode / Dark Mode Toggle) */}
-          <div
+            type="button"
             onClick={(e) => {
               toggle(e)
               showToast(theme === 'dark' ? 'Switched to Light Mode' : 'Switched to Dark Mode')
             }}
-            className="flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer"
+            className="p-1.5 sm:p-2 rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            title="Toggle Color Theme"
           >
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
-                {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-              </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
-                {t('profile.appearance')}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400">
-                {theme === 'dark' ? t('profile.darkMode') : t('profile.whiteMode')}
-              </span>
-              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
-            </div>
-          </div>
-
-          {/* 6. Withdraw Address (Image 2: Fixed Spacing & Never Stuck Together) */}
-          <button
-            onClick={() => setActiveModal('withdraw_address')}
-            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                <Send className="w-4 h-4" />
-              </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
-                {t('profile.withdrawAddress')}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                {withdrawAddresses.length} {t('profile.addresses')}
-              </span>
-              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
-            </div>
+            {theme === 'dark' ? <Sun className="w-5 h-5 text-amber-400 stroke-[2]" /> : <Moon className="w-5 h-5 text-slate-700 stroke-[2]" />}
           </button>
-
-          {/* 7. Notification Settings */}
           <button
-            onClick={() => setActiveModal('notification_settings')}
-            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
+            type="button"
+            onClick={() => setActiveModal('language')}
+            className="p-1.5 sm:p-2 rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            title="Language"
           >
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-                <Bell className="w-4 h-4" />
-              </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
-                {t('profile.notificationSettings')}
-              </span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
-          </button>
-
-          {/* 8. Rate Alerts */}
-          <button
-            onClick={() => setActiveModal('rate_alerts')}
-            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                <TrendingUp className="w-4 h-4" />
-              </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
-                {t('profile.rateAlerts')}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                Active
-              </span>
-              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
-            </div>
+            <Globe className="w-5 h-5 stroke-[2]" />
           </button>
         </div>
       </div>
 
-      {/* HELP & SUPPORT Card Group */}
-      <div className="space-y-2 pt-2">
-        <p className="text-[11px] font-extrabold tracking-wider uppercase text-slate-500 dark:text-slate-400 px-3">
-          {t('profile.helpSupport')}
-        </p>
+      {/* User Profile Header Card Matching Image 5 */}
+      <div className="flex items-center gap-3.5 py-3 px-1">
+        <div className="relative shrink-0">
+          <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-slate-400 via-slate-300 to-slate-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-500 p-0.5 shadow-md flex items-center justify-center">
+            <div className="w-full h-full rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 font-black">
+              <User className="w-7 h-7" />
+            </div>
+          </div>
+          <span className="absolute -bottom-0.5 -right-0.5 w-4.5 h-4.5 rounded-full bg-amber-500 text-white flex items-center justify-center text-[10px] font-black shadow-xs ring-2 ring-white dark:ring-[#0b1020]">
+            ✓
+          </span>
+        </div>
 
-        <div className="rounded-3xl bg-white dark:bg-[#121829] border border-slate-200/90 dark:border-slate-800/90 divide-y divide-slate-100 dark:divide-slate-800/60 shadow-xs overflow-hidden">
-          {/* 9. Take the App Tour */}
-          <button
-            onClick={() => {
-              setTourStep(0)
-              setActiveModal('app_tour')
-            }}
-            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                <Compass className="w-4 h-4" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-1 w-full h-7">
+            <h2 className="text-[13.5px] sm:text-sm font-black tracking-tight text-slate-900 dark:text-white font-mono truncate select-all">
+              {showFullEmail ? userEmail : maskedEmail}
+            </h2>
+            <button
+              type="button"
+              onClick={() => setShowFullEmail(!showFullEmail)}
+              className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0 ml-1"
+              title={showFullEmail ? 'Hide Email' : 'Show Full Email'}
+            >
+              {showFullEmail ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          <span className="inline-block mt-0.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-200/60 dark:border-slate-700/60">
+            Site: FundFusion Global
+          </span>
+        </div>
+      </div>
+
+      {/* Horizontal Tabs Matching Image 5: My info | Security | Preference | General (Equal 4 Grid Columns) */}
+      <div className="grid grid-cols-4 border-b border-slate-100 dark:border-slate-800 text-center">
+        {[
+          { id: 'my_info', label: 'My info' },
+          { id: 'security', label: 'Security' },
+          { id: 'preference', label: 'Preference' },
+          { id: 'general', label: 'General' },
+        ].map((tab) => {
+          const isActive = profileTab === tab.id
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setProfileTab(tab.id as any)}
+              className={cn(
+                'py-3 text-[12px] sm:text-[13px] font-bold transition-all cursor-pointer relative truncate px-0.5 select-none',
+                isActive
+                  ? 'text-slate-900 dark:text-white font-extrabold'
+                  : 'text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300'
+              )}
+            >
+              <span>{tab.label}</span>
+              {isActive && (
+                <span className="absolute bottom-0 left-2 right-2 h-[2.5px] bg-slate-900 dark:bg-white rounded-full transition-all" />
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Tab Content */}
+      <div className="pt-1">
+        {profileTab === 'general' && (
+          /* General Tab (Image 5 exact menu list) */
+          <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+            {/* 1. Language */}
+            <button
+              type="button"
+              onClick={() => setActiveModal('language')}
+              className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors cursor-pointer text-left"
+            >
+              <div className="flex items-center gap-3">
+                <Globe className="w-5 h-5 text-slate-700 dark:text-slate-300" />
+                <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Language</span>
               </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
-                {t('profile.appTour')}
+              <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                <span className="font-semibold">{language === 'hi' ? 'हिंदी' : 'English'}</span>
+                <ChevronRight className="w-4 h-4" />
+              </div>
+            </button>
+
+            {/* 2. Currency Display */}
+            <button
+              type="button"
+              onClick={() => setActiveModal('display_currency')}
+              className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors cursor-pointer text-left"
+            >
+              <div className="flex items-center gap-3">
+                <DollarSign className="w-5 h-5 text-slate-700 dark:text-slate-300" />
+                <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Currency Display</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                <span className="font-semibold font-mono">{displayCurrency}</span>
+                <ChevronRight className="w-4 h-4" />
+              </div>
+            </button>
+
+            {/* 3. Color Theme */}
+            <button
+              type="button"
+              onClick={(e) => {
+                toggle(e)
+                showToast(theme === 'dark' ? 'Switched to Light Mode' : 'Switched to Dark Mode')
+              }}
+              className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors cursor-pointer text-left"
+            >
+              <div className="flex items-center gap-3">
+                <Sun className="w-5 h-5 text-slate-700 dark:text-slate-300" />
+                <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Color Theme</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                <span className="font-semibold">{theme === 'dark' ? 'Dark Mode' : 'Light Mode'}</span>
+                <ChevronRight className="w-4 h-4" />
+              </div>
+            </button>
+
+            {/* 4. Always on (no screen lock) */}
+            <div className="w-full flex items-center justify-between py-3.5 px-2">
+              <div className="flex items-center gap-3">
+                <Smartphone className="w-5 h-5 text-slate-700 dark:text-slate-300" />
+                <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Always on (no screen lock)</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !alwaysOn
+                  setAlwaysOn(next)
+                  showToast(next ? 'Screen keep-awake enabled' : 'Screen keep-awake disabled')
+                }}
+                className={cn(
+                  'w-11 h-6 rounded-full transition-colors relative p-0.5 cursor-pointer flex items-center',
+                  alwaysOn ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'
+                )}
+                aria-label="Toggle screen keep awake"
+              >
+                <div
+                  className={cn(
+                    'w-5 h-5 rounded-full bg-white transition-transform shadow-xs',
+                    alwaysOn ? 'translate-x-5' : 'translate-x-0'
+                  )}
+                />
+              </button>
+            </div>
+
+            {/* 5. Help Center (Moved from top header!) */}
+            <button
+              type="button"
+              onClick={() => navigate('/customer/support')}
+              className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors cursor-pointer text-left"
+            >
+              <div className="flex items-center gap-3">
+                <HelpCircle className="w-5 h-5 text-slate-700 dark:text-slate-300" />
+                <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Help Center</span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400" />
+            </button>
+
+            {/* 6. Trade market overview */}
+            <button
+              type="button"
+              onClick={() => setActiveModal('market_overview_modal')}
+              className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors cursor-pointer text-left"
+            >
+              <div className="flex items-center gap-3">
+                <TrendingUp className="w-5 h-5 text-slate-700 dark:text-slate-300" />
+                <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Trade market overview</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-emerald-500 font-bold">
+                <span>₹89.95</span>
+                <ChevronRight className="w-4 h-4 text-slate-400" />
+              </div>
+            </button>
+
+            {/* 7. Contact Support */}
+            <button
+              type="button"
+              onClick={() => setActiveModal('contact_support')}
+              className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors cursor-pointer text-left"
+            >
+              <div className="flex items-center gap-3">
+                <MessageSquare className="w-5 h-5 text-slate-700 dark:text-slate-300" />
+                <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Contact Support</span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400" />
+            </button>
+
+            {/* 8. User feedback */}
+            <button
+              type="button"
+              onClick={() => setActiveModal('share_feedback')}
+              className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors cursor-pointer text-left"
+            >
+              <div className="flex items-center gap-3">
+                <FileText className="w-5 h-5 text-slate-700 dark:text-slate-300" />
+                <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">User feedback</span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400" />
+            </button>
+          </div>
+        )}
+
+        {profileTab === 'security' && (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+            {/* 1. 2FA */}
+            <button
+              type="button"
+              onClick={() => setActiveModal('2fa_modal')}
+              className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors cursor-pointer text-left"
+            >
+              <div>
+                <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white block">2-Factor Authentication</span>
+                <span className="text-[11px] text-slate-400">Google Authenticator (TOTP)</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className={cn('text-xs font-bold px-2.5 py-0.5 rounded-full', totpEnabled ? 'text-emerald-600 bg-emerald-500/10' : 'text-slate-500 bg-slate-100 dark:bg-slate-800')}>
+                  {totpEnabled ? 'Active' : 'Disabled'}
+                </span>
+                <ChevronRight className="w-4 h-4 text-slate-400" />
+              </div>
+            </button>
+
+            {/* 2. KYC */}
+            <button
+              type="button"
+              onClick={() => setActiveModal('kyc_modal')}
+              className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors cursor-pointer text-left"
+            >
+              <div>
+                <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white block">Identity Verification (KYC)</span>
+                <span className="text-[11px] text-slate-400">Aadhaar & PAN Linked</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-emerald-600 bg-emerald-500/10 px-2.5 py-0.5 rounded-full">Tier 2 Verified</span>
+                <ChevronRight className="w-4 h-4 text-slate-400" />
+              </div>
+            </button>
+
+            {/* 3. Login Password */}
+            <button
+              type="button"
+              onClick={() => setActiveModal('password_modal')}
+              className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors cursor-pointer text-left"
+            >
+              <div>
+                <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white block">Login Password</span>
+                <span className="text-[11px] text-slate-400">Tap to change password</span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400" />
+            </button>
+
+            {/* 4. Anti-Phishing Code */}
+            <button
+              type="button"
+              onClick={() => setActiveModal('anti_phishing_modal')}
+              className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors cursor-pointer text-left"
+            >
+              <div>
+                <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white block">Anti-Phishing Code</span>
+                <span className="text-[11px] text-slate-400">Protects official emails</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-500 font-mono">{antiPhishingCode}</span>
+                <ChevronRight className="w-4 h-4 text-slate-400" />
+              </div>
+            </button>
+
+            {/* 5. Device Sessions */}
+            <button
+              type="button"
+              onClick={() => setActiveModal('sessions_modal')}
+              className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors cursor-pointer text-left"
+            >
+              <div>
+                <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white block">Device Management</span>
+                <span className="text-[11px] text-slate-400">{sessions.length} Active devices</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-emerald-500 font-bold">Online</span>
+                <ChevronRight className="w-4 h-4 text-slate-400" />
+              </div>
+            </button>
+          </div>
+        )}
+
+        {profileTab === 'my_info' && (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+            {/* 1. Nickname */}
+            <div className="flex items-center justify-between py-3.5 px-2">
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Nickname</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 font-mono">@{displayName}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNicknameInput(displayName)
+                    setActiveModal('edit_name_modal')
+                  }}
+                  className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  title="Edit Display Name"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* 2. UID */}
+            <div className="flex items-center justify-between py-3.5 px-2">
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">UID</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-mono font-bold text-slate-600 dark:text-slate-300">8920194</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText('8920194')
+                    showToast('UID 8920194 copied!')
+                  }}
+                  className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                  title="Copy UID"
+                >
+                  <Copy className="w-3.5 h-3.5 text-slate-400" />
+                </button>
+              </div>
+            </div>
+
+            {/* 3. Email */}
+            <div className="flex items-center justify-between py-3.5 px-2">
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Email Address</span>
+              <span className="text-xs font-mono text-slate-600 dark:text-slate-300">
+                {showFullEmail ? userEmail : maskedEmail}
               </span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-semibold shrink-0">
-              <span>Replay</span>
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-          </button>
 
-          {/* 10. Contact Support */}
-          <button
-            onClick={() => setActiveModal('contact_support')}
-            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-9 h-9 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
-                <MessageSquare className="w-4 h-4" />
+            {/* 4. VIP Level */}
+            <button
+              type="button"
+              onClick={() => setActiveModal('vip_modal')}
+              className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors cursor-pointer text-left"
+            >
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">VIP Level</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-amber-600 bg-amber-500/10 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                  <Award className="w-3 h-3" /> VIP 1
+                </span>
+                <ChevronRight className="w-4 h-4 text-slate-400" />
               </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
-                {t('profile.contactSupport')}
+            </button>
+
+            {/* 5. Account Status */}
+            <div className="flex items-center justify-between py-3.5 px-2">
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Account Status</span>
+              <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Good Standing
               </span>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
-          </button>
 
-          {/* 11. Share Feedback */}
-          <button
-            onClick={() => setActiveModal('share_feedback')}
-            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-                <HelpCircle className="w-4 h-4" />
+            {/* 6. Referral Code */}
+            <div className="flex items-center justify-between py-3.5 px-2">
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Referral Code</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400">FF-892019</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText('FF-892019')
+                    showToast('Referral code copied to clipboard!')
+                  }}
+                  className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                  title="Copy Referral Code"
+                >
+                  <Copy className="w-3.5 h-3.5 text-slate-400" />
+                </button>
               </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
-                {t('profile.shareFeedback')}
-              </span>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
-          </button>
 
-          {/* 12. Privacy Policy */}
-          <button
-            onClick={() => setActiveModal('privacy_policy')}
-            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-9 h-9 rounded-xl bg-slate-500/10 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0">
-                <FileText className="w-4 h-4" />
+            {/* 7. Registration Date */}
+            <div className="flex items-center justify-between py-3.5 px-2">
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Registration Date</span>
+              <span className="text-xs text-slate-400 font-mono">Nov 2026</span>
+            </div>
+          </div>
+        )}
+
+        {profileTab === 'preference' && (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+            <button
+              type="button"
+              onClick={() => setActiveModal('manage_payments')}
+              className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors text-left"
+            >
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Payment Accounts</span>
+              <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                <span className="font-semibold">{paymentMethods.length} Methods</span>
+                <ChevronRight className="w-4 h-4" />
               </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
-                {t('profile.privacyPolicy')}
-              </span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
-          </button>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveModal('withdraw_address')}
+              className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors text-left"
+            >
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Withdraw Addresses</span>
+              <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                <span className="font-semibold">{withdrawAddresses.length} Saved</span>
+                <ChevronRight className="w-4 h-4" />
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveModal('notification_settings')}
+              className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors text-left"
+            >
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Push & Trade Notifications</span>
+              <ChevronRight className="w-4 h-4 text-slate-400" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveModal('rate_alerts')}
+              className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors text-left"
+            >
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Custom Rate Alerts</span>
+              <span className="text-xs font-bold text-emerald-600">Active</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTourStep(0)
+                setActiveModal('app_tour')
+              }}
+              className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors text-left"
+            >
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">App Tour & Overview</span>
+              <ChevronRight className="w-4 h-4 text-slate-400" />
+            </button>
+          </div>
+        )}
 
-          {/* 13. Log out */}
+        {/* Log Out Button at the Bottom */}
+        <div className="pt-8 pb-12">
           <button
+            type="button"
             onClick={() => setActiveModal('logout_confirm')}
-            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-rose-500/10 transition-colors group cursor-pointer text-rose-600 dark:text-rose-400 text-left"
+            className="w-full py-3.5 rounded-2xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/15 border border-rose-200 dark:border-rose-500/20 text-rose-600 dark:text-rose-400 font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-98"
           >
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-9 h-9 rounded-xl bg-rose-500/15 flex items-center justify-center shrink-0">
-                <LogOut className="w-4 h-4" />
-              </div>
-              <span className="text-xs sm:text-sm font-black truncate">{t('profile.logout')}</span>
-            </div>
-            <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform shrink-0" />
+            <LogOut className="w-4 h-4" />
+            <span>Log out</span>
           </button>
         </div>
       </div>
@@ -1326,7 +1529,7 @@ export function CustomerProfilePage() {
             <div className="flex gap-2 pt-2">
               <button
                 onClick={() => setActiveModal(null)}
-                className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
               >
                 Cancel
               </button>
@@ -1336,9 +1539,482 @@ export function CustomerProfilePage() {
                   await logout()
                   navigate('/')
                 }}
-                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20"
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 cursor-pointer"
               >
                 Log Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 16. 2FA AUTHENTICATOR MODAL */}
+      {activeModal === '2fa_modal' && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-[28px] w-full max-w-[360px] p-4 sm:p-5 space-y-4 shadow-2xl relative max-h-[85%] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-500" />
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">2-Factor Authentication</h3>
+              </div>
+              <button onClick={() => setActiveModal(null)} className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
+                <div>
+                  <span className="font-extrabold text-slate-900 dark:text-white block">Google Authenticator (TOTP)</span>
+                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">Active & Protecting Trades</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !totpEnabled
+                    setTotpEnabled(next)
+                    showToast(next ? '2FA Authenticator activated' : '2FA Authenticator temporarily paused')
+                  }}
+                  className={cn(
+                    'w-11 h-6 rounded-full transition-colors relative p-0.5 cursor-pointer flex items-center',
+                    totpEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'
+                  )}
+                >
+                  <div className={cn('w-5 h-5 rounded-full bg-white transition-transform shadow-xs', totpEnabled ? 'translate-x-5' : 'translate-x-0')} />
+                </button>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-2">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Backup Secret Key</span>
+                <div className="flex items-center justify-between font-mono bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <span className="font-bold text-slate-900 dark:text-white">JBSW Y3DP EHPK 3PXP</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText('JBSWY3DPEHPK3PXP')
+                      showToast('2FA Secret Key copied!')
+                    }}
+                    className="p-1 text-slate-400 hover:text-slate-600"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-tight">
+                  Save this key in a secure place. If you lose your phone, you can restore your authenticator codes.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveModal(null)
+                  showToast('Security settings verified')
+                }}
+                className="w-full py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 font-bold text-xs"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 17. KYC MODAL */}
+      {activeModal === 'kyc_modal' && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-[28px] w-full max-w-[360px] p-4 sm:p-5 space-y-4 shadow-2xl relative max-h-[85%] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">KYC Verification Status</h3>
+              </div>
+              <button onClick={() => setActiveModal(null)} className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="font-black text-emerald-700 dark:text-emerald-400">Tier 2 Verified</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500 text-white">Full Access</span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                  Government ID (Aadhaar & PAN) and selfie match successfully completed.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                  <span className="text-slate-500 font-bold">Daily P2P Buy/Sell Limit</span>
+                  <span className="font-mono font-black text-slate-900 dark:text-white">$50,000 USDT</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                  <span className="text-slate-500 font-bold">Daily Crypto Withdrawal</span>
+                  <span className="font-mono font-black text-slate-900 dark:text-white">100,000 USDT</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                  <span className="text-slate-500 font-bold">Bank / UPI Settlement</span>
+                  <span className="text-emerald-600 font-bold">Instant Instant 24×7</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setActiveModal(null)}
+                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 18. LOGIN PASSWORD MODAL */}
+      {activeModal === 'password_modal' && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-[28px] w-full max-w-[360px] p-4 sm:p-5 space-y-4 shadow-2xl relative max-h-[85%] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <Lock className="w-5 h-5 text-indigo-500" />
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">Change Password</h3>
+              </div>
+              <button onClick={() => setActiveModal(null)} className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-500">Current Password</label>
+                <input
+                  type="password"
+                  value={currPassInput}
+                  onChange={(e) => setCurrPassInput(e.target.value)}
+                  placeholder="Enter current password"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-500">New Password</label>
+                <input
+                  type="password"
+                  value={newPassInput}
+                  onChange={(e) => setNewPassInput(e.target.value)}
+                  placeholder="Minimum 8 characters"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-500">Confirm New Password</label>
+                <input
+                  type="password"
+                  value={confirmPassInput}
+                  onChange={(e) => setConfirmPassInput(e.target.value)}
+                  placeholder="Repeat new password"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveModal(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-slate-600 dark:text-slate-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!newPassInput || newPassInput.length < 6) {
+                      showToast('Password must be at least 6 characters.')
+                      return
+                    }
+                    if (newPassInput !== confirmPassInput) {
+                      showToast('New passwords do not match.')
+                      return
+                    }
+                    setCurrPassInput('')
+                    setNewPassInput('')
+                    setConfirmPassInput('')
+                    setActiveModal(null)
+                    showToast('Login password updated successfully!')
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
+                >
+                  Update
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 19. ANTI-PHISHING CODE MODAL */}
+      {activeModal === 'anti_phishing_modal' && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-[28px] w-full max-w-[360px] p-4 sm:p-5 space-y-4 shadow-2xl relative max-h-[85%] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-5 h-5 text-amber-500" />
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">Anti-Phishing Code</h3>
+              </div>
+              <button onClick={() => setActiveModal(null)} className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <p className="text-slate-500 dark:text-slate-400 leading-relaxed">
+                Your Anti-Phishing code is included in every genuine email from FundFusion. If an email does not contain this exact code, it is fraudulent.
+              </p>
+
+              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-center space-y-1">
+                <span className="text-[10px] uppercase font-bold text-amber-600">Active Anti-Phishing Code</span>
+                <p className="text-xl font-mono font-black text-slate-900 dark:text-white">{antiPhishingCode}</p>
+              </div>
+
+              <div className="space-y-1 pt-1">
+                <label className="text-[11px] font-bold text-slate-500">Change Custom Code</label>
+                <input
+                  type="text"
+                  maxLength={16}
+                  placeholder="Enter new 4-16 letter code"
+                  value={newAntiPhishingInput}
+                  onChange={(e) => setNewAntiPhishingInput(e.target.value.toUpperCase())}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-slate-900 dark:text-white text-xs font-bold"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (newAntiPhishingInput.trim().length >= 4) {
+                    setAntiPhishingCode(newAntiPhishingInput.trim())
+                    setNewAntiPhishingInput('')
+                    setActiveModal(null)
+                    showToast('Anti-phishing code updated!')
+                  } else {
+                    showToast('Code must be at least 4 characters.')
+                  }
+                }}
+                className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs"
+              >
+                Save Code
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 20. SESSIONS MODAL */}
+      {activeModal === 'sessions_modal' && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-[28px] w-full max-w-[360px] p-4 sm:p-5 space-y-4 shadow-2xl relative max-h-[85%] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <Laptop className="w-5 h-5 text-indigo-500" />
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">Active Device Sessions</h3>
+              </div>
+              <button onClick={() => setActiveModal(null)} className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2.5 text-xs">
+              {sessions.map((s) => (
+                <div key={s.id} className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="font-extrabold text-slate-900 dark:text-white">{s.device}</span>
+                    {s.isCurrent ? (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-600">Current</span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400">{s.time}</span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-mono">{s.location} · {s.ip}</p>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSessions(sessions.filter((s) => s.isCurrent))
+                  showToast('All other device sessions terminated!')
+                }}
+                className="w-full mt-2 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/20 text-rose-600 font-bold text-xs"
+              >
+                Log Out All Other Devices
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 21. VIP MODAL */}
+      {activeModal === 'vip_modal' && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-[28px] w-full max-w-[360px] p-4 sm:p-5 space-y-4 shadow-2xl relative max-h-[85%] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <Award className="w-5 h-5 text-amber-500" />
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">VIP Trader Perks</h3>
+              </div>
+              <button onClick={() => setActiveModal(null)} className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-amber-500/10 border border-amber-500/30 space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-black text-amber-600 dark:text-amber-400">VIP Level 1</span>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-500 text-slate-950">Active Tier</span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                  Qualified via 30-day volume & Tier 2 bank verification.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                {[
+                  { label: '0% Maker Trading Fees', desc: 'No platform commission on standard P2P orders' },
+                  { label: 'Tier 1 Local Vault Delivery', desc: 'Guaranteed local voucher fulfillment under 15 seconds' },
+                  { label: '24/7 Dedicated Desk Support', desc: 'Average ticket resolution under 3 minutes' },
+                  { label: 'Maximum Escrow Protection', desc: 'Triple check smart contract guarantee' },
+                ].map((item, idx) => (
+                  <div key={idx} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 flex items-start gap-2">
+                    <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-extrabold text-slate-900 dark:text-white block">{item.label}</span>
+                      <span className="text-[10px] text-slate-400">{item.desc}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setActiveModal(null)}
+                className="w-full py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 font-bold text-xs"
+              >
+                Got It
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 22. EDIT NICKNAME MODAL */}
+      {activeModal === 'edit_name_modal' && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-[28px] w-full max-w-[360px] p-4 sm:p-5 space-y-4 shadow-2xl relative max-h-[85%] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <Edit3 className="w-5 h-5 text-indigo-500" />
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">Change Nickname</h3>
+              </div>
+              <button onClick={() => setActiveModal(null)} className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-500">New Display Name</label>
+                <input
+                  type="text"
+                  maxLength={24}
+                  value={nicknameInput}
+                  onChange={(e) => setNicknameInput(e.target.value)}
+                  placeholder="Enter custom nickname"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveModal(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-slate-600 dark:text-slate-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (nicknameInput.trim()) {
+                      setDisplayName(nicknameInput.trim())
+                      setActiveModal(null)
+                      showToast('Nickname updated!')
+                    }
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 23. LIVE MARKET OVERVIEW MODAL */}
+      {activeModal === 'market_overview_modal' && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#121829] border border-slate-200 dark:border-slate-800 rounded-[28px] w-full max-w-[360px] p-4 sm:p-5 space-y-4 shadow-2xl relative max-h-[85%] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-emerald-500" />
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">P2P Market Overview</h3>
+              </div>
+              <button onClick={() => setActiveModal(null)} className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+                  <span className="text-[10px] font-bold text-emerald-600 uppercase block">Buy USDT</span>
+                  <span className="text-lg font-black font-mono text-slate-900 dark:text-white">₹89.95</span>
+                  <span className="text-[10px] text-emerald-500 font-bold">+0.12%</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-center">
+                  <span className="text-[10px] font-bold text-blue-600 uppercase block">Sell USDT</span>
+                  <span className="text-lg font-black font-mono text-slate-900 dark:text-white">₹89.80</span>
+                  <span className="text-[10px] text-emerald-500 font-bold">+0.08%</span>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-2">
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-slate-500 font-bold">24h P2P Volume</span>
+                  <span className="font-mono font-bold text-slate-900 dark:text-white">$1,420,890 USDT</span>
+                </div>
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-slate-500 font-bold">Avg. Escrow Release</span>
+                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">42 seconds</span>
+                </div>
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-slate-500 font-bold">Dispute Rate</span>
+                  <span className="font-mono font-bold text-slate-900 dark:text-white">0.04% (Protected)</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveModal(null)
+                  navigate('/customer/dashboard?tab=leaderboard')
+                }}
+                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"
+              >
+                Open Full Orderbook
               </button>
             </div>
           </div>

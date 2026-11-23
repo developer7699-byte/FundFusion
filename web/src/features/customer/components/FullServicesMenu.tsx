@@ -5,7 +5,7 @@ import {
   ArrowUpFromLine,
   Banknote,
   QrCode,
-  CreditCard,
+  Gamepad2,
   Receipt,
   ArrowDownCircle,
   Gift,
@@ -83,11 +83,11 @@ export function FullServicesMenu({
       title: 'Payments & Bills',
       items: [
         { id: 'scan', label: 'Scan & Pay', icon: QrCode, to: '/customer/pay/scan' },
-        { id: 'cards', label: 'Virtual Cards', icon: CreditCard, action: onOpenVirtualCard },
+        { id: 'gaming', label: 'Game Topup (FF/BGMI)', icon: Gamepad2, action: () => onOpenBills?.('gaming' as any) },
         { id: 'bills', label: 'Bill Payments', icon: Receipt, action: () => onOpenBills?.('electricity') },
         { id: 'recharge', label: 'Mobile Recharge', icon: Smartphone, action: () => onOpenBills?.('recharge') },
         { id: 'request', label: 'Request Money', icon: ArrowDownCircle, to: '/customer/request' },
-        { id: 'gifts', label: 'Gift Cards', icon: Gift, action: onOpenGifts },
+        { id: 'gifts', label: 'Gift Cards', icon: Gift, to: '/customer/gift-cards' },
       ],
     },
     {

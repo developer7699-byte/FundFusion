@@ -36,7 +36,7 @@ export function SiteHeader() {
       )}
     >
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-        <Link to="/" aria-label="NEXORA PAY home">
+        <Link to="/" aria-label="FundFusion home">
           <Logo />
         </Link>
         <nav className="hidden items-center gap-6 lg:flex">

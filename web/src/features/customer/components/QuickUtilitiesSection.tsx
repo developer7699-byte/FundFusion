@@ -1,13 +1,23 @@
-import { Smartphone, Zap, Tv, Globe, Gift, ArrowRight } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Smartphone, Zap, Tv, Globe, Gift, ArrowRight, Gamepad2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface QuickUtilitiesSectionProps {
-  onOpenBills: (cat: 'recharge' | 'electricity' | 'dth' | 'broadband') => void
-  onOpenGifts: () => void
+  onOpenBills: (cat: 'gaming' | 'recharge' | 'electricity' | 'dth' | 'broadband') => void
+  onOpenGifts?: () => void
 }
 
 export function QuickUtilitiesSection({ onOpenBills, onOpenGifts }: QuickUtilitiesSectionProps) {
   const utilityItems = [
+    {
+      id: 'gaming',
+      name: 'Game Top-up',
+      desc: 'Free Fire, BGMI, Play',
+      icon: Gamepad2,
+      color: 'text-rose-600 dark:text-rose-400',
+      bg: 'bg-rose-500/10',
+      cat: 'gaming' as const,
+    },
     {
       id: 'recharge',
       name: 'Mobile Recharge',
@@ -35,15 +45,6 @@ export function QuickUtilitiesSection({ onOpenBills, onOpenGifts }: QuickUtiliti
       bg: 'bg-blue-500/10',
       cat: 'dth' as const,
     },
-    {
-      id: 'broadband',
-      name: 'Broadband Wifi',
-      desc: 'JioFiber, Airtel, ACT',
-      icon: Globe,
-      color: 'text-indigo-600 dark:text-indigo-400',
-      bg: 'bg-indigo-500/10',
-      cat: 'broadband' as const,
-    },
   ]
 
   const featuredVouchers = [
@@ -66,7 +67,7 @@ export function QuickUtilitiesSection({ onOpenBills, onOpenGifts }: QuickUtiliti
           </div>
           <button
             type="button"
-            onClick={() => onOpenBills('recharge')}
+            onClick={() => onOpenBills('gaming')}
             className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5 cursor-pointer"
           >
             <span>All Billers</span>
@@ -110,23 +111,21 @@ export function QuickUtilitiesSection({ onOpenBills, onOpenGifts }: QuickUtiliti
               Popular Gift Vouchers
             </h3>
           </div>
-          <button
-            type="button"
-            onClick={onOpenGifts}
+          <Link
+            to="/customer/gift-cards"
             className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-0.5 cursor-pointer"
           >
             <span>100+ Brands</span>
             <ArrowRight className="w-3 h-3" />
-          </button>
+          </Link>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
           {featuredVouchers.map((v) => (
-            <button
+            <Link
               key={v.id}
-              type="button"
-              onClick={onOpenGifts}
-              className="p-2.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 hover:border-amber-300 dark:hover:border-amber-500/40 text-left transition-all group cursor-pointer"
+              to="/customer/gift-cards"
+              className="p-2.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 hover:border-amber-300 dark:hover:border-amber-500/40 text-left transition-all group cursor-pointer block"
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
@@ -144,7 +143,7 @@ export function QuickUtilitiesSection({ onOpenBills, onOpenGifts }: QuickUtiliti
                   {v.usdt}
                 </span>
               </div>
-            </button>
+            </Link>
           ))}
         </div>
       </div>
