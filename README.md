@@ -18,6 +18,7 @@ Three roles share one web application: customer, merchant and admin.
 | Document | What it is |
 |---|---|
 | [`docs/PRD.md`](docs/PRD.md) | **The spec.** Wins over every other document. |
+| [`docs/RUNNING.md`](docs/RUNNING.md) | How to run the app locally — prerequisites, env, demo data, commands, troubleshooting |
 | [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md) | Accounts, keys and costs needed from the client, ordered by what they block |
 | [`CLAUDE.md`](CLAUDE.md) | Rules for agents working in this repo |
 | [`AGENTS.md`](AGENTS.md) | Shared working rules |
