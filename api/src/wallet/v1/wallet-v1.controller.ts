@@ -19,6 +19,8 @@ import { IdempotencyKey } from '../../common/idempotency.decorator';
 import { ok } from '../../common/http';
 import { AccountService } from '../../ledger/account.service';
 import { BalanceService } from '../../ledger/balance.service';
+import { approxInr } from '../../money/money';
+import { RateService } from '../../rates/rate.service';
 import { V1AuthGuard } from '../../v1/v1-auth.guard';
 import { ActivityService } from './activity.service';
 import { AllowlistService } from './allowlist.service';
@@ -45,8 +47,25 @@ export class WalletV1Controller {
     private readonly activity: ActivityService,
     private readonly accounts: AccountService,
     private readonly balances: BalanceService,
+    private readonly rates: RateService,
     @Inject(CHAIN_SERVICES) private readonly chain: ChainServices | null,
   ) {}
+
+  /**
+   * The mid-market USDT→INR rate as a string, or null when pricing is down.
+   *
+   * Indicative only: it decorates balances and activity with a "≈ ₹" hint
+   * (PRD §13.5). A dead feed must not fail a read the ledger is certain about,
+   * so it fails soft to null — the screen then shows USDT alone, exactly as it
+   * did before this field existed.
+   */
+  private async indicativeRate(): Promise<string | null> {
+    try {
+      return await this.rates.indicative();
+    } catch {
+      return null;
+    }
+  }
 
   /**
    * Everything a dashboard opens with, in one request: the derived balances
@@ -60,8 +79,26 @@ export class WalletV1Controller {
   @Get('summary')
   async summary(@CurrentUser() user: AuthUser) {
     const accountId = await this.accounts.ensureAccount(user.sub, 'USDT');
+    const balances = await this.balances.balances(accountId);
+    const usdtInrRate = await this.indicativeRate();
+
+    // A per-bucket "≈ ₹" computed server-side as strings, so no screen ever
+    // multiplies money in a JavaScript number (PRD §5.1). Null when the feed
+    // is down, which the UI reads as "show USDT only".
+    const inr =
+      usdtInrRate === null
+        ? null
+        : Object.fromEntries(
+            Object.entries(balances).map(([bucket, amount]) => [
+              bucket,
+              approxInr(amount, usdtInrRate),
+            ]),
+          );
+
     return ok({
-      balances: await this.balances.balances(accountId),
+      balances,
+      usdtInrRate,
+      inr,
       address: this.chain
         ? await this.chain.wallets.addressFor(user.sub)
         : null,
@@ -72,7 +109,20 @@ export class WalletV1Controller {
   /** This user's own journal entries, newest first (PRD §5 rule 1). */
   @Get('activity')
   async activityFeed(@CurrentUser() user: AuthUser) {
-    return ok(await this.activity.forUser(user.sub));
+    const rows = await this.activity.forUser(user.sub);
+    const usdtInrRate = await this.indicativeRate();
+    // Decorate each row with its indicative ₹ value (string, server-computed).
+    return ok(
+      rows.map((row) => ({
+        ...row,
+        // Only USDT converts: the ledger is multi-asset, and multiplying an
+        // INR entry by a USDT→INR rate would be nonsense.
+        amountInr:
+          usdtInrRate === null || row.assetSymbol !== 'USDT'
+            ? null
+            : approxInr(row.amount, usdtInrRate),
+      })),
+    );
   }
 
   @Get('address')

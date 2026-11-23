@@ -85,3 +85,31 @@ describe('deviation bound (PRD §7)', () => {
     await expect(rates.quote('SELL')).rejects.toThrow();
   });
 });
+
+// Indicative is a display read (PRD §13.5). It must return a usable mid rate
+// without touching the deviation baseline that quote() maintains, because the
+// same singleton prices real P2P trades.
+describe('indicative read (PRD §13.5)', () => {
+  it('returns the mid rate as a string', async () => {
+    expect(await rates.indicative()).toBe('97.00');
+  });
+
+  it('honours an admin override', async () => {
+    await rates.override('90.00');
+    expect(await rates.indicative()).toBe('90.00');
+  });
+
+  it('never moves the deviation baseline real quotes depend on', async () => {
+    provider.next('97.00');
+    expect(await rates.indicative()).toBe('97.00');
+    provider.next('1000.00');
+    // Had indicative stored 97 as lastGood, this would breach the bound and
+    // throw. It must not: a display read records nothing.
+    await expect(rates.indicative()).resolves.toBe('1000.00');
+  });
+
+  it('still refuses a non-positive tick', async () => {
+    provider.next('0');
+    await expect(rates.indicative()).rejects.toThrow(/unavailable/i);
+  });
+});

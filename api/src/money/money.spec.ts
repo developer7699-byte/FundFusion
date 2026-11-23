@@ -1,4 +1,5 @@
 import {
+  approxInr,
   Decimal,
   inr,
   inrString,
@@ -7,6 +8,24 @@ import {
   usdt,
   usdtString,
 } from './money';
+
+describe('approxInr (PRD §13.5 — indicative display only)', () => {
+  it('multiplies a full-scale USDT string by a rate and returns 2dp INR', () => {
+    expect(approxInr('1359.500000000000000000', '84.25')).toBe('114537.88');
+  });
+
+  it('returns a string, never a JavaScript number', () => {
+    expect(typeof approxInr('1', '84.25')).toBe('string');
+  });
+
+  it('rounds half-up to the INR scale', () => {
+    expect(approxInr('0.001', '84.25')).toBe('0.08'); // 0.08425 -> 0.08
+  });
+
+  it('is zero for a zero balance', () => {
+    expect(approxInr('0.000000000000000000', '84.25')).toBe('0.00');
+  });
+});
 
 describe('usdt (PRD §5.1 — NUMERIC(38,18))', () => {
   it('keeps 18 decimal places exactly', () => {

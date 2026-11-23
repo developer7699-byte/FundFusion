@@ -8,6 +8,7 @@ import { DbService } from '../../db/db.service';
 import { AccountService, DRIZZLE } from '../../ledger/account.service';
 import { LedgerModule } from '../../ledger/ledger.module';
 import { PostingService } from '../../ledger/posting.service';
+import { RateModule } from '../../rates/rate.module';
 import { PlatformSettingsService } from '../../settings/platform-settings.service';
 import { SettingsModule } from '../../settings/settings.module';
 import { ActivityService } from './activity.service';
@@ -24,7 +25,13 @@ import { WithdrawalService } from './withdrawal.service';
  * inject an interface, so the wiring names the implementation here, once.
  */
 @Module({
-  imports: [LedgerModule, CapabilityModule, AuditModule, SettingsModule],
+  imports: [
+    LedgerModule,
+    CapabilityModule,
+    AuditModule,
+    SettingsModule,
+    RateModule,
+  ],
   controllers: [WalletV1Controller],
   providers: [
     {

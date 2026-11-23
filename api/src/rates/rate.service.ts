@@ -49,6 +49,31 @@ export class RateService {
     this.manualOverride = null;
   }
 
+  /**
+   * A read-only mid rate, for an indicative "≈ ₹" display (PRD §13.5).
+   *
+   * Unlike {@link quote}, it never assigns `lastGood`: a dashboard or activity
+   * read must not move the §7 deviation baseline that protects real quotes,
+   * and this service is a shared singleton that pricing also depends on. It
+   * still honours an admin override and still rejects a non-positive or
+   * out-of-bound tick, because an estimate built on a bad feed is still wrong.
+   */
+  async indicative(): Promise<string> {
+    const mid = this.manualOverride ?? inr(await this.provider.midRate());
+
+    if (!mid.gt(0)) {
+      throw new ServiceUnavailableException(
+        'Pricing is unavailable: the feed returned a non-positive rate.',
+      );
+    }
+
+    if (!this.manualOverride) {
+      await this.assertWithinBound(mid); // reads lastGood; never writes it
+    }
+
+    return inrString(mid);
+  }
+
   async quote(side: 'BUY' | 'SELL'): Promise<RateQuote> {
     const mid = this.manualOverride ?? inr(await this.provider.midRate());
 

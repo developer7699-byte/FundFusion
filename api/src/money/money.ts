@@ -73,6 +73,22 @@ export function inrString(value: Decimal): string {
   return value.toFixed(INR_SCALE);
 }
 
+/**
+ * An indicative INR value for a USDT amount, for display only (PRD §13.5).
+ *
+ * Not a money operation: no journal settles against it, and it never rounds in
+ * the platform's favour, so it rounds half-up to the 2dp INR scale. It exists
+ * so a screen can show "≈ ₹X" beside a USDT figure without the client ever
+ * multiplying money in a JavaScript number (PRD §5.1). Both inputs are strings
+ * and the result is a string.
+ */
+export function approxInr(usdtValue: string, rate: string): string {
+  const product = new Decimal(usdtValue)
+    .times(new Decimal(rate))
+    .toDecimalPlaces(INR_SCALE, BaseDecimal.ROUND_HALF_UP);
+  return inrString(inr(product));
+}
+
 export interface Rounded {
   value: Decimal;
   /** original - value. Posts to the ROUNDING account so the journal balances. */
