@@ -7,12 +7,15 @@ import { useLanguage } from '@/lib/language'
 interface TotalAssetsCardProps {
   /** A string at full scale, straight from the ledger (PRD §5.1). Shown at 2dp; never parsed. */
   availableUsdt?: string
+  /** Server-computed indicative ₹ for the amount above, or null (PRD §13.5). */
+  availableInr?: string | null
   onOpenDeposit?: () => void
   onOpenSell?: () => void
 }
 
 export function TotalAssetsCard({
   availableUsdt = '0.000000000000000000',
+  availableInr,
   onOpenDeposit,
   onOpenSell,
 }: TotalAssetsCardProps) {
@@ -43,14 +46,19 @@ export function TotalAssetsCard({
           </span>
         </div>
 
-        {/* 3. Tether USDT Network Badge */}
-        <div className="flex items-center gap-1.5 pt-0.5">
+        {/* 3. Tether USDT Network Badge + indicative ₹ */}
+        <div className="flex items-center flex-wrap gap-1.5 pt-0.5">
           <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-[9px]">
             ₮
           </div>
           <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
             USDT available to spend
           </span>
+          {isVisible && availableInr != null && (
+            <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">
+              (≈ ₹{usdt2dp(availableInr)})
+            </span>
+          )}
         </div>
       </div>
 

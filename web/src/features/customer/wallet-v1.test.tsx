@@ -18,8 +18,26 @@ const SUMMARY = {
     BONDED: '0.000000000000000000',
     PENDING: '0.000000000000000000',
   },
+  // Indicative ₹, server-computed as strings (PRD §13.5). The UI only formats
+  // these; it never multiplies money in a JavaScript number (PRD §5.1).
+  usdtInrRate: '84.25',
+  inr: {
+    AVAILABLE: '104007.34',
+    LOCKED: '1011.00',
+    BONDED: '0.00',
+    PENDING: '0.00',
+  },
   address: '0x4b7877dD11Ef2d15297Cb0a013F8513d8D9EBf3C',
   network: 'BSC_TESTNET',
+}
+
+/** The same wallet when the pricing feed is down: balances certain, ₹ null. */
+const SUMMARY_NO_RATE = {
+  balances: SUMMARY.balances,
+  usdtInrRate: null,
+  inr: null,
+  address: SUMMARY.address,
+  network: SUMMARY.network,
 }
 
 const ME = {
@@ -140,13 +158,22 @@ describe('the wallet screens on the v1 API (PRD §5.1, §8)', () => {
     expect(typeof props.availableUsdt).toBe('string')
   })
 
-  it('shows no INR headline or estimate and no BTC/ETH rows on the dashboard', async () => {
+  it('shows the indicative ₹ estimate when the feed gives a rate, and no BTC/ETH rows', async () => {
     stubApi()
     show(<CustomerDashboard />)
 
     const card = await screen.findByTestId('total-assets-card')
-    expect(card).not.toHaveTextContent(/₹|INR|≈/)
+    expect(card).toHaveTextContent(/≈ ₹1,04,007\.34/)
     expect(screen.queryByText(/\b(BTC|ETH|Bitcoin|Ethereum)\b/)).toBeNull()
+  })
+
+  it('hides the ₹ estimate when the pricing feed is down', async () => {
+    stubApi({ summary: () => jsonResponse({ success: true, data: SUMMARY_NO_RATE }) })
+    show(<CustomerDashboard />)
+
+    const card = await screen.findByTestId('total-assets-card')
+    expect(card).toHaveTextContent('1,234.57') // balance still certain
+    expect(card).not.toHaveTextContent(/₹|≈/)
   })
 
   it('shows the real deposit address and refuses to invent one', async () => {

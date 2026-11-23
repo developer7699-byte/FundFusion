@@ -5,6 +5,7 @@ import { useWalletSummary } from './wallet-flows'
 
 import { TotalAssetsCard } from './components/TotalAssetsCard'
 import { QuickActionGrid } from './components/QuickActionGrid'
+import { PromoBannerCard } from './components/PromoBannerCard'
 import { P2PRatesSection } from './components/P2PRatesSection'
 import { DepositModal } from './components/DepositModal'
 import { AboutModal, BecomeMerchantModal } from './components/InfoModals'
@@ -39,11 +40,18 @@ export function CustomerDashboard() {
     <div className="space-y-3.5 sm:space-y-4 max-w-5xl mx-auto w-full pb-1 overflow-x-hidden min-w-0 transition-all">
       <TotalAssetsCard
         availableUsdt={q.data?.balances.AVAILABLE}
+        availableInr={q.data?.inr?.AVAILABLE ?? null}
         onOpenDeposit={() => setIsDepositOpen(true)}
         onOpenSell={() => navigate('/customer/sell')}
       />
 
       <QuickActionGrid onOpenMore={() => navigate('/customer/wallet')} />
+
+      <PromoBannerCard
+        onDeposit={() => setIsDepositOpen(true)}
+        onBuy={() => navigate('/customer/buy')}
+        onSell={() => navigate('/customer/sell')}
+      />
 
       <P2PRatesSection />
 

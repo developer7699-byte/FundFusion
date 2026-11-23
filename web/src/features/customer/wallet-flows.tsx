@@ -21,6 +21,10 @@ import { actionFor } from './order-actions'
 /** `GET /v1/wallet/summary`. Every figure is a string (PRD §5.1). */
 export interface WalletSummary {
   balances: Record<string, string>
+  /** Mid-market USDT→INR rate, or null when the pricing feed is down. */
+  usdtInrRate: string | null
+  /** Per-bucket indicative ₹, server-computed as strings (PRD §13.5), or null. */
+  inr: Record<string, string> | null
   address: string | null
   network: string
 }
@@ -35,6 +39,8 @@ export interface ActivityRow {
   assetSymbol: string
   memo: string
   at: string
+  /** Indicative ₹ value of `amount`, server-computed string, or null. */
+  amountInr: string | null
 }
 
 /**
@@ -89,14 +95,21 @@ export function WalletHome() {
           </div>
         </div>
 
-        <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-          {d.network}
-        </span>
+        <div className="flex flex-col items-end gap-1">
+          {d.usdtInrRate != null && (
+            <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              1 USDT ≈ ₹{usdt2dp(d.usdtInrRate)}
+            </span>
+          )}
+          <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-slate-500/10 text-slate-500 dark:text-slate-400 border border-slate-500/20">
+            {d.network}
+          </span>
+        </div>
       </div>
 
-      {/* Main Balance Card. No total and no rupee estimate: adding buckets
-          together, or multiplying by a rate, would be money arithmetic in a
-          JavaScript number (PRD §5.1). The ledger states each bucket. */}
+      {/* Main Balance Card. The ₹ figures are indicative and server-computed as
+          strings (PRD §13.5) — the client never multiplies money in a
+          JavaScript number (PRD §5.1). The ledger still states each bucket. */}
       <div className="rounded-[28px] bg-gradient-to-tr from-slate-950 via-slate-900 to-emerald-950 text-white p-5 sm:p-6 shadow-xl border border-emerald-500/30 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/15 rounded-full blur-2xl pointer-events-none" />
 
@@ -106,6 +119,11 @@ export function WalletHome() {
             <div className="text-2xl sm:text-3xl font-black font-mono tracking-tight mt-0.5 break-all">
               {usdt2dp(d.balances.AVAILABLE)} <span className="text-base">USDT</span>
             </div>
+            {d.inr?.AVAILABLE != null && (
+              <span className="text-xs text-emerald-300/90 font-semibold">
+                ≈ ₹{usdt2dp(d.inr.AVAILABLE)}
+              </span>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/10 text-xs">
@@ -115,6 +133,11 @@ export function WalletHome() {
                 <span className={cn('font-mono font-bold break-all', tone)}>
                   {usdt2dp(d.balances[key])} USDT
                 </span>
+                {d.inr?.[key] != null && (
+                  <span className="block text-[10px] text-slate-400 font-medium">
+                    ≈ ₹{usdt2dp(d.inr[key])}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -181,6 +204,11 @@ export function WalletHome() {
                   {row.direction === 'DEBIT' ? '−' : '+'}
                   {usdt2dp(row.amount)} {row.assetSymbol}
                 </span>
+                {row.amountInr != null && (
+                  <span className="block text-[10px] text-slate-400 font-medium">
+                    ≈ ₹{usdt2dp(row.amountInr)}
+                  </span>
+                )}
                 <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                   {row.bucket}
                 </span>
