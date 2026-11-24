@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
@@ -77,6 +77,21 @@ export function CustomerDashboard() {
   // Balance updates
   const [addedDepositBalance, setAddedDepositBalance] = useState(0)
   const [spentBalance, setSpentBalance] = useState(0)
+  const [localEarnedBal, setLocalEarnedBal] = useState(() =>
+    parseFloat(localStorage.getItem('fundfusion_customer_balance') || '0')
+  )
+
+  useEffect(() => {
+    const handleSync = () => {
+      setLocalEarnedBal(parseFloat(localStorage.getItem('fundfusion_customer_balance') || '0'))
+    }
+    window.addEventListener('fundfusion_customer_sync', handleSync)
+    window.addEventListener('storage', handleSync)
+    return () => {
+      window.removeEventListener('fundfusion_customer_sync', handleSync)
+      window.removeEventListener('storage', handleSync)
+    }
+  }, [])
 
   const q = useQuery({
     queryKey: ['overview'],
@@ -104,7 +119,7 @@ export function CustomerDashboard() {
   const usdtInrRate = d?.usdtInrRate || '91.50'
   const rateNum = parseFloat(usdtInrRate) || 91.5
   const baseUsdt = parseFloat(d?.wallet?.totalUsdt || '0.00') || 0
-  const netBalance = Math.max(0, baseUsdt + addedDepositBalance - spentBalance)
+  const netBalance = Math.max(0, baseUsdt + addedDepositBalance + localEarnedBal - spentBalance)
   const totalUsdt = netBalance.toFixed(2)
   const inrEstimate = (netBalance * rateNum).toFixed(2)
 

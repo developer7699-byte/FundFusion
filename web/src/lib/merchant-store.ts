@@ -10,12 +10,41 @@ export interface MerchantOrder {
   rate: number
   paymentMethod: string
   paymentType: 'UPI' | 'IMPS' | 'RTGS' | 'BANK'
-  status: 'AVAILABLE' | 'AWAITING_PAYMENT' | 'UTR_SUBMITTED' | 'COMPLETED' | 'DISPUTED'
+  status: 'AVAILABLE' | 'AWAITING_PAYMENT' | 'UTR_SUBMITTED' | 'COMPLETED' | 'DISPUTED' | 'CANCELLED'
   createdAt: string
   expiresInMinutes: number
   utr?: string
   disputeReason?: string
   commissionEarned?: number
+  acceptedByDesk?: string
+  acceptedDeskAccount?: SettlementAccount
+  isLiveBroadcast?: boolean
+}
+
+export interface CustomerOrder {
+  id: string
+  kind: string
+  status: 'AVAILABLE' | 'ESCROW_LOCKED' | 'AWAITING_PAYMENT' | 'UTR_SUBMITTED' | 'COMPLETED' | 'CANCELLED' | 'DISPUTED'
+  usdtAmount: string
+  inrAmount: string
+  rate: string
+  beneficiary?: string
+  upiId?: string
+  bankDetails?: {
+    accountNumber: string
+    ifsc: string
+    holderName: string
+    bankName: string
+  }
+  paymentMethod: string
+  paymentType: 'UPI' | 'IMPS' | 'RTGS' | 'BANK'
+  utr?: string
+  createdAt: string
+  expiresInMinutes: number
+  timeline: { at: string; status: string; note: string }[]
+  acceptedByDesk?: string
+  acceptedDeskAccount?: SettlementAccount
+  isLiveBroadcast?: boolean
 }
 
 export interface SettlementAccount {
@@ -77,6 +106,26 @@ export interface MerchantState {
 
 const STORAGE_KEY = 'fundfusion_merchant_state_v1'
 const EVENT_KEY = 'fundfusion_merchant_sync'
+
+export const CUSTOMER_ORDERS_STORAGE_KEY = 'fundfusion_customer_orders_v1'
+export const CUSTOMER_SYNC_EVENT = 'fundfusion_customer_sync'
+export const CUSTOMER_BALANCE_KEY = 'fundfusion_customer_balance'
+
+export function loadCustomerOrders(): CustomerOrder[] {
+  try {
+    const raw = localStorage.getItem(CUSTOMER_ORDERS_STORAGE_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch {}
+  return []
+}
+
+export function saveCustomerOrders(orders: CustomerOrder[]) {
+  try {
+    localStorage.setItem(CUSTOMER_ORDERS_STORAGE_KEY, JSON.stringify(orders))
+    window.dispatchEvent(new Event(CUSTOMER_SYNC_EVENT))
+    window.dispatchEvent(new Event('storage'))
+  } catch {}
+}
 
 const INITIAL_STATE: MerchantState = {
   deskName: 'Orbit Desk LLP',
@@ -383,16 +432,23 @@ export function useMerchantStore() {
     }
   }, [])
 
-  // 1. Accept Order from Available Book
+  // 1. Accept Order from Available Book (First Merchant to Accept Locks Escrow)
   const acceptOrder = useCallback(
-    (orderId: string): boolean => {
+    (orderId: string, deskNameOverride?: string): boolean => {
       const current = loadState()
-      const target = current.availableOrders.find((o) => o.id === orderId)
-      if (!target) return false
+      const targetIndex = current.availableOrders.findIndex((o) => o.id === orderId)
+      if (targetIndex === -1) {
+        // Order already accepted by another desk or cancelled!
+        return false
+      }
+      const target = current.availableOrders[targetIndex]
 
       if (current.availableUsdt < target.usdtAmount) {
         return false // Insufficient liquidity
       }
+
+      const activeDeskName = deskNameOverride || current.deskName
+      const defaultAccount = current.accounts.find((a) => a.isDefault) || current.accounts[0]
 
       // Deduct from available, add to locked in escrow
       const nextAvailable = current.availableUsdt - target.usdtAmount
@@ -403,8 +459,12 @@ export function useMerchantStore() {
         status: 'AWAITING_PAYMENT',
         createdAt: 'Just now',
         expiresInMinutes: 15,
+        acceptedByDesk: activeDeskName,
+        acceptedDeskAccount: defaultAccount,
+        acceptedAt: 'Just now',
       }
 
+      // Remove from available orders so NO OTHER merchant can accept it!
       const updatedAvailable = current.availableOrders.filter((o) => o.id !== orderId)
       const updatedMyOrders = [acceptedOrder, ...current.myOrders]
 
@@ -429,6 +489,83 @@ export function useMerchantStore() {
 
       saveState(nextState)
       setState(nextState)
+
+      // Also update Customer Orders store in real time!
+      const custOrders = loadCustomerOrders()
+      const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      const foundCust = custOrders.some((co) => co.id === orderId)
+      
+      let updatedCustOrders: CustomerOrder[]
+      if (foundCust) {
+        updatedCustOrders = custOrders.map((co) => {
+          if (co.id === orderId) {
+            return {
+              ...co,
+              status: 'ESCROW_LOCKED' as const,
+              beneficiary: activeDeskName,
+              acceptedByDesk: activeDeskName,
+              acceptedDeskAccount: defaultAccount,
+              upiId: defaultAccount?.upiVpa || 'orbitdesk@okaxis',
+              bankDetails: defaultAccount?.accountNumber
+                ? {
+                    accountNumber: defaultAccount.accountNumber,
+                    ifsc: defaultAccount.ifsc || 'HDFC0000128',
+                    holderName: defaultAccount.holderName || activeDeskName,
+                    bankName: defaultAccount.label || 'Current Account',
+                  }
+                : undefined,
+              timeline: [
+                ...co.timeline,
+                {
+                  at: nowTime,
+                  status: 'ESCROW_LOCKED',
+                  note: `${activeDeskName} accepted your order first & locked ${target.usdtAmount.toFixed(2)} USDT in escrow`,
+                },
+              ],
+            }
+          }
+          return co
+        })
+      } else {
+        // Prepend new customer order if customer initiated from merchant book
+        updatedCustOrders = [
+          {
+            id: orderId,
+            kind: 'BUY_USDT',
+            status: 'ESCROW_LOCKED',
+            usdtAmount: target.usdtAmount.toFixed(2),
+            inrAmount: target.inrAmount.toFixed(2),
+            rate: target.rate.toFixed(2),
+            beneficiary: activeDeskName,
+            acceptedByDesk: activeDeskName,
+            acceptedDeskAccount: defaultAccount,
+            upiId: defaultAccount?.upiVpa || 'orbitdesk@okaxis',
+            bankDetails: defaultAccount?.accountNumber
+              ? {
+                  accountNumber: defaultAccount.accountNumber,
+                  ifsc: defaultAccount.ifsc || 'HDFC0000128',
+                  holderName: defaultAccount.holderName || activeDeskName,
+                  bankName: defaultAccount.label || 'Current Account',
+                }
+              : undefined,
+            paymentMethod: target.paymentMethod,
+            paymentType: target.paymentType,
+            createdAt: 'Just now',
+            expiresInMinutes: 15,
+            timeline: [
+              { at: nowTime, status: 'CREATED', note: 'Order broadcasted to merchants' },
+              {
+                at: nowTime,
+                status: 'ESCROW_LOCKED',
+                note: `${activeDeskName} accepted your order first & locked ${target.usdtAmount.toFixed(2)} USDT in escrow`,
+              },
+            ],
+          },
+          ...custOrders,
+        ]
+      }
+      saveCustomerOrders(updatedCustOrders)
+
       return true
     },
     []
@@ -437,6 +574,8 @@ export function useMerchantStore() {
   // 2. Submit / Update UTR for an order
   const submitUtr = useCallback((orderId: string, utr: string) => {
     const current = loadState()
+    const target = current.myOrders.find((o) => o.id === orderId)
+
     const updatedMyOrders = current.myOrders.map((o) => {
       if (o.id === orderId) {
         return {
@@ -448,12 +587,46 @@ export function useMerchantStore() {
       return o
     })
 
+    const newNotice: MerchantNotice = {
+      id: `notice-${Date.now()}`,
+      title: 'Action Needed: Bank UTR Submitted',
+      desc: `Buyer submitted UTR: ${utr} for order #${orderId} (₹${(target?.inrAmount || 0).toLocaleString('en-IN')}). Verify bank receipt and release USDT.`,
+      time: 'Just now',
+      read: false,
+      type: 'UTR',
+      link: `/merchant/orders/${orderId}`,
+    }
+
     const nextState: MerchantState = {
       ...current,
       myOrders: updatedMyOrders,
+      notices: [newNotice, ...current.notices],
     }
     saveState(nextState)
     setState(nextState)
+
+    // Also update Customer Orders store
+    const custOrders = loadCustomerOrders()
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    const updatedCust = custOrders.map((co) => {
+      if (co.id === orderId) {
+        return {
+          ...co,
+          utr,
+          status: 'UTR_SUBMITTED' as const,
+          timeline: [
+            ...co.timeline,
+            {
+              at: nowTime,
+              status: 'UTR_SUBMITTED',
+              note: `UTR ${utr} submitted. Merchant is confirming receipt on banking app.`,
+            },
+          ],
+        }
+      }
+      return co
+    })
+    saveCustomerOrders(updatedCust)
   }, [])
 
   // 3. Confirm INR Receipt & Release USDT from Escrow
@@ -507,6 +680,36 @@ export function useMerchantStore() {
 
     saveState(nextState)
     setState(nextState)
+
+    // Credit Customer Wallet & update customer order status
+    const custOrders = loadCustomerOrders()
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    const updatedCust = custOrders.map((co) => {
+      if (co.id === orderId) {
+        return {
+          ...co,
+          status: 'COMPLETED' as const,
+          timeline: [
+            ...co.timeline,
+            {
+              at: nowTime,
+              status: 'COMPLETED',
+              note: `Merchant confirmed payment! ${target.usdtAmount.toFixed(2)} USDT released to your wallet.`,
+            },
+          ],
+        }
+      }
+      return co
+    })
+    saveCustomerOrders(updatedCust)
+
+    // Add USDT to customer wallet balance
+    try {
+      const currentCustBal = parseFloat(localStorage.getItem(CUSTOMER_BALANCE_KEY) || '0')
+      localStorage.setItem(CUSTOMER_BALANCE_KEY, (currentCustBal + target.usdtAmount).toFixed(2))
+      window.dispatchEvent(new Event(CUSTOMER_SYNC_EVENT))
+    } catch {}
+
     return true
   }, [])
 
@@ -710,4 +913,182 @@ export function useMerchantStore() {
     deleteAccount,
   }
 }
+
+// ---------------------------------------------------------------------------
+// CUSTOMER ORDER BROADCAST ENGINE (Broadcasts to all online merchants)
+// ---------------------------------------------------------------------------
+
+export function broadcastCustomerBuyOrder(data: {
+  usdtAmount: number
+  inrAmount: number
+  rate: number
+  paymentMethod: string
+  paymentType: 'UPI' | 'IMPS' | 'RTGS' | 'BANK'
+  buyerName?: string
+}): MerchantOrder {
+  const current = loadState()
+  const orderId = `FF-${Math.floor(1000 + Math.random() * 9000)}`
+
+  const merchantOrder: MerchantOrder = {
+    id: orderId,
+    buyerName: data.buyerName || '@customer_vault',
+    buyerRating: '100%',
+    buyerTrades: 1,
+    usdtAmount: data.usdtAmount,
+    inrAmount: data.inrAmount,
+    rate: data.rate,
+    paymentMethod: data.paymentMethod,
+    paymentType: data.paymentType,
+    status: 'AVAILABLE',
+    createdAt: 'Just now',
+    expiresInMinutes: 15,
+    commissionEarned: data.usdtAmount * 0.015,
+    isLiveBroadcast: true,
+  }
+
+  // Prepend to merchant available orders so all merchants see it immediately!
+  const nextAvailableOrders = [merchantOrder, ...current.availableOrders]
+  saveState({
+    ...current,
+    availableOrders: nextAvailableOrders,
+  })
+
+  // Create corresponding customer order
+  const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const customerOrder: CustomerOrder = {
+    id: orderId,
+    kind: 'BUY_USDT',
+    status: 'AVAILABLE',
+    usdtAmount: data.usdtAmount.toFixed(2),
+    inrAmount: data.inrAmount.toFixed(2),
+    rate: data.rate.toFixed(2),
+    paymentMethod: data.paymentMethod,
+    paymentType: data.paymentType,
+    createdAt: 'Just now',
+    expiresInMinutes: 15,
+    isLiveBroadcast: true,
+    timeline: [
+      {
+        at: nowTime,
+        status: 'BROADCASTED',
+        note: 'Order broadcasted to all verified merchant desks · First to accept locks escrow',
+      },
+    ],
+  }
+
+  const existingCustomerOrders = loadCustomerOrders()
+  saveCustomerOrders([customerOrder, ...existingCustomerOrders.filter((o) => o.id !== orderId)])
+
+  return merchantOrder
+}
+
+export function cancelCustomerBroadcastOrder(orderId: string): boolean {
+  const current = loadState()
+  const existsInAvailable = current.availableOrders.some((o) => o.id === orderId)
+  if (!existsInAvailable) {
+    return false // Cannot cancel if already accepted by a desk!
+  }
+
+  // Remove from merchant available orders pool
+  const updatedAvailable = current.availableOrders.filter((o) => o.id !== orderId)
+  saveState({
+    ...current,
+    availableOrders: updatedAvailable,
+  })
+
+  // Update customer order status to CANCELLED
+  const custOrders = loadCustomerOrders()
+  const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const updatedCust = custOrders.map((co) => {
+    if (co.id === orderId) {
+      return {
+        ...co,
+        status: 'CANCELLED' as const,
+        timeline: [
+          ...co.timeline,
+          {
+            at: nowTime,
+            status: 'CANCELLED',
+            note: 'Broadcast request cancelled by customer before merchant pickup.',
+          },
+        ],
+      }
+    }
+    return co
+  })
+  saveCustomerOrders(updatedCust)
+  return true
+}
+
+export function useCustomerOrders() {
+  const [orders, setOrders] = useState<CustomerOrder[]>(loadCustomerOrders)
+
+  useEffect(() => {
+    const handleSync = () => setOrders(loadCustomerOrders())
+    window.addEventListener(CUSTOMER_SYNC_EVENT, handleSync)
+    window.addEventListener(EVENT_KEY, handleSync)
+    window.addEventListener('storage', handleSync)
+    return () => {
+      window.removeEventListener(CUSTOMER_SYNC_EVENT, handleSync)
+      window.removeEventListener(EVENT_KEY, handleSync)
+      window.removeEventListener('storage', handleSync)
+    }
+  }, [])
+
+  const getOrder = useCallback(
+    (orderId: string) => {
+      return orders.find((o) => o.id === orderId)
+    },
+    [orders]
+  )
+
+  const submitCustomerUtr = useCallback((orderId: string, utr: string) => {
+    const custOrders = loadCustomerOrders()
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    const updatedCust = custOrders.map((co) => {
+      if (co.id === orderId) {
+        return {
+          ...co,
+          utr,
+          status: 'UTR_SUBMITTED' as const,
+          timeline: [
+            ...co.timeline,
+            {
+              at: nowTime,
+              status: 'UTR_SUBMITTED',
+              note: `UTR ${utr} submitted. Merchant is confirming receipt on banking app.`,
+            },
+          ],
+        }
+      }
+      return co
+    })
+    saveCustomerOrders(updatedCust)
+
+    // Also update merchant order
+    const currentMerchant = loadState()
+    const updatedMerchantOrders = currentMerchant.myOrders.map((mo) => {
+      if (mo.id === orderId) {
+        return {
+          ...mo,
+          utr,
+          status: 'UTR_SUBMITTED' as const,
+        }
+      }
+      return mo
+    })
+    saveState({
+      ...currentMerchant,
+      myOrders: updatedMerchantOrders,
+    })
+  }, [])
+
+  return {
+    orders,
+    getOrder,
+    submitCustomerUtr,
+    cancelOrder: cancelCustomerBroadcastOrder,
+  }
+}
+
 

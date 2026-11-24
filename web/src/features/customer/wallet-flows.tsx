@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
+import { broadcastCustomerBuyOrder } from '@/lib/merchant-store'
 import {
   ArrowLeft,
   Copy,
@@ -803,6 +804,7 @@ export function AddressesFlow() {
 
 export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const [step, setStep] = useState<'AMOUNT' | 'BANK' | 'CONFIRM'>(side === 'BUY' ? 'AMOUNT' : 'BANK')
   const [amount, setAmount] = useState('')
   const [hasPaymentMethod, setHasPaymentMethod] = useState(false)
@@ -810,6 +812,10 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
   const [showAddModal, setShowAddModal] = useState(false)
   const [addedMethods, setAddedMethods] = useState<{ id: string; type: 'BANK' | 'UPI'; title: string; meta: string }[]>([])
   
+  // Real-time broadcast state
+  const [isBroadcasting, setIsBroadcasting] = useState(false)
+  const [broadcastedId, setBroadcastedId] = useState<string | null>(null)
+
   // Bank / UPI form state inside modal
   const [selectedMethodType, setSelectedMethodType] = useState<'BANK' | 'UPI' | null>(null)
   const [bankAccNumber, setBankAccNumber] = useState('')
@@ -838,6 +844,31 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
     }
   }
 
+  // Trigger Multi-Merchant Order Broadcast
+  const handleConfirmBuy = () => {
+    const usdtVal = parseFloat(amount || '0')
+    if (usdtVal <= 0) return
+
+    const selectedMethod = addedMethods[0]
+    const paymentMethod = selectedMethod ? selectedMethod.title : 'Instant UPI (Google Pay / PhonePe)'
+    const paymentType = selectedMethod?.type === 'BANK' ? 'IMPS' : 'UPI'
+
+    setIsBroadcasting(true)
+    const newOrder = broadcastCustomerBuyOrder({
+      usdtAmount: usdtVal,
+      inrAmount: usdtVal * 91.5,
+      rate: 91.5,
+      paymentMethod,
+      paymentType,
+      buyerName: '@customer_vault',
+    })
+    setBroadcastedId(newOrder.id)
+
+    setTimeout(() => {
+      navigate(`/customer/orders/${newOrder.id}`)
+    }, 1500)
+  }
+
   // Header Title
   const pageTitle = side === 'BUY' ? 'Buy USDT' : isManagePayments ? 'Manage Payments' : side === 'SELL' ? 'Sell USDT' : 'Convert'
 
@@ -860,9 +891,9 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
         </div>
 
         {/* Live Market Rate Badge */}
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/40">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span>1 USDT = ₹99.11</span>
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200/80 dark:border-amber-800/40">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#f7a83b] animate-pulse" />
+          <span>1 USDT = ₹91.50</span>
         </div>
       </div>
 
@@ -875,9 +906,9 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
           <div className="space-y-2 pt-0.5">
             {/* Top 3 Capsule Indicator Bars */}
             <div className="grid grid-cols-3 gap-2">
-              <div className={cn("h-1 rounded-full transition-all duration-300", step === 'AMOUNT' ? "bg-[#3b59f8]" : "bg-slate-200 dark:bg-slate-800")} />
-              <div className={cn("h-1 rounded-full transition-all duration-300", step === 'BANK' ? "bg-[#3b59f8]" : "bg-slate-200 dark:bg-slate-800")} />
-              <div className={cn("h-1 rounded-full transition-all duration-300", step === 'CONFIRM' ? "bg-[#3b59f8]" : "bg-slate-200 dark:bg-slate-800")} />
+              <div className={cn("h-1 rounded-full transition-all duration-300", step === 'AMOUNT' ? "bg-[#f7a83b]" : "bg-slate-200 dark:bg-slate-800")} />
+              <div className={cn("h-1 rounded-full transition-all duration-300", step === 'BANK' ? "bg-[#f7a83b]" : "bg-slate-200 dark:bg-slate-800")} />
+              <div className={cn("h-1 rounded-full transition-all duration-300", step === 'CONFIRM' ? "bg-[#f7a83b]" : "bg-slate-200 dark:bg-slate-800")} />
             </div>
 
             {/* Step Titles Row */}
@@ -886,7 +917,7 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
                 onClick={() => setStep('AMOUNT')}
                 className={cn(
                   "text-[10px] font-black tracking-wider transition-colors cursor-pointer",
-                  step === 'AMOUNT' ? "text-[#3b59f8]" : "text-slate-400 dark:text-slate-500 hover:text-slate-700"
+                  step === 'AMOUNT' ? "text-[#f7a83b]" : "text-slate-400 dark:text-slate-500 hover:text-slate-700"
                 )}
               >
                 AMOUNT
@@ -895,7 +926,7 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
                 onClick={() => setStep('BANK')}
                 className={cn(
                   "text-[10px] font-black tracking-wider transition-colors cursor-pointer",
-                  step === 'BANK' ? "text-[#3b59f8]" : "text-slate-400 dark:text-slate-500 hover:text-slate-700"
+                  step === 'BANK' ? "text-[#f7a83b]" : "text-slate-400 dark:text-slate-500 hover:text-slate-700"
                 )}
               >
                 BANK
@@ -904,7 +935,7 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
                 onClick={() => setStep('CONFIRM')}
                 className={cn(
                   "text-[10px] font-black tracking-wider transition-colors cursor-pointer",
-                  step === 'CONFIRM' ? "text-[#3b59f8]" : "text-slate-400 dark:text-slate-500 hover:text-slate-700"
+                  step === 'CONFIRM' ? "text-[#f7a83b]" : "text-slate-400 dark:text-slate-500 hover:text-slate-700"
                 )}
               >
                 CONFIRM
@@ -1010,8 +1041,8 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
                 className={cn(
                   'w-full rounded-2xl py-3.5 text-xs font-black flex items-center justify-center gap-2 transition-all shadow-md group relative overflow-hidden',
                   isValidAmount
-                    ? 'bg-gradient-to-r from-[#3b59f8] to-[#2d46e5] hover:from-[#2d46e5] hover:to-[#2237bf] text-white cursor-pointer active:scale-98 shadow-blue-500/25'
-                    : 'bg-[#9bb0fc] dark:bg-blue-950/60 text-white cursor-not-allowed shadow-none'
+                    ? 'bg-[#f7a83b] hover:bg-[#f59e26] text-slate-950 cursor-pointer active:scale-98 shadow-amber-400/25'
+                    : 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed shadow-none'
                 )}
               >
                 <span>Next Step</span>
@@ -1053,7 +1084,7 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
                     {/* Dashed Verify Bank Button */}
                     <button
                       onClick={() => setShowAddModal(true)}
-                      className="w-full rounded-xl border-2 border-dashed border-blue-400/80 dark:border-blue-500/60 bg-blue-50/50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 font-extrabold py-3 text-xs flex items-center justify-center gap-1 cursor-pointer hover:bg-blue-100/50 transition-colors"
+                      className="w-full rounded-xl border-2 border-dashed border-[#f7a83b] bg-amber-50/50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 font-extrabold py-3 text-xs flex items-center justify-center gap-1 cursor-pointer hover:bg-amber-100/50 transition-colors"
                     >
                       <span>+ Verify a bank account</span>
                     </button>
@@ -1073,7 +1104,7 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
                     ))}
                     <button
                       onClick={() => setShowAddModal(true)}
-                      className="w-full text-center text-xs font-extrabold text-blue-600 hover:underline pt-1 cursor-pointer"
+                      className="w-full text-center text-xs font-extrabold text-amber-600 hover:underline pt-1 cursor-pointer"
                     >
                       + Add another method
                     </button>
@@ -1083,7 +1114,7 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
 
               <button
                 onClick={() => setStep('CONFIRM')}
-                className="w-full rounded-2xl py-3.5 text-xs font-black bg-[#3b59f8] hover:bg-[#2d46e5] text-white shadow-lg shadow-blue-500/20 flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-98"
+                className="w-full rounded-2xl py-3.5 text-xs font-black bg-[#f7a83b] hover:bg-[#f59e26] text-slate-950 shadow-lg shadow-amber-400/25 flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-98"
               >
                 <span>Review Order</span>
                 <span>→</span>
@@ -1091,7 +1122,7 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
             </div>
           )}
 
-          {/* STEP 3: CONFIRMATION ORDER SUMMARY */}
+          {/* STEP 3: CONFIRMATION & MULTI-MERCHANT BROADCAST */}
           {step === 'CONFIRM' && (
             <div className="space-y-4">
               <button
@@ -1102,28 +1133,108 @@ export function QuoteFlow({ side }: { side: 'BUY' | 'SELL' | 'CONVERT' }) {
               </button>
 
               <div className="rounded-2xl bg-white dark:bg-[#121829] border border-slate-100 dark:border-slate-800 p-4 space-y-3 shadow-sm">
-                <h3 className="text-sm font-black text-slate-900 dark:text-white">Order Summary</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-black text-slate-900 dark:text-white">Order Summary</h3>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    Live Escrow Broadcast
+                  </span>
+                </div>
                 <div className="space-y-2 text-xs divide-y divide-slate-100 dark:divide-slate-800">
                   <div className="flex justify-between py-1.5">
                     <span className="text-slate-500">Buying</span>
-                    <span className="font-black text-slate-900 dark:text-white">{amount} USDT</span>
+                    <span className="font-black text-slate-900 dark:text-white font-mono">{amount} USDT</span>
                   </div>
                   <div className="flex justify-between py-1.5">
                     <span className="text-slate-500">Rate</span>
-                    <span className="font-mono font-bold text-slate-900 dark:text-white">₹99.11 / USDT</span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white">₹91.50 / USDT</span>
                   </div>
                   <div className="flex justify-between py-1.5">
                     <span className="text-slate-500">Total INR</span>
-                    <span className="font-black text-emerald-600 dark:text-emerald-400 text-sm">₹{(parseFloat(amount || '0') * 99.11).toFixed(2)}</span>
+                    <span className="font-black text-emerald-600 dark:text-emerald-400 text-sm font-mono">
+                      ₹{(parseFloat(amount || '0') * 91.5).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1.5">
+                    <span className="text-slate-500">Payment Channel</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">
+                      {addedMethods[0]?.title || 'Instant UPI (Google Pay / PhonePe)'}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              <Link to="/customer/orders">
-                <Button className="w-full rounded-2xl py-3.5 text-xs font-black bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20 cursor-pointer">
-                  Confirm Buy Order
-                </Button>
-              </Link>
+              {/* Broadcast Notice Card */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 border border-amber-200/80 dark:border-amber-800/40 space-y-1.5">
+                <div className="flex items-center gap-1.5 text-xs font-black text-amber-900 dark:text-amber-300">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                  <span>Multi-Merchant Order Broadcast</span>
+                </div>
+                <p className="text-[11px] text-amber-800/90 dark:text-amber-300/80 leading-relaxed">
+                  Upon confirmation, this buy request will be broadcasted to all online merchant desks simultaneously. <strong>The first merchant to accept will lock your USDT in escrow immediately.</strong>
+                </p>
+              </div>
+
+              <button
+                type="button"
+                disabled={isBroadcasting}
+                onClick={handleConfirmBuy}
+                className="w-full rounded-2xl py-3.5 text-xs font-black bg-[#f7a83b] hover:bg-[#f59e26] text-slate-950 shadow-lg shadow-amber-400/25 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-98 disabled:opacity-60"
+              >
+                {isBroadcasting ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                    <span>Broadcasting to Merchants...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Confirm Buy Order</span>
+                    <span>→</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Real-time Order Broadcast Modal */}
+          {isBroadcasting && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="w-full max-w-sm bg-white dark:bg-[#111827] rounded-[28px] border border-amber-200 dark:border-amber-900/60 p-6 text-center space-y-4 shadow-2xl relative overflow-hidden">
+                {/* Ambient Radial Glow */}
+                <div className="absolute -top-12 -left-12 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+                <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-orange-500/10 rounded-full blur-2xl pointer-events-none" />
+
+                {/* Radar Pulse Icon */}
+                <div className="relative mx-auto w-16 h-16 flex items-center justify-center">
+                  <span className="absolute inset-0 rounded-full bg-amber-400/30 animate-ping" />
+                  <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 flex items-center justify-center text-amber-600 dark:text-amber-400 text-2xl font-black">
+                    📡
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">
+                    Broadcasting to Merchants...
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Order <span className="font-mono font-bold text-amber-600">{broadcastedId}</span> sent to 14 verified desks
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs space-y-1 text-left">
+                  <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold">
+                    <span>✓</span>
+                    <span>Order published to available book</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-bold">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                    <span>Waiting for first desk to accept & lock escrow...</span>
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-slate-400">
+                  Redirecting to live order desk screen...
+                </p>
+              </div>
             </div>
           )}
         </div>

@@ -122,8 +122,21 @@ export function MerchantAvailable() {
             return (
               <div
                 key={order.id}
-                className="p-4 rounded-3xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800/90 shadow-2xs hover:border-emerald-500/40 transition-all space-y-3"
+                className={cn(
+                  "p-4 rounded-3xl bg-white dark:bg-[#111827] border shadow-2xs hover:border-emerald-500/40 transition-all space-y-3",
+                  order.isLiveBroadcast
+                    ? "border-amber-400 dark:border-amber-600/70 shadow-amber-500/10"
+                    : "border-slate-100 dark:border-slate-800/90"
+                )}
               >
+                {/* Live Broadcast Badge */}
+                {order.isLiveBroadcast && (
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-[10px] font-black">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                    <span>⚡ LIVE BROADCAST REQUEST · First merchant desk to accept locks escrow</span>
+                  </div>
+                )}
+
                 {/* Header */}
                 <div className="flex items-start justify-between">
                   <div>

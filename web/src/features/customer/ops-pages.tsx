@@ -50,6 +50,7 @@ import { cn } from '@/lib/utils'
 import { BackButton } from '@/components/ui/BackButton'
 import { useNotifications } from '@/lib/notifications'
 import { useAdminStore } from '@/lib/admin-store'
+import { useCustomerOrders, useMerchantStore, type CustomerOrder } from '@/lib/merchant-store'
 
 type Order = {
   id: string
@@ -68,6 +69,7 @@ type Order = {
    ========================================================================= */
 export function OrdersList() {
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'P2P' | 'UPI' | 'UTILITIES'>('ALL')
+  const { orders: localCustomerOrders } = useCustomerOrders()
   const q = useQuery({ queryKey: ['orders'], queryFn: () => api<Order[]>('/orders').catch(() => []) })
 
   // Mock demo orders if none exist
@@ -123,7 +125,12 @@ export function OrdersList() {
     },
   ]
 
-  const orders = (q.data && q.data.length > 0) ? q.data : mockOrders
+  const baseOrders = (q.data && q.data.length > 0) ? q.data : mockOrders
+  // Merge live customer orders with base orders so newly broadcasted orders appear right at top
+  const orders: Order[] = [
+    ...(localCustomerOrders as Order[]),
+    ...baseOrders.filter((bo) => !localCustomerOrders.some((lo) => lo.id === bo.id)),
+  ]
 
   const filteredOrders = orders.filter((o) => {
     if (activeFilter === 'ALL') return true
@@ -233,14 +240,18 @@ export function OrdersList() {
                   <span
                     className={cn(
                       'text-[9px] font-black px-1.5 py-0.2 rounded-full inline-block mt-0.5',
-                      isCompleted
+                      o.status === 'AVAILABLE'
+                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 animate-pulse'
+                        : isCompleted
                         ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                        : o.status === 'UTR_SUBMITTED'
+                        ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
                         : isLocked
-                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 animate-pulse'
+                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
                         : 'bg-slate-100 text-slate-500'
                     )}
                   >
-                    {o.status.replace('_', ' ')}
+                    {o.status === 'AVAILABLE' ? '📡 BROADCASTING' : o.status.replace('_', ' ')}
                   </span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
@@ -259,8 +270,14 @@ export function OrdersList() {
 export function OrderDetail() {
   const { orderId } = useParams()
   const qc = useQueryClient()
-  const [copied, setCopied] = useState(false)
+  const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [actionDone, setActionDone] = useState<string | null>(null)
+  const [utrInput, setUtrInput] = useState('')
+
+  const { getOrder, submitCustomerUtr, cancelOrder } = useCustomerOrders()
+  const { acceptOrder: merchantAcceptOrder, releaseEscrow: merchantReleaseEscrow } = useMerchantStore()
+
+  const liveOrder = getOrder(orderId || '')
 
   const q = useQuery({
     queryKey: ['order', orderId],
@@ -273,23 +290,45 @@ export function OrderDetail() {
     status: 'ESCROW_LOCKED',
     usdtAmount: '50.00',
     inrAmount: '4575.00',
-    beneficiary: 'NexoraEscrow_Fast',
-    upiId: 'merchant.fast@okicici',
+    beneficiary: 'Orbit Desk LLP',
+    upiId: 'orbitdesk@okaxis',
     utr: 'UTR99482019482',
     timeline: [
-      { at: '14:20', status: 'CREATED', note: 'Order placed by customer' },
-      { at: '14:21', status: 'ESCROW_LOCKED', note: '50.00 USDT locked in escrow ledger' },
-      { at: '14:22', status: 'AWAITING_PAYMENT', note: 'Transfer ₹4575.00 to merchant UPI' },
+      { at: '14:20', status: 'CREATED', note: 'Order broadcasted to verified merchants' },
+      { at: '14:21', status: 'ESCROW_LOCKED', note: '50.00 USDT locked in smart escrow' },
+      { at: '14:22', status: 'AWAITING_PAYMENT', note: 'Transfer ₹4,575.00 to merchant UPI' },
     ],
   }
 
-  const o = q.data || fallbackOrder
+  const o: any = liveOrder || q.data || fallbackOrder
 
-  const handleCopy = (text: string) => {
+  const handleCopy = (text: string, key = 'generic') => {
     navigator.clipboard?.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setCopiedKey(key)
+    setTimeout(() => setCopiedKey(null), 2000)
   }
+
+  const handleSubmitUtr = () => {
+    if (!utrInput.trim()) return
+    submitCustomerUtr(o.id, utrInput.trim())
+    setActionDone('UTR submitted to merchant! Waiting for bank verification.')
+    setUtrInput('')
+  }
+
+  const handleCancelBroadcast = () => {
+    const ok = cancelOrder(o.id)
+    if (ok) {
+      setActionDone('Order broadcast request cancelled.')
+    } else {
+      alert('Cannot cancel: Order has already been accepted by a merchant desk.')
+    }
+  }
+
+  const isBroadcasting = o.status === 'AVAILABLE'
+  const isEscrowLocked = o.status === 'ESCROW_LOCKED' || o.status === 'AWAITING_PAYMENT'
+  const isUtrSubmitted = o.status === 'UTR_SUBMITTED'
+  const isCompleted = o.status === 'COMPLETED'
+  const isCancelled = o.status === 'CANCELLED'
 
   return (
     <div className="space-y-4 max-w-lg mx-auto w-full pb-4">
@@ -306,67 +345,235 @@ export function OrderDetail() {
         <span
           className={cn(
             'text-[10px] font-black px-2.5 py-1 rounded-full',
-            o.status === 'COMPLETED'
+            isBroadcasting
+              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 animate-pulse'
+              : isCompleted
               ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+              : isUtrSubmitted
+              ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+              : isCancelled
+              ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
               : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
           )}
         >
-          {o.status.replace('_', ' ')}
+          {isBroadcasting ? '📡 BROADCASTING' : o.status.replace('_', ' ')}
         </span>
       </div>
 
-      {/* Main Escrow Hero Card */}
-      <div className="rounded-[28px] bg-gradient-to-tr from-slate-950 via-slate-900 to-emerald-950 text-white p-5 space-y-3.5 shadow-xl border border-emerald-500/30">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-slate-400 font-medium">Escrow Amount</span>
-          <span className="text-xs font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-            🛡️ 100% Protected
-          </span>
-        </div>
-
-        <div>
-          <div className="text-3xl font-black font-mono tracking-tight text-white">
-            {o.usdtAmount} USDT
+      {/* 1. BROADCASTING RADAR HERO (When waiting for first merchant to accept) */}
+      {isBroadcasting && (
+        <div className="rounded-[28px] bg-gradient-to-br from-amber-500/10 via-orange-500/10 to-amber-500/5 border-2 border-dashed border-[#f7a83b] p-5 text-center space-y-4 shadow-sm relative overflow-hidden animate-in fade-in duration-300">
+          <div className="relative mx-auto w-16 h-16 flex items-center justify-center">
+            <span className="absolute inset-0 rounded-full bg-amber-400/20 animate-ping" />
+            <div className="w-16 h-16 rounded-full bg-[#f7a83b] text-slate-950 flex items-center justify-center text-2xl font-black shadow-md shadow-amber-400/30">
+              📡
+            </div>
           </div>
-          <span className="text-xs text-emerald-300 font-mono">
-            ≈ ₹{o.inrAmount} INR
-          </span>
-        </div>
 
-        <div className="pt-2 border-t border-white/10 grid grid-cols-2 gap-2 text-xs">
+          <div className="space-y-1">
+            <h2 className="text-base font-black text-slate-900 dark:text-white">
+              Broadcasting to Online Merchants...
+            </h2>
+            <p className="text-xs text-slate-600 dark:text-slate-300 max-w-sm mx-auto leading-relaxed">
+              Your purchase of <strong className="text-slate-900 dark:text-white font-mono">{o.usdtAmount} USDT</strong> (₹{o.inrAmount}) has been sent to <strong>14 verified merchant desks</strong>.
+            </p>
+            <p className="text-[11px] font-bold text-amber-700 dark:text-amber-400 pt-1">
+              ⚡ Whichever merchant accepts first will lock your USDT in escrow immediately.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={handleCancelBroadcast}
+              className="py-2 px-4 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 cursor-pointer"
+            >
+              Cancel Broadcast
+            </button>
+            <button
+              type="button"
+              onClick={() => merchantAcceptOrder(o.id, 'Orbit Desk LLP')}
+              className="py-2 px-4 rounded-xl text-xs font-black bg-[#f7a83b] hover:bg-[#f59e26] text-slate-950 shadow-md shadow-amber-400/20 cursor-pointer flex items-center gap-1.5"
+            >
+              <span>⚡ Accept as 'Orbit Desk LLP'</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 2. ACCEPTED / ESCROW LOCKED BANNER */}
+      {(isEscrowLocked || isUtrSubmitted || isCompleted) && (
+        <div className="rounded-[28px] bg-gradient-to-tr from-slate-950 via-slate-900 to-amber-950 text-white p-5 space-y-3.5 shadow-xl border border-amber-500/30">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-amber-300 font-medium">Escrow Protected Asset</span>
+            <span className="text-xs font-black text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+              🛡️ Multi-Sig Vault Locked
+            </span>
+          </div>
+
           <div>
-            <span className="text-[10px] text-slate-400 block">Recipient / Merchant</span>
-            <span className="font-bold text-white truncate block">{o.beneficiary || 'Verified Desk'}</span>
+            <div className="text-3xl font-black font-mono tracking-tight text-white">
+              {o.usdtAmount} USDT
+            </div>
+            <span className="text-xs text-amber-300 font-mono">
+              ≈ ₹{o.inrAmount} INR
+            </span>
           </div>
-          <div>
-            <span className="text-[10px] text-slate-400 block">Exchange Rate</span>
-            <span className="font-bold font-mono text-emerald-300">₹91.50 / USDT</span>
-          </div>
-        </div>
-      </div>
 
-      {/* Payment Details Box */}
-      {o.upiId && (
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-3 shadow-2xs">
-          <span className="text-xs font-black text-slate-900 dark:text-white block">
-            Payment Transfer Details
-          </span>
-
-          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800">
+          <div className="pt-2 border-t border-white/10 grid grid-cols-2 gap-2 text-xs">
             <div>
-              <span className="text-[10px] text-slate-400 block">Merchant UPI ID</span>
-              <span className="text-xs font-mono font-black text-slate-900 dark:text-white">
-                {o.upiId}
+              <span className="text-[10px] text-slate-400 block">Accepted By Desk</span>
+              <span className="font-bold text-white truncate block">
+                {o.beneficiary || o.acceptedByDesk || 'Orbit Desk LLP'}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-400 block">Locked Exchange Rate</span>
+              <span className="font-bold font-mono text-amber-300">₹{o.rate || '91.50'} / USDT</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. PAYMENT DETAILS & UTR SUBMISSION (When Escrow is locked) */}
+      {isEscrowLocked && (
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 space-y-3.5 shadow-2xs">
+          <div>
+            <span className="text-xs font-black text-slate-900 dark:text-white block">
+              Step 1: Transfer Exact INR to Merchant
+            </span>
+            <p className="text-[11px] text-slate-500">
+              Send payment within 15 minutes to prevent escrow timeout.
+            </p>
+          </div>
+
+          {/* Amount to pay */}
+          <div className="flex items-center justify-between p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40">
+            <div>
+              <span className="text-[10px] text-slate-500 block">Exact INR Amount</span>
+              <span className="text-base font-black font-mono text-slate-900 dark:text-white">
+                ₹{o.inrAmount}
               </span>
             </div>
             <button
               type="button"
-              onClick={() => handleCopy(o.upiId!)}
+              onClick={() => handleCopy(o.inrAmount, 'amt')}
               className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 flex items-center gap-1 cursor-pointer"
             >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copied ? 'Copied' : 'Copy'}</span>
+              {copiedKey === 'amt' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copiedKey === 'amt' ? 'Copied' : 'Copy'}</span>
             </button>
+          </div>
+
+          {/* UPI ID */}
+          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800">
+            <div>
+              <span className="text-[10px] text-slate-400 block">Merchant Verified UPI ID</span>
+              <span className="text-xs font-mono font-black text-slate-900 dark:text-white">
+                {o.upiId || 'orbitdesk@okaxis'}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleCopy(o.upiId || 'orbitdesk@okaxis', 'upi')}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 flex items-center gap-1 cursor-pointer"
+            >
+              {copiedKey === 'upi' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copiedKey === 'upi' ? 'Copied' : 'Copy'}</span>
+            </button>
+          </div>
+
+          {/* Optional Bank Details if present */}
+          {o.bankDetails && (
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 space-y-1.5 text-xs">
+              <span className="text-[10px] text-slate-400 font-bold block uppercase">Merchant Bank Account</span>
+              <div className="flex justify-between">
+                <span className="text-slate-500">A/C Number:</span>
+                <span className="font-mono font-bold">{o.bankDetails.accountNumber}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">IFSC:</span>
+                <span className="font-mono font-bold">{o.bankDetails.ifsc}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">A/C Holder:</span>
+                <span className="font-bold">{o.bankDetails.holderName}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Submit UTR */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+            <span className="text-xs font-black text-slate-900 dark:text-white block">
+              Step 2: Submit 12-Digit Bank UTR / UPI Ref ID
+            </span>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={utrInput}
+                onChange={(e) => setUtrInput(e.target.value)}
+                placeholder="e.g. 429104829104"
+                className="flex-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs text-slate-900 dark:text-white"
+              />
+              <button
+                type="button"
+                disabled={!utrInput.trim()}
+                onClick={handleSubmitUtr}
+                className="px-4 py-2 rounded-xl bg-[#f7a83b] hover:bg-[#f59e26] disabled:opacity-40 text-slate-950 font-black text-xs shadow-md shadow-amber-400/20 active:scale-95 transition-all cursor-pointer shrink-0"
+              >
+                Submit UTR
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. UTR SUBMITTED BANNER */}
+      {isUtrSubmitted && (
+        <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60 space-y-3">
+          <div className="flex items-start gap-2.5">
+            <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <h3 className="text-xs font-black text-blue-900 dark:text-blue-300">
+                UTR Submitted: {o.utr}
+              </h3>
+              <p className="text-[11px] text-blue-800/90 dark:text-blue-300/80 leading-relaxed">
+                Merchant <strong>{o.beneficiary || 'Orbit Desk LLP'}</strong> has been alerted to verify the INR receipt in their banking app. Escrow will release automatically upon confirmation.
+              </p>
+            </div>
+          </div>
+
+          {/* Developer / Demo Quick Release */}
+          <div className="pt-2 border-t border-blue-200/60 dark:border-blue-900/40 flex items-center justify-between">
+            <span className="text-[10px] text-blue-700 dark:text-blue-300 font-medium">Demo Testing Shortcut:</span>
+            <button
+              type="button"
+              onClick={() => merchantReleaseEscrow(o.id)}
+              className="py-1.5 px-3 rounded-lg text-xs font-black bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer flex items-center gap-1"
+            >
+              <span>⚡ Simulate Merchant Release</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 5. COMPLETED BANNER */}
+      {isCompleted && (
+        <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/60 text-center space-y-2">
+          <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400 mx-auto" />
+          <h3 className="text-sm font-black text-emerald-900 dark:text-emerald-300">
+            Order Successfully Settled!
+          </h3>
+          <p className="text-xs text-emerald-800/90 dark:text-emerald-300/80 font-mono">
+            +{o.usdtAmount} USDT has been credited to your wallet balance.
+          </p>
+          <div className="pt-1">
+            <Link
+              to="/customer/wallet"
+              className="inline-block py-2 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-md"
+            >
+              View My Wallet Vault →
+            </Link>
           </div>
         </div>
       )}
@@ -377,9 +584,9 @@ export function OrderDetail() {
           Order Status History
         </span>
         <div className="space-y-3">
-          {o.timeline.map((t, idx) => (
+          {o.timeline?.map((t: any, idx: number) => (
             <div key={`${t.at}-${idx}`} className="flex items-start gap-2.5 text-xs">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+              <span className="w-2 h-2 rounded-full bg-[#f7a83b] mt-1.5 shrink-0" />
               <div className="min-w-0">
                 <span className="font-bold text-slate-900 dark:text-white block">{t.status}</span>
                 <span className="text-[11px] text-slate-500 dark:text-slate-400">{t.note}</span>

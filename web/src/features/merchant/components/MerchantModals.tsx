@@ -371,10 +371,15 @@ export function AcceptOrderModal({
   const handleConfirm = () => {
     const ok = acceptOrder(order.id)
     if (ok) {
-      onSuccess(`Order #${order.id} accepted! ${order.usdtAmount} USDT locked in escrow.`)
+      onSuccess(`Order #${order.id} accepted! ${order.usdtAmount.toFixed(2)} USDT locked in smart escrow.`)
       onClose()
     } else {
-      alert('Insufficient available USDT liquidity in desk vault.')
+      if (availableUsdt < order.usdtAmount) {
+        alert('Insufficient available USDT liquidity in desk vault.')
+      } else {
+        alert('⚡ Order already accepted by another merchant desk or expired!')
+        onClose()
+      }
     }
   }
 
