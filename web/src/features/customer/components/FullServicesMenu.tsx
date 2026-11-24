@@ -103,7 +103,7 @@ export function FullServicesMenu({
     {
       title: 'Business Services',
       items: [
-        { id: 'merchant', label: 'Merchant Desk', icon: Store, to: '/merchant/dashboard', badge: 'Live', badgeColor: 'bg-emerald-500 text-white' },
+        { id: 'merchant', label: 'Merchant Desk', icon: Store, to: '/merchant/dashboard', badge: 'Live', badgeColor: 'bg-[#f7a83b] text-slate-950 font-black' },
         { id: 'payout-api', label: 'Payout API', icon: Link2, action: onOpenPayoutApi },
         { id: 'bulk-payout', label: 'Bulk Payout', icon: Layers, action: onOpenBulkPayout },
       ],
@@ -166,7 +166,7 @@ export function FullServicesMenu({
                       'border border-slate-200/50 dark:border-slate-700/60'
                     )}
                   >
-                    <Icon className="w-5 h-5 stroke-[1.8] group-hover:text-emerald-500 transition-colors" />
+                    <Icon className="w-5 h-5 stroke-[1.8] group-hover:text-[#f7a83b] transition-colors" />
                   </div>
 
                   {/* Label */}

@@ -44,7 +44,7 @@ export function QuickActionGrid({ onOpenMore, onAction }: QuickActionGridProps) 
       label: t('dash.bills') || 'Bills & Utility',
       icon: Receipt,
       badge: '$50K',
-      badgeColor: 'bg-emerald-500 text-white',
+      badgeColor: 'bg-[#f7a83b] text-slate-950 font-black',
       actionId: 'bills',
     },
     {
@@ -58,7 +58,7 @@ export function QuickActionGrid({ onOpenMore, onAction }: QuickActionGridProps) 
       label: 'Game Topup',
       icon: Gamepad2,
       badge: 'HOT',
-      badgeColor: 'bg-gradient-to-r from-orange-500 to-rose-500 text-white',
+      badgeColor: 'bg-gradient-to-r from-amber-400 to-[#f7a83b] text-slate-950 font-black',
       actionId: 'gaming',
     },
     {
@@ -66,7 +66,7 @@ export function QuickActionGrid({ onOpenMore, onAction }: QuickActionGridProps) 
       label: t('dash.community') || 'Refer & Earn',
       icon: Users,
       badge: 'Top',
-      badgeColor: 'bg-emerald-500 text-white',
+      badgeColor: 'bg-[#f7a83b] text-slate-950 font-black',
       actionId: 'community',
     },
     {
@@ -106,7 +106,7 @@ export function QuickActionGrid({ onOpenMore, onAction }: QuickActionGridProps) 
                     'border border-slate-200/50 dark:border-slate-700/60'
                   )}
                 >
-                  <Icon className="w-5 h-5 stroke-[1.8] group-hover:text-emerald-500 transition-colors" />
+                  <Icon className="w-5 h-5 stroke-[1.8] group-hover:text-[#f7a83b] transition-colors" />
                 </div>
               </div>
 

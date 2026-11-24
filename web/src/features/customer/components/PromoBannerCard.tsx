@@ -52,20 +52,20 @@ export function PromoBannerCard({ onOpenAction }: PromoBannerCardProps) {
       <div
         className={cn(
           'w-full rounded-[28px] p-5 sm:p-6 transition-all duration-300 relative overflow-hidden text-center text-white',
-          'bg-gradient-to-b from-[#15803d] via-[#166534] to-[#0b291a]',
-          'shadow-md shadow-emerald-950/20 border border-emerald-600/30'
+          'bg-gradient-to-br from-[#fbb042] via-[#f7a83b] to-[#f3952a]',
+          'shadow-md shadow-amber-500/15 border border-amber-300/40'
         )}
       >
         {/* Subtle Ambient Glow */}
-        <div className="absolute top-0 right-1/4 w-32 h-32 bg-emerald-400/20 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute top-0 right-1/4 w-36 h-36 bg-white/20 rounded-full blur-2xl pointer-events-none" />
 
-        {/* Content Centered Matching Screenshot 3 */}
+        {/* Content Centered Matching White & Orange Theme */}
         <div className="relative z-10 flex flex-col items-center justify-center space-y-1.5 py-1">
-          <h4 className="text-base sm:text-lg font-black tracking-tight leading-snug">
+          <h4 className="text-base sm:text-lg font-black tracking-tight leading-snug text-white drop-shadow-xs">
             {current.title}
           </h4>
 
-          <p className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest text-emerald-200/90 pb-2.5">
+          <p className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-amber-100/95 pb-2.5">
             {current.subtitle}
           </p>
 

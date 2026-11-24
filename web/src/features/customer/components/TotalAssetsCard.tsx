@@ -49,7 +49,7 @@ export function TotalAssetsCard({
 
         {/* 3. Tether USDT Network Badge */}
         <div className="flex items-center gap-1.5 pt-0.5">
-          <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-[9px]">
+          <div className="w-4 h-4 rounded-full bg-[#f7a83b] text-slate-950 flex items-center justify-center font-black text-[9px] shadow-2xs">
             ₮
           </div>
           <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
@@ -61,14 +61,14 @@ export function TotalAssetsCard({
         </div>
       </div>
 
-      {/* 4. Two Action Buttons (Deposit ↓ and Sell Crypto ↑) Matching Screenshot 3 */}
+      {/* 4. Two Action Buttons (Deposit ↓ and Sell Crypto ↑) Matching White & Orange Theme */}
       <div className="grid grid-cols-2 gap-2.5 pt-1">
-        {/* Deposit Button (Bright Green) */}
+        {/* Deposit Button (Lighter Warm Honey-Orange Pill matching Image 2) */}
         {onOpenDeposit ? (
           <button
             type="button"
             onClick={onOpenDeposit}
-            className="py-3 px-4 rounded-2xl bg-[#22c55e] hover:bg-[#16a34a] text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer"
+            className="py-3 px-4 rounded-2xl bg-[#f7a83b] hover:bg-[#f59e26] text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm shadow-amber-400/25 active:scale-95 transition-all cursor-pointer"
           >
             <span>{t('dash.deposit')}</span>
             <ArrowDown className="w-4 h-4 stroke-[2.5]" />
@@ -77,7 +77,7 @@ export function TotalAssetsCard({
           <Link to="/customer/wallet/deposit">
             <button
               type="button"
-              className="w-full py-3 px-4 rounded-2xl bg-[#22c55e] hover:bg-[#16a34a] text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer"
+              className="w-full py-3 px-4 rounded-2xl bg-[#f7a83b] hover:bg-[#f59e26] text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm shadow-amber-400/25 active:scale-95 transition-all cursor-pointer"
             >
               <span>{t('dash.deposit')}</span>
               <ArrowDown className="w-4 h-4 stroke-[2.5]" />
@@ -85,12 +85,12 @@ export function TotalAssetsCard({
           </Link>
         )}
 
-        {/* Sell Crypto Button (Dark Slate/Forest Green) */}
+        {/* Sell Crypto Button (Clean Modern Slate with Subtle Border) */}
         {onOpenSell ? (
           <button
             type="button"
             onClick={onOpenSell}
-            className="py-3 px-4 rounded-2xl bg-[#0c2417] dark:bg-[#10291e] hover:bg-[#133321] text-emerald-100 dark:text-emerald-300 font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer border border-emerald-900/30"
+            className="py-3 px-4 rounded-2xl bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-xs active:scale-95 transition-all cursor-pointer border border-slate-200/80 dark:border-slate-700/80"
           >
             <span>{t('dash.sell')}</span>
             <ArrowUp className="w-4 h-4 stroke-[2.5]" />
@@ -99,7 +99,7 @@ export function TotalAssetsCard({
           <Link to="/customer/sell">
             <button
               type="button"
-              className="w-full py-3 px-4 rounded-2xl bg-[#0c2417] dark:bg-[#10291e] hover:bg-[#133321] text-emerald-100 dark:text-emerald-300 font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer border border-emerald-900/30"
+              className="w-full py-3 px-4 rounded-2xl bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-xs active:scale-95 transition-all cursor-pointer border border-slate-200/80 dark:border-slate-700/80"
             >
               <span>{t('dash.sell')}</span>
               <ArrowUp className="w-4 h-4 stroke-[2.5]" />

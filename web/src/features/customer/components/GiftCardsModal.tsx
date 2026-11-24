@@ -273,7 +273,7 @@ export function GiftCardsModal({ isOpen, onClose, onBuySuccess }: GiftCardsModal
                     className={cn(
                       'py-2 px-1 rounded-xl border text-center transition-all cursor-pointer',
                       selectedDenom === denom
-                        ? 'border-emerald-500 bg-emerald-500 text-white font-extrabold shadow-sm'
+                        ? 'border-[#f7a83b] bg-[#f7a83b] text-slate-950 font-black shadow-xs'
                         : 'border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-100 font-bold text-xs'
                     )}
                   >
@@ -289,7 +289,7 @@ export function GiftCardsModal({ isOpen, onClose, onBuySuccess }: GiftCardsModal
                 <span className="text-slate-500 dark:text-slate-400 block text-[10px]">
                   Total USDT to Deduct
                 </span>
-                <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
+                <span className="text-base font-extrabold text-[#f7a83b] dark:text-[#f7a83b] font-mono">
                   {usdtEquivalent} USDT
                 </span>
               </div>
@@ -305,7 +305,7 @@ export function GiftCardsModal({ isOpen, onClose, onBuySuccess }: GiftCardsModal
             <Button
               onClick={handleBuy}
               disabled={isProcessing}
-              className="w-full py-3 rounded-2xl font-bold bg-[#22c55e] hover:bg-[#16a34a] text-white shadow-md shadow-emerald-500/20 text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              className="w-full py-3 rounded-2xl font-black bg-[#f7a83b] hover:bg-[#f59e26] text-slate-950 shadow-md shadow-amber-400/20 text-xs flex items-center justify-center gap-1.5 cursor-pointer"
             >
               {isProcessing ? (
                 <span>Generating Digital PIN...</span>

@@ -23,7 +23,7 @@ import { TotalAssetsCard } from './components/TotalAssetsCard'
 import { QuickActionGrid } from './components/QuickActionGrid'
 import { PromoBannerCard } from './components/PromoBannerCard'
 import { QuickUtilitiesSection } from './components/QuickUtilitiesSection'
-import { P2PRatesSection } from './components/P2PRatesSection'
+import { PromotionalCampaignBanner } from './components/PromotionalCampaignBanner'
 import { FullServicesMenu } from './components/FullServicesMenu'
 
 // Interactive Feature Modals
@@ -210,19 +210,19 @@ export function CustomerDashboard() {
           </div>
 
           {/* User Rank Card */}
-          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex items-center justify-between shadow-sm">
+          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#f7a83b] to-amber-400 text-slate-950 font-bold flex items-center justify-between shadow-xs">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-black text-sm">
+              <div className="w-10 h-10 rounded-full bg-white/40 text-slate-950 flex items-center justify-center font-black text-sm shadow-2xs">
                 #42
               </div>
               <div>
-                <span className="text-xs font-black block">Your Performance</span>
-                <span className="text-[11px] text-emerald-100">Volume: $1,250 USDT</span>
+                <span className="text-xs font-black block text-slate-950">Your Performance</span>
+                <span className="text-[11px] text-slate-900 font-semibold">Volume: $1,250 USDT</span>
               </div>
             </div>
             <div className="text-right">
-              <span className="text-[10px] text-emerald-100 block">Rebate Earned</span>
-              <span className="text-xs font-black font-mono">₹1,140</span>
+              <span className="text-[10px] text-slate-900 block font-semibold">Rebate Earned</span>
+              <span className="text-xs font-black font-mono text-slate-950">₹1,140</span>
             </div>
           </div>
 
@@ -308,16 +308,16 @@ export function CustomerDashboard() {
             onOpenGifts={() => navigate('/customer/gift-cards')}
           />
 
-          {/* 5. Live P2P USDT/INR Rates (Buy USDT @ ₹91.45, Sell USDT @ ₹97.10) */}
-          <P2PRatesSection
-            onOpenQuickBuy={() => navigate('/customer/buy')}
-            onOpenQuickSell={() => navigate('/customer/sell')}
+          {/* 5. Promotional Campaign Banner (Replacing P2P Rates Section) */}
+          <PromotionalCampaignBanner
+            onOpenReferral={() => setIsReferralOpen(true)}
+            onOpenOffers={() => setIsOffersOpen(true)}
           />
 
           {/* 6. Instant UPI & QR Scanner Floating Banner */}
-          <div className="rounded-[24px] bg-gradient-to-r from-emerald-600/10 via-teal-600/10 to-blue-600/10 border border-emerald-500/20 p-3.5 sm:p-4 flex items-center justify-between gap-3 shadow-xs">
+          <div className="rounded-[24px] bg-gradient-to-r from-amber-400/10 via-yellow-400/10 to-orange-400/10 border border-amber-400/25 p-3.5 sm:p-4 flex items-center justify-between gap-3 shadow-xs">
             <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-10 h-10 rounded-2xl bg-[#0a2316] text-emerald-400 flex items-center justify-center shadow-md shadow-emerald-950/20 shrink-0">
+              <div className="w-10 h-10 rounded-2xl bg-[#f7a83b] text-slate-950 flex items-center justify-center shadow-md shadow-amber-400/20 shrink-0">
                 <QrCode className="w-5 h-5" />
               </div>
               <div className="min-w-0 flex-1">
@@ -331,7 +331,7 @@ export function CustomerDashboard() {
             </div>
             <Link
               to="/customer/pay/scan"
-              className="shrink-0 px-4 py-2 rounded-full text-xs font-bold bg-[#22c55e] hover:bg-[#16a34a] text-white transition-all shadow-xs active:scale-95"
+              className="shrink-0 px-4 py-2 rounded-full text-xs font-black bg-[#f7a83b] hover:bg-[#f59e26] text-slate-950 transition-all shadow-xs active:scale-95 cursor-pointer"
             >
               Scan QR
             </Link>

@@ -313,7 +313,7 @@ export function CustomerProfilePage() {
               <User className="w-7 h-7" />
             </div>
           </div>
-          <span className="absolute -bottom-0.5 -right-0.5 w-4.5 h-4.5 rounded-full bg-amber-500 text-white flex items-center justify-center text-[10px] font-black shadow-xs ring-2 ring-white dark:ring-[#0b1020]">
+          <span className="absolute -bottom-0.5 -right-0.5 w-4.5 h-4.5 rounded-full bg-[#f7a83b] text-slate-950 flex items-center justify-center text-[10px] font-black shadow-xs ring-2 ring-white dark:ring-[#0b1020]">
             ✓
           </span>
         </div>
@@ -361,7 +361,7 @@ export function CustomerProfilePage() {
             >
               <span>{tab.label}</span>
               {isActive && (
-                <span className="absolute bottom-0 left-2 right-2 h-[2.5px] bg-slate-900 dark:bg-white rounded-full transition-all" />
+                <span className="absolute bottom-0 left-2 right-2 h-[2.5px] bg-[#f7a83b] rounded-full transition-all shadow-xs" />
               )}
             </button>
           )
@@ -439,7 +439,7 @@ export function CustomerProfilePage() {
                 }}
                 className={cn(
                   'w-11 h-6 rounded-full transition-colors relative p-0.5 cursor-pointer flex items-center',
-                  alwaysOn ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'
+                  alwaysOn ? 'bg-[#f7a83b]' : 'bg-slate-200 dark:bg-slate-700'
                 )}
                 aria-label="Toggle screen keep awake"
               >
@@ -475,7 +475,7 @@ export function CustomerProfilePage() {
                 <TrendingUp className="w-5 h-5 text-slate-700 dark:text-slate-300" />
                 <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Trade market overview</span>
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-emerald-500 font-bold">
+              <div className="flex items-center gap-1.5 text-xs text-[#f7a83b] font-bold">
                 <span>₹89.95</span>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
               </div>
@@ -522,7 +522,7 @@ export function CustomerProfilePage() {
                 <span className="text-[11px] text-slate-400">Google Authenticator (TOTP)</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className={cn('text-xs font-bold px-2.5 py-0.5 rounded-full', totpEnabled ? 'text-emerald-600 bg-emerald-500/10' : 'text-slate-500 bg-slate-100 dark:bg-slate-800')}>
+                <span className={cn('text-xs font-bold px-2.5 py-0.5 rounded-full', totpEnabled ? 'text-orange-600 dark:text-orange-400 bg-orange-500/10' : 'text-slate-500 bg-slate-100 dark:bg-slate-800')}>
                   {totpEnabled ? 'Active' : 'Disabled'}
                 </span>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
@@ -540,7 +540,7 @@ export function CustomerProfilePage() {
                 <span className="text-[11px] text-slate-400">Aadhaar & PAN Linked</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-emerald-600 bg-emerald-500/10 px-2.5 py-0.5 rounded-full">Tier 2 Verified</span>
+                <span className="text-xs font-bold text-orange-600 dark:text-orange-400 bg-orange-500/10 px-2.5 py-0.5 rounded-full">Tier 2 Verified</span>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
               </div>
             </button>
@@ -585,7 +585,7 @@ export function CustomerProfilePage() {
                 <span className="text-[11px] text-slate-400">{sessions.length} Active devices</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="text-xs text-emerald-500 font-bold">Online</span>
+                <span className="text-xs text-[#f7a83b] font-bold">Online</span>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
               </div>
             </button>
@@ -658,7 +658,7 @@ export function CustomerProfilePage() {
             {/* 5. Account Status */}
             <div className="flex items-center justify-between py-3.5 px-2">
               <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Account Status</span>
-              <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+              <span className="text-xs font-bold text-orange-600 dark:text-orange-400 flex items-center gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5" /> Good Standing
               </span>
             </div>

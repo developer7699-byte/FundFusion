@@ -368,9 +368,9 @@ export function MobileSimulatorLayout({
                   className="relative group shrink-0 cursor-pointer"
                   aria-label="View user profile"
                 >
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-600 via-indigo-500 to-sky-400 p-0.5 shadow-xs transition-transform group-hover:scale-105 active:scale-95 flex items-center justify-center">
-                    <div className="w-full h-full rounded-full bg-gradient-to-tr from-purple-500 to-indigo-600 flex items-center justify-center text-white">
-                      <User className="w-4.5 h-4.5" />
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-amber-400 via-amber-300 to-yellow-300 p-0.5 shadow-xs transition-transform group-hover:scale-105 active:scale-95 flex items-center justify-center">
+                    <div className="w-full h-full rounded-full bg-gradient-to-tr from-[#f7a83b] to-amber-400 flex items-center justify-center text-slate-950 font-black">
+                      <User className="w-4.5 h-4.5 text-slate-950" />
                     </div>
                   </div>
                 </NavLink>
@@ -554,8 +554,8 @@ export function MobileSimulatorLayout({
                       className="-mt-7 flex flex-col items-center group cursor-pointer z-40"
                       title={isMerchant ? 'Available Orders' : 'Scan & Pay'}
                     >
-                      <div className="w-14 h-14 rounded-full bg-[#0a2316] dark:bg-[#07301f] text-white flex items-center justify-center shadow-xl shadow-emerald-950/40 border-[3.5px] border-white dark:border-[#0c1122] group-hover:scale-105 active:scale-95 transition-all duration-200">
-                        <item.icon className="w-6 h-6 stroke-[2.2] text-white" />
+                      <div className="w-14 h-14 rounded-full bg-[#f7a83b] text-slate-950 flex items-center justify-center shadow-xl shadow-amber-400/35 border-[3.5px] border-white dark:border-[#0c1122] group-hover:scale-105 active:scale-95 transition-all duration-200">
+                        <item.icon className="w-6 h-6 stroke-[2.4] text-slate-950" />
                       </div>
                     </NavLink>
                   )
@@ -568,14 +568,14 @@ export function MobileSimulatorLayout({
                     className={cn(
                       'flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl text-[10px] font-bold transition-all duration-200 relative select-none',
                       isNavActive
-                        ? 'text-slate-950 dark:text-white font-extrabold scale-105'
+                        ? 'text-[#f7a83b] dark:text-[#f7a83b] font-black scale-105'
                         : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                     )}
                   >
-                    <item.icon className={cn('w-5 h-5', isNavActive && 'stroke-[2.5px] text-slate-950 dark:text-white')} />
+                    <item.icon className={cn('w-5 h-5', isNavActive && 'stroke-[2.5px] text-[#f7a83b] dark:text-[#f7a83b]')} />
                     <span className="tracking-tight">{item.label}</span>
                     {isNavActive && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-slate-950 dark:bg-white absolute -bottom-0.5" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#f7a83b] absolute -bottom-0.5 shadow-2xs" />
                     )}
                   </NavLink>
                 )

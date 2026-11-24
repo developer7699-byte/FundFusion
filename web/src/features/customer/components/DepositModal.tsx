@@ -7,42 +7,17 @@ interface DepositModalProps {
   onDepositSuccess?: (amount: number) => void
 }
 
-export function DepositModal({ isOpen, onClose, onDepositSuccess }: DepositModalProps) {
+export function DepositModal({ isOpen, onClose }: DepositModalProps) {
   if (!isOpen) return null
 
-  const [network, setNetwork] = useState<'TRC20' | 'BEP20' | 'ERC20' | 'UPI'>('TRC20')
+  // Exclusively BEP20 (BNB Smart Chain) as requested
+  const bep20Address = '0x71C9484920492850294829482948294829482948'
   const [copied, setCopied] = useState(false)
-  const [simulatedAmount, setSimulatedAmount] = useState('100')
-  const [isDepositing, setIsDepositing] = useState(false)
-  const [successMsg, setSuccessMsg] = useState('')
-
-  const addresses = {
-    TRC20: 'TLvM8vPq9xK92Zc1Qj4w9tG7eX5m4P1y9z',
-    BEP20: '0x71C9484920492850294829482948294829482948',
-    ERC20: '0x89205A3A3b2A5532642352bCfe327E749aCfe123',
-    UPI: 'fundfusion.deposit@icici',
-  }
 
   const handleCopy = () => {
-    navigator.clipboard?.writeText(addresses[network])
+    navigator.clipboard?.writeText(bep20Address)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
-  }
-
-  const handleSimulateDeposit = () => {
-    setIsDepositing(true)
-    setTimeout(() => {
-      setIsDepositing(false)
-      const amt = parseFloat(simulatedAmount) || 100
-      setSuccessMsg(`Successfully credited +${amt} USDT to your wallet!`)
-      if (onDepositSuccess) {
-        onDepositSuccess(amt)
-      }
-      setTimeout(() => {
-        setSuccessMsg('')
-        onClose()
-      }, 1500)
-    }, 900)
   }
 
   return (
@@ -53,60 +28,54 @@ export function DepositModal({ isOpen, onClose, onDepositSuccess }: DepositModal
       >
         {/* Header */}
         <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
-              <ArrowDownLeft className="w-4 h-4" />
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-400/20 text-[#f7a83b] flex items-center justify-center font-black">
+              <ArrowDownLeft className="w-4 h-4 stroke-[2.5]" />
             </div>
             <div>
-              <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">Deposit Crypto & Fiat</h3>
-              <p className="text-[10px] text-slate-400">Zero deposit fees · Instant confirmation</p>
+              <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
+                Deposit USDT (BEP20)
+              </h3>
+              <p className="text-[10px] text-slate-400 font-medium">
+                BNB Smart Chain · Zero deposit fee
+              </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors"
+            className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="p-4 space-y-4 overflow-y-auto">
-          {successMsg && (
-            <div className="p-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-2 animate-in zoom-in-95">
-              <Check className="w-4 h-4 shrink-0" />
-              <span>{successMsg}</span>
+        <div className="p-4 space-y-3.5 overflow-y-auto">
+          {/* Exclusive BEP20 Network Badge Card */}
+          <div className="p-2.5 rounded-2xl bg-gradient-to-r from-amber-400/15 via-yellow-400/10 to-orange-400/10 border border-amber-400/25 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-[#f7a83b] text-slate-950 flex items-center justify-center font-black text-xs shadow-xs">
+                ⚡
+              </div>
+              <div>
+                <span className="text-xs font-black text-slate-900 dark:text-white block">
+                  BNB Smart Chain (BEP20)
+                </span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
+                  Official USDT Contract · Fastest Rail
+                </span>
+              </div>
             </div>
-          )}
-
-          {/* Network Selector Tabs */}
-          <div>
-            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-              Select Deposit Rail
-            </label>
-            <div className="grid grid-cols-4 gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/60 rounded-xl">
-              {(['TRC20', 'BEP20', 'ERC20', 'UPI'] as const).map((net) => (
-                <button
-                  key={net}
-                  type="button"
-                  onClick={() => setNetwork(net)}
-                  className={`py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
-                    network === net
-                      ? 'bg-white dark:bg-[#1e273e] text-slate-900 dark:text-white shadow-xs'
-                      : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                  }`}
-                >
-                  {net}
-                </button>
-              ))}
-            </div>
+            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              Active
+            </span>
           </div>
 
           {/* QR Code Container */}
-          <div className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-800/80">
-            <div className="w-36 h-36 bg-white p-2 rounded-2xl shadow-sm flex items-center justify-center border border-slate-200/80">
-              {/* Simulated QR Code SVG */}
+          <div className="flex flex-col items-center justify-center p-3.5 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-800/80">
+            <div className="w-34 h-34 bg-white p-2.5 rounded-2xl shadow-sm flex items-center justify-center border border-slate-200/80">
+              {/* Simulated BEP20 QR Code SVG */}
               <svg viewBox="0 0 100 100" className="w-full h-full text-slate-900" fill="currentColor">
                 <rect x="5" y="5" width="28" height="28" rx="4" />
                 <rect x="9" y="9" width="20" height="20" fill="white" rx="2" />
@@ -117,7 +86,7 @@ export function DepositModal({ isOpen, onClose, onDepositSuccess }: DepositModal
                 <rect x="5" y="67" width="28" height="28" rx="4" />
                 <rect x="9" y="71" width="20" height="20" fill="white" rx="2" />
                 <rect x="13" y="75" width="12" height="12" rx="2" />
-                <circle cx="50" cy="50" r="10" fill="#f59e0b" />
+                <circle cx="50" cy="50" r="10" fill="#f7a83b" />
                 <rect x="42" y="10" width="8" height="16" />
                 <rect x="42" y="74" width="8" height="16" />
                 <rect x="10" y="42" width="16" height="8" />
@@ -126,25 +95,25 @@ export function DepositModal({ isOpen, onClose, onDepositSuccess }: DepositModal
                 <rect x="80" y="80" width="10" height="10" />
               </svg>
             </div>
-            <p className="text-[11px] text-slate-500 font-medium mt-2">
-              Scan to deposit {network === 'UPI' ? 'INR' : 'USDT'}
+            <p className="text-[11px] text-slate-500 font-bold mt-2 flex items-center gap-1">
+              <span>Scan to deposit USDT (BEP20)</span>
             </p>
           </div>
 
           {/* Address Bar */}
           <div>
             <div className="flex items-center justify-between text-xs text-slate-400 font-medium mb-1">
-              <span>Deposit Address / UPI ID:</span>
-              <span className="text-amber-500 font-bold">{network}</span>
+              <span>BEP20 Deposit Address:</span>
+              <span className="text-[#f7a83b] font-black">BEP20</span>
             </div>
             <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
-              <span className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200 truncate pr-2">
-                {addresses[network]}
+              <span className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200 truncate pr-2 select-all">
+                {bep20Address}
               </span>
               <button
                 type="button"
                 onClick={handleCopy}
-                className="shrink-0 p-1.5 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-amber-500 shadow-xs transition-colors flex items-center gap-1 text-[11px] font-bold"
+                className="shrink-0 p-1.5 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-amber-500 shadow-xs transition-colors flex items-center gap-1 text-[11px] font-bold cursor-pointer active:scale-95"
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                 <span>{copied ? 'Copied!' : 'Copy'}</span>
@@ -152,36 +121,15 @@ export function DepositModal({ isOpen, onClose, onDepositSuccess }: DepositModal
             </div>
           </div>
 
-          {/* Quick Simulation Test (Client Demo Feature) */}
-          <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-2">
-            <div className="flex items-center justify-between text-xs font-bold text-amber-700 dark:text-amber-400">
-              <span className="flex items-center gap-1">
-                <Zap className="w-3.5 h-3.5" /> Demo Instant Deposit
-              </span>
-              <span className="text-[10px] bg-amber-500/20 px-1.5 py-0.2 rounded">Sandbox</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                value={simulatedAmount}
-                onChange={(e) => setSimulatedAmount(e.target.value)}
-                className="w-24 px-2 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-[#121829] border border-amber-300 dark:border-amber-800 text-slate-900 dark:text-white"
-                placeholder="Amount"
-              />
-              <span className="text-xs font-bold text-slate-500">USDT</span>
-              <button
-                type="button"
-                onClick={handleSimulateDeposit}
-                disabled={isDepositing}
-                className="ml-auto px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs transition-transform active:scale-95"
-              >
-                {isDepositing ? 'Crediting...' : 'Deposit Now'}
-              </button>
-            </div>
+          {/* Network Safety Tip */}
+          <div className="p-3 rounded-2xl bg-amber-400/10 border border-amber-400/20 flex items-start gap-2.5 text-[11px] text-slate-600 dark:text-slate-300">
+            <ShieldCheck className="w-4 h-4 text-[#f7a83b] shrink-0 mt-0.5 stroke-[2.2]" />
+            <p className="leading-snug">
+              Deposit strictly <strong>USDT via BNB Smart Chain (BEP20)</strong>. Any other asset sent to this address may be permanently lost.
+            </p>
           </div>
         </div>
       </div>
     </div>
   )
 }
-

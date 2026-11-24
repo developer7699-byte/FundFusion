@@ -80,7 +80,7 @@ export function P2PRatesSection({ onOpenQuickBuy, onOpenQuickSell }: P2PRatesSec
             className={cn(
               'px-3 py-1 rounded-xl text-xs font-black transition-all cursor-pointer',
               activeTab === 'BUY'
-                ? 'bg-emerald-500 text-white shadow-xs'
+                ? 'bg-[#f7a83b] text-slate-950 shadow-xs'
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             )}
           >
@@ -102,7 +102,7 @@ export function P2PRatesSection({ onOpenQuickBuy, onOpenQuickSell }: P2PRatesSec
 
         <Link
           to={activeTab === 'BUY' ? '/customer/buy' : '/customer/sell'}
-          className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5"
+          className="text-[11px] font-bold text-[#f7a83b] dark:text-[#f7a83b] hover:underline flex items-center gap-0.5"
         >
           <span>All P2P Ads</span>
           <ArrowRight className="w-3 h-3" />
@@ -116,7 +116,7 @@ export function P2PRatesSection({ onOpenQuickBuy, onOpenQuickSell }: P2PRatesSec
             {/* Left Dealer Info */}
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                <span className="w-2 h-2 rounded-full bg-[#f7a83b] shrink-0" />
                 <span className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
                   {dealer.name}
                 </span>
@@ -155,10 +155,10 @@ export function P2PRatesSection({ onOpenQuickBuy, onOpenQuickSell }: P2PRatesSec
                 <button
                   type="button"
                   className={cn(
-                    'px-3 py-1 rounded-xl text-[11px] font-bold text-white shadow-xs cursor-pointer transition-transform active:scale-95',
+                    'px-3 py-1 rounded-xl text-[11px] font-black cursor-pointer transition-transform active:scale-95 shadow-xs',
                     activeTab === 'BUY'
-                      ? 'bg-emerald-500 hover:bg-emerald-600'
-                      : 'bg-rose-500 hover:bg-rose-600'
+                      ? 'bg-[#f7a83b] hover:bg-[#f59e26] text-slate-950'
+                      : 'bg-rose-500 hover:bg-rose-600 text-white'
                   )}
                 >
                   {activeTab === 'BUY' ? 'Buy USDT' : 'Sell USDT'}

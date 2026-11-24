@@ -23,8 +23,8 @@ export function QuickUtilitiesSection({ onOpenBills, onOpenGifts }: QuickUtiliti
       name: 'Mobile Recharge',
       desc: 'Jio, Airtel, Vi, BSNL',
       icon: Smartphone,
-      color: 'text-emerald-600 dark:text-emerald-400',
-      bg: 'bg-emerald-500/10',
+      color: 'text-[#f7a83b] dark:text-[#f7a83b]',
+      bg: 'bg-amber-500/10',
       cat: 'recharge' as const,
     },
     {
@@ -60,7 +60,7 @@ export function QuickUtilitiesSection({ onOpenBills, onOpenGifts }: QuickUtiliti
       <div className="rounded-[28px] bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 p-4 shadow-xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span className="w-2 h-2 rounded-full bg-[#f7a83b]" />
             <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white">
               Instant Bill Pay & Recharge
             </h3>
@@ -68,7 +68,7 @@ export function QuickUtilitiesSection({ onOpenBills, onOpenGifts }: QuickUtiliti
           <button
             type="button"
             onClick={() => onOpenBills('gaming')}
-            className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5 cursor-pointer"
+            className="text-[11px] font-bold text-[#f7a83b] dark:text-[#f7a83b] hover:underline flex items-center gap-0.5 cursor-pointer"
           >
             <span>All Billers</span>
             <ArrowRight className="w-3 h-3" />
@@ -89,7 +89,7 @@ export function QuickUtilitiesSection({ onOpenBills, onOpenGifts }: QuickUtiliti
                   <div className={cn('w-7 h-7 rounded-xl flex items-center justify-center shrink-0', item.bg, item.color)}>
                     <Icon className="w-3.5 h-3.5" />
                   </div>
-                  <span className="text-xs font-bold text-slate-900 dark:text-white truncate group-hover:text-emerald-500 transition-colors">
+                  <span className="text-xs font-bold text-slate-900 dark:text-white truncate group-hover:text-[#f7a83b] transition-colors">
                     {item.name}
                   </span>
                 </div>
@@ -106,14 +106,14 @@ export function QuickUtilitiesSection({ onOpenBills, onOpenGifts }: QuickUtiliti
       <div className="rounded-[28px] bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800 p-4 shadow-xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <Gift className="w-3.5 h-3.5 text-amber-500" />
+            <Gift className="w-3.5 h-3.5 text-[#f7a83b]" />
             <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white">
               Popular Gift Vouchers
             </h3>
           </div>
           <Link
             to="/customer/gift-cards"
-            className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-0.5 cursor-pointer"
+            className="text-[11px] font-bold text-[#f7a83b] dark:text-[#f7a83b] hover:underline flex items-center gap-0.5 cursor-pointer"
           >
             <span>100+ Brands</span>
             <ArrowRight className="w-3 h-3" />
@@ -125,13 +125,13 @@ export function QuickUtilitiesSection({ onOpenBills, onOpenGifts }: QuickUtiliti
             <Link
               key={v.id}
               to="/customer/gift-cards"
-              className="p-2.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 hover:border-amber-300 dark:hover:border-amber-500/40 text-left transition-all group cursor-pointer block"
+              className="p-2.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 hover:border-[#f7a83b]/50 text-left transition-all group cursor-pointer block"
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
                   {v.name}
                 </span>
-                <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                   {v.tag}
                 </span>
               </div>
