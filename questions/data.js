@@ -593,3 +593,166 @@ round({
     }
   ]
 });
+
+round({
+  id: "ui-r1",
+  title: "UI rebuild — porting the main-branch design onto the real v1 API",
+  settled: false,
+  qs: [
+    {
+      id: "ui-r1-q1",
+      t: '"Use exact main UI" — what does "exact" cover?',
+      ctx: "main ships screens PRD §3 forbids in v1: gift-cards, utilities (mobile/DTH/electricity/bill), pay/scan (UPI QR), convert, multi-asset BTC/ETH, referrals, rewards. CLAUDE.md: do not leave routes or tables for out-of-scope lying around. So a literal 1:1 copy ships banned scope.",
+      o: [
+        "Exact visual design/layout/components of main, but ONLY the v1-legal screens (auth, wallet, buy, sell, send, receive, orders, merchant desk, admin). Banned screens dropped.",
+        "Literally every main screen, banned ones included.",
+        "main design as a loose reference; redraw where v1's money model differs."
+      ],
+      r: 0,
+      why: "Option 1 contradicts the spec you set (PRD §3). Option 0 keeps main's look and obeys scope. Option 2 loses the point of 'use main'."
+    },
+    {
+      id: "ui-r1-q2",
+      t: "Base strategy — what do we build on?",
+      ctx: "Current branch has a plain but REAL, TESTED v1-wired spine (auth-v1, wallet-v1, orders-v1, merchant-v1 specs, all green). main has the pretty UI but every data call hits the DELETED prototype API (/api, token nx.access, envelope {success,data,error}) and silently falls back to hardcoded fake balances. v1 is /api/v1, token ff.access. None of main's wiring works against the real backend.",
+      o: [
+        "Reskin the current v1-wired spine using main's components/styles/layout. Keep the working wiring + tests; restyle screen by screen.",
+        "Drop current UI, port main's screens in, rip out the prototype api layer, rewire every call to v1 from scratch.",
+        "Fresh branch from main, delete out-of-scope, then rewire to v1."
+      ],
+      r: 0,
+      why: "The wiring is the hard, money-critical, already-passing part. Options 1/2 throw away working+tested v1 integration to chase pixels, then rebuild the same integration against a UI whose every data call is prototype-shaped. Reskin keeps the ledger-correct flows and borrows main's look. Only pick 1/2 if main's screen STRUCTURE (not just style) is worth more than the test coverage."
+    },
+    {
+      id: "ui-r1-q3",
+      t: "First slice — which features in the first cut?",
+      ctx: "You named auth, buy, sell, send, receive. 'Receive' = a deposit address; 'send' = an on-chain/withdrawal. Buy/sell are P2P order flows that need a bound payee (0.3.2) and OTP. So the core flows pull in deposit/withdraw and payment-methods whether named or not.",
+      o: [
+        "Auth + wallet (deposit/receive + withdraw/send) + buy + sell + payment-methods + order detail. The smallest set where money actually round-trips on screen.",
+        "Exactly the five you named (auth, buy, sell, send, receive), defer deposit/withdraw/payment-methods.",
+        "Everything v1-legal in one pass."
+      ],
+      r: 0,
+      why: "Option 1 breaks: buy/sell can't complete without a payee method and the send/receive you named IS deposit/withdraw. Option 2 is the coherent minimum. Option 2-wide (all) is a big-bang with more regression surface."
+    },
+    {
+      id: "ui-r1-q4",
+      t: "The out-of-scope screens in main — delete or hide?",
+      ctx: "Gift-cards, utilities, pay/scan, convert, referrals, rewards exist as routes + components + mock stores in main. PRD §18 leaves a re-entry path for some, but §3 + CLAUDE.md say don't ship them in v1.",
+      o: [
+        "Delete the routes, components and mock stores now. Re-add from PRD §18's path if/when scoped.",
+        "Keep the components in the tree but unreachable (no route/nav).",
+        "Keep routes behind a feature flag, off in v1."
+      ],
+      r: 0,
+      why: "CLAUDE.md is explicit: do not leave routes or tables lying around. Dead-but-present code rots and invites accidental exposure. git history is the re-entry path, not a parked flag."
+    },
+    {
+      id: "ui-r1-q5",
+      t: "main's wallet shows BTC + ETH. v1 holds USDT + INR only. What happens to multi-asset?",
+      ctx: "main's WalletSnap lists BTC/ETH assets (display-only in the mock). v1's ledger is USDT (NUMERIC 38,18) and INR (NUMERIC 20,2). No other asset exists or can.",
+      o: [
+        "Drop multi-asset entirely. Wallet shows USDT balance + INR estimate, matching the ledger.",
+        "Keep a multi-asset list UI but feed it only USDT (one row).",
+        "Keep BTC/ETH as display-only placeholders."
+      ],
+      r: 0,
+      why: "Option 2 shows assets the ledger can never hold — a lie on a money screen. Option 1 matches what exists. A multi-asset shell with one row (opt 1-mid) is pointless chrome."
+    }
+  ]
+});
+
+answer("engine-r1", { q37: [0, "Accepted the recommendation — search window binds at accept; this is what is built."] });
+
+answer("ui-r1", {
+  "ui-r1-q1": [0, "main's visual design/layout/components, v1-legal screens only."],
+  "ui-r1-q2": [1, "Drop current UI; port main's screens, rip out the prototype api, rewire to v1."],
+  "ui-r1-q3": [0, "First slice: auth + wallet (deposit/withdraw) + buy + sell + payment-methods + order detail."],
+  "ui-r1-q4": [1, "Keep out-of-scope components in the tree but unreachable — no route/nav."],
+  "ui-r1-q5": [0, "Drop multi-asset. Wallet shows USDT + INR estimate only."]
+});
+
+round({
+  id: "ui-r2",
+  title: "UI rebuild — gaps the builder check surfaced before a plan",
+  settled: false,
+  qs: [
+    {
+      id: "ui-r2-q1",
+      t: "Who accepts a customer's buy/sell order so it completes on testnet this slice?",
+      ctx: "The engine has NO auto-accept. An order parks at AWAITING_MERCHANT until a merchant accepts from the feed (POST /v1/p2p/orders/:id/accept). Memory records a one-price 'first eligible merchant auto-wins' INTENT, but that is not built — baseline engine is manual accept. With only customer screens, no order ever reaches COMPLETED. Goal #1 says buy/sell work end to end on testnet.",
+      o: [
+        "Seed/operator merchant stands in. Keep the parked SpineMerchant (or a seed+accept script) as the testnet counterparty so the customer loop completes, without building merchant UI now.",
+        "Pull a minimal merchant accept path into this slice (feed + accept + merchant utr/confirm). Bigger slice, but a real two-sided round-trip.",
+        "Re-scope Goal #1 to 'customer side up to AWAITING_MERCHANT'. Full completion waits for the merchant slice.",
+        "Build backend auto-accept now so a single platform price auto-matches (matches the memory intent). Backend change, outside the UI slice."
+      ],
+      r: 0,
+      why: "Option 0 is the cheapest way to prove the customer loop completes on testnet without front-loading merchant UI. Option 1 doubles the slice. Option 2 means buy/sell never visibly finish this slice. Option 3 is real backend work and contradicts 'UI-and-wiring only'."
+    },
+    {
+      id: "ui-r2-q2",
+      t: "MFA enrollment screen — main never designed it, but the money gate needs it.",
+      ctx: "Every wallet/p2p/payment route 403s until TOTP is enrolled (/auth/mfa/begin → /confirm). main's auth set is Login/Register/VerifyOtp(email)/ForgotPassword — no authenticator-enrollment screen. The spine (SpineAuth stage 'enrol', shows secret + begin/confirm) has the wiring to copy. This is a missing SCREEN, not a missing endpoint.",
+      o: [
+        "Design a new enrollment screen in main's visual language. A conscious, documented deviation from 'exact main' — the screen is mandatory and permanent.",
+        "Enroll out-of-band for testnet (script/manual); no enrollment UI this slice.",
+        "Inline the enrollment step into the existing VerifyOtp screen's flow."
+      ],
+      r: 0,
+      why: "The gate blocks the entire money slice; enrollment is permanent product, not testnet scaffolding. Option 1 leaves a hole in the real app. Option 2 (inline) may fight main's layout; a dedicated screen in main's style is cleanest. Deviation from 'exact main' is unavoidable — main simply never drew this."
+    },
+    {
+      id: "ui-r2-q3",
+      t: "main's wallet has Deposit / Withdraw / Send / Receive. v1 has two operations. How do the four tiles map?",
+      ctx: "v1: GET /v1/wallet/address (receive a deposit) and POST /v1/wallet/withdrawals (external, allowlisted, TOTP-gated). Internal user-to-user 'send' has NO endpoint (memory lists it open). So Send maps to nothing today.",
+      o: [
+        "Send = inert <ParkedAction> (internal transfer, no backend). Withdraw = the real external send. Deposit and Receive both = the address screen (merge or keep both pointing at it).",
+        "Send = alias of Withdraw (treat 'send' as external send-out). Drop the separate Withdraw tile or point both at withdrawals.",
+        "Keep all four tiles exactly; Send and Deposit become inert until backend exists."
+      ],
+      r: 0,
+      why: "Option 0 keeps every main tile in place, lights up the two real operations, and parks internal-send honestly per the ui-r1-q4 inert rule. Option 1 loses a tile main designed. Option 2 makes Deposit inert even though the address screen already serves it."
+    },
+    {
+      id: "ui-r2-q4",
+      t: "The dashboard/wallet 'INR estimate' — where does it come from?",
+      ctx: "v1 balances are USDT-only. No rates GET endpoint exists. PRD §5 bars the UI from multiplying balance × rate (float risk, no re-derivation of money). The only INR figure today is from POST /v1/p2p/quotes, which persists a side-specific quote row per call.",
+      o: [
+        "Show USDT only this slice; defer the INR headline. Raise a backend finding to add a server-computed INR estimate (decimal) on /v1/wallet/summary or a dedicated endpoint.",
+        "Create a quote (POST /quotes) on each dashboard/wallet load to get INR — pick the SELL-side rate. Accepts a persisted quote row per view.",
+        "Drop the INR estimate permanently; USDT is the only balance shown."
+      ],
+      r: 0,
+      why: "Option 1 pollutes the quote table with a row per page view and picks a side arbitrarily. The estimate must be server-computed to obey §5, so the clean path is USDT-only now (opt 0) plus a backend finding. Option 2 is a correctness/clutter hazard. Opt 0 keeps the headline coming back once the backend lands."
+    }
+  ]
+});
+
+answer("identity-r1", { q38: [1, "Manual review of merchants only — gate the bonded side; self-dealing needs both sides."] });
+
+answer("ui-r2", {
+  "ui-r2-q1": [0, "Seed/operator merchant stands in as testnet counterparty; no merchant UI this slice."],
+  "ui-r2-q2": [0, "Design a new MFA-enrollment screen in main's visual language (documented deviation)."],
+  "ui-r2-q3": [0, "Send = inert ParkedAction; Withdraw = real external send; Deposit/Receive = address screen."],
+  "ui-r2-q4": [0, "USDT only this slice; raise a backend finding for a server-computed INR estimate."]
+});
+
+// --- Round closure appended 2026-11-27 ---
+// All nine rounds answered; grilling frontier empty. Marking each round settled
+// so the page shows a closing line. Append-only: these mutate the settled field
+// that round() set to false, and run before questions.html calls render().
+[
+  ["scope-r1",    "Closed 27 Nov 2026 · 9/9 answered · logged in grilling.md Round 1."],
+  ["scope-r2",    "Closed 27 Nov 2026 · 8/8 answered · logged in grilling.md Round 2."],
+  ["scope-r3",    "Closed 27 Nov 2026 · 9/9 answered · logged in grilling.md Round 3."],
+  ["scope-r4",    "Closed 27 Nov 2026 · 8/8 answered · logged in grilling.md Round 4."],
+  ["scope-r5",    "Closed 27 Nov 2026 · 4/4 answered · logged in grilling.md Round 5."],
+  ["engine-r1",   "Closed 27 Nov 2026 · 1/1 answered · logged in grilling.md Round 6."],
+  ["identity-r1", "Closed 27 Nov 2026 · 1/1 answered · logged in grilling.md Round 7. Supersedes q7/q18 (phone gate)."],
+  ["ui-r1",       "Closed 27 Nov 2026 · 5/5 answered · logged in grilling.md Round 8."],
+  ["ui-r2",       "Closed 27 Nov 2026 · 4/4 answered · logged in grilling.md Round 9."]
+].forEach(([id, note]) => {
+  const r = ROUNDS.find(r => r.id === id);
+  if (r) r.settled = note;
+});

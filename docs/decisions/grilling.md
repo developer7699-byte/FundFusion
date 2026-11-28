@@ -19,7 +19,7 @@ BEP-20, trade P2P, and pay utilities and gift cards. Roles: user, merchant, supe
 - `api/prisma/schema.prisma` — 536 lines, 30+ models, sound double-entry shape, **unused**.
 - Four competing product names: FundFusion, NEXORA PAY, PandaPay, FASTXP2P.
 
-**Status:** COMPLETE — 36 decisions, 5 rounds, frontier empty. See `PRD.md`. Branch: `feat/v1-rebuild`.
+**Status:** COMPLETE — 47 decisions, 9 rounds, frontier empty. All rounds closed on the questions page 2026-11-27. See `PRD.md`. Branch: `feat/v1-rebuild`.
 
 ---
 
@@ -33,7 +33,7 @@ BEP-20, trade P2P, and pay utilities and gift cards. Roles: user, merchant, supe
 | q4 | Custody model | **A — Fully custodial, self-managed HD wallet, isolated signer interface.** *(rec)* | — |
 | q5 | Real chain or mock | **A — Real BEP-20 on BSC testnet, mainnet behind a flag.** *(rec)* | — |
 | q6 | Client surfaces | **B — Responsive web, PWA-installable.** *(rec)* | Web application only. No contract for Android/iOS apps. |
-| q7 | Identity verification | **A — Phone OTP, flat limits, limit engine built for later tiers.** *(rec)* | Onboarding via OAuth, email **and** phone — but verification is phone OTP only. |
+| q7 | Identity verification | **A — Phone OTP, flat limits, limit engine built for later tiers.** *(rec)* · **CHANGED (R7, 2026-11-21): identity moved to email + authenticator; phone dropped.** | Onboarding via OAuth, email **and** phone — but verification is phone OTP only. |
 | q8 | Fate of existing code | **A — Keep repo + design system, delete out-of-scope screens, rebuild backend on PostgreSQL.** *(rec)* | **Re-evaluate the tech stack on both sides.** Cut a branch off `main`, then change. |
 | q9 | Commercial engine | **A — Configurable versioned fee engine + 3%/3.75% postings. Weekly bonus pool deferred.** *(rec)* | — |
 
@@ -104,7 +104,7 @@ near-identical. The real cost of collateral is **merchant supply**, not capital.
 |---|----------|-------------|--------------|
 | q13b | Rate engine (re-asked with worked example) | **A — Pluggable provider: feed + admin markup + bounded manual override + immutable snapshot, 90s TTL.** *(rec)* | — |
 | q11b | Collateral vs reputation | **A — Keep USDT collateral per order.** *(rec)* | Confirmed after seeing the Binance precedent. |
-| q18 | Pre-verification limits | **A — Phone OTP is the financial gate. One phone = one account.** *(rec)* | — |
+| q18 | Pre-verification limits | **A — Phone OTP is the financial gate. One phone = one account.** *(rec)* · **CHANGED (R7): authenticator is the gate; one-phone-one-account replaced by merchant manual review.** | — |
 | q19 | Deposit confirmations | **CHANGED 2026-11-16 → credit on `finalized` block tag, ~1–2s.** Originally A (15 confirmations, ~45s). | Premise was stale: BSC block time is ~0.45s since Fermi (Jan 2026), and BEP-126 gives deterministic finality. Counting confirmations is now slower *and* weaker than reading the finalized head. Reorg-reversal path still built. |
 | q20 | Custody of swept funds | **A — Threshold sweep → hot wallet (days of withdrawals) → cold. Funded gas wallet with alerts.** *(rec)* | — |
 | q21 | Withdrawal approval | **A — Auto below a threshold with velocity caps; manual above or on risk flag.** *(rec)* | — |
@@ -188,10 +188,89 @@ rather than bonds, because a first-time buyer has an empty wallet by definition.
 
 ---
 
+## Round 6 — M4: two clocks over one order (`engine-r1`)
+
+| # | Question | Your answer | Your comment |
+|---|----------|-------------|--------------|
+| q37 | Which clock binds at accept — the quote's 90s TTL or the order's 120s search window | **A — The search window binds at accept; the TTL only bounds the customer's decision to confirm.** *(rec)* | Accepted the recommendation — this is what is built. |
+
+**Summary.** A code review flagged that PRD §6.7's "accept asserts the quote
+has not expired" is unimplementable against a 90s TTL under a 120s search
+window — literally read, every order dies at 90s. Resolved: the two clocks
+guard different risks. The TTL stops a customer sitting on a favourable price
+and confirming only when the market moves their way — that risk ends at
+confirmation, when their USDT locks. The merchant-side risk is bounded by the
+search window. The settings registry already refuses a window shorter than the
+TTL, so the gap cannot be configured open.
+
+---
+
+## Round 7 — Email-only identity: what replaces one-phone-one-account (`identity-r1`)
+
+| # | Question | Your answer | Your comment |
+|---|----------|-------------|--------------|
+| q38 | With phone verification gone, what stops one person running many accounts and self-trading | **B — Manual review of merchants only; self-dealing needs both sides, so gating the bonded side breaks it.** *(rec, with C as honest fallback)* | Gate the bonded side; self-dealing needs both sides. |
+
+**Summary.** Identity moved to email + authenticator on 2026-11-21, which takes
+TRAI DLT registration off the critical path — a real win — but email is near-free
+to create, so PRD §9.1's "one verified phone = one account" anti-self-dealing
+property is gone. Resolution: self-dealing needs a merchant on one side, and
+merchants already bond USDT and already need approval, so gating the merchant
+side breaks the loop at its narrowest point for no new cost. v1 has no incentive
+programme, so the honest fallback (C) — accept it, since self-trading only burns
+fees — holds until any referral/rewards scheme lands.
+
+**Supersedes:** q7 and q18 (phone OTP as the financial gate, one-phone-one-account)
+— both marked **Changed** above.
+
+---
+
+## Round 8 — UI rebuild: porting main's design onto the real v1 API (`ui-r1`)
+
+| # | Question | Your answer | Your comment |
+|---|----------|-------------|--------------|
+| ui-r1-q1 | What does "use exact main UI" cover | **main's visual design/layout/components, but only the v1-legal screens.** *(rec)* | Banned scope dropped. |
+| ui-r1-q2 | What do we build on | **CHANGED from rec — drop current UI, port main's screens, rip out the prototype API, rewire to v1.** | Chose option 1 over the reskin recommendation. |
+| ui-r1-q3 | First slice | **Auth + wallet (deposit/withdraw) + buy + sell + payment-methods + order detail.** *(rec)* | The smallest set where money round-trips. |
+| ui-r1-q4 | Out-of-scope screens — delete or hide | **CHANGED from rec — keep components in the tree but unreachable (no route/nav).** | Chose hide over delete. |
+| ui-r1-q5 | main's BTC/ETH wallet vs v1 USDT+INR | **Drop multi-asset; wallet shows USDT + INR estimate only.** *(rec)* | Matches the ledger. |
+
+**Summary.** The UI is rebuilt from main's visual language but scoped to v1-legal
+screens only. Two answers departed from the recommendation: you chose to port
+main's screens and rewire from scratch rather than reskin the already-tested
+v1-wired spine (q2), and to keep out-of-scope components parked-but-unreachable
+rather than delete them (q4). The q4 choice sits in tension with CLAUDE.md §3
+("do not leave routes or tables lying around") — tolerable only while the parked
+components carry no route and no nav; revisit if any become reachable.
+
+---
+
+## Round 9 — UI rebuild: gaps the builder check surfaced (`ui-r2`)
+
+| # | Question | Your answer | Your comment |
+|---|----------|-------------|--------------|
+| ui-r2-q1 | Who accepts a buy/sell order so it completes on testnet this slice | **Seed/operator merchant stands in as counterparty; no merchant UI this slice.** *(rec)* | — |
+| ui-r2-q2 | MFA enrollment screen main never designed | **Design a new MFA-enrollment screen in main's visual language.** *(rec)* | Documented deviation. |
+| ui-r2-q3 | main's four wallet tiles vs v1's two operations | **Send = inert ParkedAction; Withdraw = real external send; Deposit/Receive = address screen.** *(rec)* | — |
+| ui-r2-q4 | Where the INR estimate comes from | **USDT only this slice; raise a backend finding for a server-computed INR estimate.** *(rec)* | — |
+
+**Summary.** The first UI slice is made buildable on testnet: a seed/operator
+merchant stands in as the order counterparty so buy/sell complete without a
+merchant UI; a new MFA-enrollment screen is drawn in main's visual language
+(logged as a deliberate deviation since main never designed one); the four
+main wallet tiles collapse onto v1's two real operations with Send parked; and
+the INR estimate is deferred to a server-computed value (§5 forbids a
+client-side figure) with a backend finding raised, USDT-only until it lands.
+
+---
+
 # Grilling complete
 
-**36 decisions across 5 rounds. Frontier empty.** Specification written to
-`PRD.md`.
+**47 decisions across 9 rounds (36 in the scope rounds R1–R5, 11 in the build
+rounds R6–R9). Frontier empty.** Specification written to `PRD.md`. The four
+build rounds moved from scope to construction: the order-clock ambiguity (R6),
+the loss of the phone anti-self-dealing property under email identity (R7), and
+the UI rebuild onto the real v1 API (R8–R9).
 
 ## How the answers shaped the idea
 
